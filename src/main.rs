@@ -389,6 +389,14 @@ mod tests {
 
         let frame = trajectory.read_at(0).unwrap();
         assert_eq!(frame.size(), 192);
+        let mut unit_cell = UnitCell::new();
+        unit_cell.cell_matrix[(0, 0)] = 8.43116035;
+        unit_cell.cell_matrix[(0, 1)] = 0.158219155128;
+        unit_cell.cell_matrix[(1, 1)] = 14.5042431863;
+        unit_cell.cell_matrix[(0, 2)] = 1.16980663624;
+        unit_cell.cell_matrix[(1, 2)] = 4.4685149855;
+        unit_cell.cell_matrix[(2, 2)] = 14.9100096405;
+        assert_eq!(frame.unit_cell, unit_cell);
 
         let frame = trajectory.read_at(1).unwrap();
         assert_eq!(frame.size(), 62);
