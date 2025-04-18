@@ -1,5 +1,7 @@
+use molio::property::Property;
+use itertools::Itertools;
 use molio::{
-    extendedxyzparser::{ExtendedXyzParser, Property},
+    extendedxyzparser::ExtendedXyzParser,
     unit_cell::UnitCell,
 };
 use std::{

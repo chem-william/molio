@@ -1,13 +1,5 @@
+use crate::property::Property;
 use std::collections::HashMap;
-
-/// The two kinds of values we can see in extended‑XYZ comments:
-/// - `Bool(true)` for flags with no “=value` (ASE treats them as true)
-/// - `Str(...)` for quoted or unquoted string values
-#[derive(Debug, Clone, PartialEq)]
-pub enum Property {
-    Bool(bool),
-    Str(String),
-}
 
 pub type ExtendedXyzProperties = HashMap<String, Property>;
 
