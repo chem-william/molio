@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::Chars};
+use std::collections::HashMap;
 
 /// The two kinds of values we can see in extended‑XYZ comments:
 /// - `Bool(true)` for flags with no “=value` (ASE treats them as true)
