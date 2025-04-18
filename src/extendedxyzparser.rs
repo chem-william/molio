@@ -16,6 +16,17 @@ pub struct ExtendedXyzParser<'a> {
     pos: usize,
     done: bool,
 }
+#[derive(Debug, PartialEq)]
+enum State {
+    /// We're not in a token right now
+    Whitespace,
+    /// We're building a token, unquoted
+    Unquoted,
+    /// We're inside a double‐quoted token
+    DoubleQuoted,
+    /// We're inside a single‐quoted token
+    SingleQuoted,
+}
 
 impl<'a> ExtendedXyzParser<'a> {
     pub fn new(line: &'a str) -> Self {
@@ -26,76 +37,100 @@ impl<'a> ExtendedXyzParser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> ExtendedXyzProperties {
-        let mut props = HashMap::new();
+    /// Splits an input string into tokens, honoring single and double quotes.
+    fn split_tokens(input: &str) -> Vec<String> {
+        let mut tokens = Vec::new();
+        let mut current = String::new();
+        let mut state = State::Whitespace;
 
-        while !self.done {
-            let name = self.next_substring();
-            let value = self.next_substring();
-            props.insert(name, Property::Str(value.to_string()));
-            self.done = true;
+        for ch in input.chars() {
+            match state {
+                State::Whitespace => {
+                    if ch.is_whitespace() {
+                        // skip
+                    } else if ch == '"' {
+                        state = State::DoubleQuoted;
+                    } else if ch == '\'' {
+                        state = State::SingleQuoted;
+                    } else {
+                        state = State::Unquoted;
+                        current.push(ch);
+                    }
+                }
+                State::Unquoted => {
+                    if ch.is_whitespace() {
+                        // end token
+                        tokens.push(current.clone());
+                        current.clear();
+                        state = State::Whitespace;
+                    } else if ch == '"' {
+                        state = State::DoubleQuoted;
+                    } else if ch == '\'' {
+                        state = State::SingleQuoted;
+                    } else {
+                        current.push(ch);
+                    }
+                }
+                State::DoubleQuoted => {
+                    if ch == '"' {
+                        // end of double‐quoted section
+                        state = State::Unquoted;
+                    } else {
+                        current.push(ch);
+                    }
+                }
+                State::SingleQuoted => {
+                    if ch == '\'' {
+                        // end of single‐quoted section
+                        state = State::Unquoted;
+                    } else {
+                        current.push(ch);
+                    }
+                }
+            }
         }
-        props
+
+        // if we ended while building a token, push it
+        if state != State::Whitespace {
+            tokens.push(current);
+        }
+
+        tokens
     }
 
-    /// Grabs either a quoted substring (allowing spaces) or an unquoted
-    /// one (stopping at `=` or whitespace).  Doesn't include the quotes.
-    pub fn next_substring(&mut self) -> String {
-        let line = self.line.trim();
-
-        let mut char_indices = line[self.pos..].char_indices().peekable();
-
-        let result = if line[self.pos..].starts_with('"') {
-            // Quoted string: skip the opening quote
-            char_indices.next();
-            let quoted_start = self.pos + 1;
-
-            // Only a quote at the end
-            if self.pos >= line.len() {
-                return "".to_string();
-            }
-
-            let pos_quoted_end = line[quoted_start..].chars().position(|x| x == '"');
-
-            // Update position to after the closing quote (if any)
-            if let Some(pos) = pos_quoted_end {
-                self.pos += pos;
-                line[quoted_start..(quoted_start + pos)].to_string()
+    /// Parses a single line of KEY=VALUE and standalone flags into a HashMap.
+    pub fn parse(&self) -> ExtendedXyzProperties {
+        let mut map = HashMap::new();
+        for tok in ExtendedXyzParser::split_tokens(self.line) {
+            if let Some(idx) = tok.find('=') {
+                let key = &tok[..idx];
+                let mut val = tok[idx + 1..].to_string();
+                // strip surrounding quotes if present
+                if (val.starts_with('"') && val.ends_with('"'))
+                    || (val.starts_with('\'') && val.ends_with('\''))
+                {
+                    val = val[1..val.len() - 1].to_string();
+                }
+                map.insert(key.to_string(), Property::Str(val));
             } else {
-                self.pos = line.len();
-                line[quoted_start..line.len()].to_string()
+                // no '=', treat as boolean flag
+                map.insert(tok, Property::Bool(true));
             }
-        } else {
-            // Unquoted string: ends at whitespace or '='
-            let start_pos = self.pos;
-            let pos_unquoted_end = line[self.pos..]
-                .chars()
-                .position(|x| x.is_whitespace() || x == '=');
-
-            if let Some(pos) = pos_unquoted_end {
-                self.pos += pos + 1;
-                line[start_pos..pos].to_string()
-            } else {
-                self.pos = line.len();
-                line[start_pos..line.len()].to_string()
-            }
-        };
-
-        result
+        }
+        map
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     #[test]
-//     fn simple_flags_and_values() {
-//         let mut p =
-//             ExtendedXyzParser::new(r#"Properties=species:S:1:pos:R:3 name='test file' debug"#);
-//         let m = p.parse();
-//         assert_eq!(m["Properties"], Property::Str("species:S:1:pos:R:3".into()));
-//         assert_eq!(m["name"], Property::Str("test file".into()));
-//         assert_eq!(m["debug"], Property::Bool(true));
-//     }
-// }
+    #[test]
+    fn simple_flags_and_values() {
+        let p = ExtendedXyzParser::new(r#"Properties=species:S:1:pos:R:3 name='test file' debug"#);
+        let m = p.parse();
+        assert_eq!(m["Properties"], Property::Str("species:S:1:pos:R:3".into()));
+        assert_eq!(m["name"], Property::Str("test file".into()));
+        assert_eq!(m["debug"], Property::Bool(true));
+    }
+}

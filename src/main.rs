@@ -97,7 +97,7 @@ impl XYZFormat {
             return Ok(Vec::new());
         }
 
-        let mut extxyz_parser = ExtendedXyzParser::new(line);
+        let extxyz_parser = ExtendedXyzParser::new(line);
         let properties = extxyz_parser.parse();
         println!("are there properties: {:?}", properties);
 
@@ -113,9 +113,10 @@ impl XYZFormat {
             frame.unit_cell = cell;
         }
 
-        // if let Some(prop_string) = properties.get("Properties") {
-        //     return Ok(parse_property_list(prop_string.as_string()?));
-        // }
+        if let Some(Property::Str(prop_string)) = properties.get("Properties") {
+            println!("properties: {}", prop_string);
+            // return Ok(XYZFormat::parse_property_list(prop_string));
+        }
 
         Ok(Vec::new())
     }
