@@ -5,8 +5,6 @@ pub type ExtendedXyzProperties = HashMap<String, Property>;
 
 pub struct ExtendedXyzParser<'a> {
     line: &'a str,
-    pos: usize,
-    done: bool,
 }
 #[derive(Debug, PartialEq)]
 enum State {
@@ -22,11 +20,7 @@ enum State {
 
 impl<'a> ExtendedXyzParser<'a> {
     pub fn new(line: &'a str) -> Self {
-        ExtendedXyzParser {
-            line,
-            pos: 0,
-            done: false,
-        }
+        ExtendedXyzParser { line }
     }
 
     /// Splits an input string into tokens, honoring single and double quotes.
