@@ -1,3 +1,0 @@
-[submodule "src/tests-data"]
-	path = src/tests-data
-	url = https://github.com/chemfiles/tests-data.git

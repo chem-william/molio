@@ -477,5 +477,17 @@ mod tests {
         unit_cell.cell_matrix[(2, 2)] = 3.0;
 
         assert_eq!(frame.unit_cell, unit_cell);
+
+        // frame level properties
+        // CHECK(frame.get("ENERGY")->as_string() == "-2069.84934116");
+        // CHECK(frame.get("Natoms")->as_string() == "192");
+        // CHECK(frame.get("NAME")->as_string() == "COBHUW");
+        // CHECK(frame.get("IsStrange")->as_bool() == true);
+
+        // assert_eq!(frame.get("CS_0"), 24.10)
+        // assert_eq!(frame.get("CS_1"), 31.34)
+        // CHECK(approx_eq(frame.positions()[0], {2.33827271799, 4.55315540425, 11.5841360926}, 1e-12));
+        // CHECK(frame[0].get("CS_0")->as_double() == 24.10);
+        // CHECK(frame[0].get("CS_1")->as_double() == 31.34);
     }
 }
