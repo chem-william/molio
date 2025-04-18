@@ -1,9 +1,7 @@
-use molio::property::Property;
-use itertools::Itertools;
-use molio::{
-    extendedxyzparser::ExtendedXyzParser,
-    unit_cell::UnitCell,
-};
+use assert_approx_eq::assert_approx_eq;
+use molio::property::PropertyKind;
+use molio::{extendedxyzparser::ExtendedXyzParser, unit_cell::UnitCell};
+use std::collections::HashMap;
 use std::{
     fs::File,
     io::{BufRead, BufReader, Seek},
@@ -42,6 +40,7 @@ pub struct Atom {
     pub x: f64,
     pub y: f64,
     pub z: f64,
+    pub properties: PropertiesList,
 }
 
 #[derive(Debug, Default)]
@@ -77,26 +76,83 @@ pub trait FileFormat {
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError>;
 }
 pub struct XYZFormat;
-enum PropertyKind {
-    Bool,
-    Double,
-    String,
-    Vector3D,
-}
-struct ExtendedProperty {
-    name: String,
-    kind: PropertyKind,
-}
-
-type PropertiesList = Vec<ExtendedProperty>;
+// type PropertiesList = Vec<ExtendedProperty>;
+type PropertiesList = HashMap<String, PropertyKind>;
 impl XYZFormat {
+    // fn read_atomic_properties(properties: PropertiesList, tokens: &SplitWhitespace, atom: &Atom) {
+    //     for property in properties {
+    //         match property.kind {
+    //             PropertyKind::String=> {
+    //                 let value = tokens.next().ok_or(CError::MissingToken)?.parse()?;
+    //                 atom.properties.
+    //             },
+    //             PropertyKind::Bool => {},
+    //             PropertyKind::Double=> {},
+    //             PropertyKind::Vector3D=> {},
+
+    //         }
+    //     }
+    // }
+    fn parse_property_list(line: &str) -> Result<PropertiesList, CError> {
+        const PREFIX: &str = "species:S:1:pos:R:3:";
+
+        let initial_input = &line;
+        let rest = line.strip_prefix(PREFIX).ok_or(CError::GenericFileError)?;
+        let fields: Vec<&str> = rest.split(':').collect();
+
+        // Ensure we have complete triples
+        if fields.len() % 3 != 0 {
+            return Err(CError::GenericFileError);
+        }
+
+        let mut properties = PropertiesList::new();
+
+        for chunk in fields.chunks_exact(3) {
+            let name = chunk[0];
+            let kind = match chunk[1] {
+                "R" | "I" => PropertyKind::Double,
+                "S" => PropertyKind::String,
+                "L" => PropertyKind::Bool,
+                _ => return Err(CError::GenericFileError),
+            };
+            let count = chunk[2]
+                .parse::<usize>()
+                .map_err(|_| CError::GenericFileError)?;
+
+            match (count, kind) {
+                // Vector3D special‐case
+                (3, PropertyKind::Double) => {
+                    properties.insert(name.to_string(), PropertyKind::Vector3D);
+                }
+
+                // Single‐column of any other kind
+                (1, k) => {
+                    properties.insert(name.to_string(), k);
+                }
+
+                // Multi‐column (n > 1)
+                (n, k) if n > 1 => {
+                    properties.reserve(n);
+                    for i in 0..n {
+                        properties.insert(format!("{name}_{i}"), k);
+                    }
+                }
+
+                // Zero‐column or any other weird case
+                _ => return Err(CError::GenericFileError),
+            }
+        }
+        println!("properties: {:?}", properties);
+
+        Ok(properties)
+    }
     fn read_extended_comment_line(line: &str, frame: &mut Frame) -> Result<PropertiesList, CError> {
         println!("what is the line: {line}");
         let contains_properties = line.contains("species:S:1:pos:R:3");
         let contains_lattice = line.contains("Lattice");
 
         if !(contains_properties || contains_lattice) {
-            return Ok(Vec::new());
+            return Ok(PropertiesList::new());
         }
 
         let extxyz_parser = ExtendedXyzParser::new(line);
@@ -110,22 +166,20 @@ impl XYZFormat {
             // frame.set(name.clone(), value.clone());
         }
 
-        if let Some(Property::Str(lattice)) = properties.get("Lattice") {
+        if let Some(lattice) = properties.get("Lattice") {
             let cell = UnitCell::parse(lattice);
             frame.unit_cell = cell;
         }
 
-        if let Some(Property::Str(prop_string)) = properties.get("Properties") {
-            println!("properties: {}", prop_string);
-            // return Ok(XYZFormat::parse_property_list(prop_string));
+        if let Some(prop_string) = properties.get("Properties") {
+            return XYZFormat::parse_property_list(prop_string);
         }
 
-        Ok(Vec::new())
+        Ok(PropertiesList::new())
     }
 }
 impl FileFormat for XYZFormat {
     fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
-        println!("Reading as XYZ format");
         let mut line = String::new();
         let _ = reader.read_line(&mut line)?;
 
@@ -150,11 +204,14 @@ impl FileFormat for XYZFormat {
             let y: f64 = tokens.next().ok_or(CError::MissingToken)?.parse()?;
             let z: f64 = tokens.next().ok_or(CError::MissingToken)?.parse()?;
 
-            assert_eq!(tokens.next(), None, "extxyz not yet implemented");
-
-            let atom = Atom { x, y, z, id: name };
-            // let remaining_line = tokens.collect::<Vec<_>>().join(" ");
-            // read_atomic_properties(&properties, &remaining_line, &mut atom)?;
+            let atom = Atom {
+                x,
+                y,
+                z,
+                id: name,
+                properties: PropertiesList::new(),
+            };
+            // XYZFormat::read_atomic_properties(&properties, &tokens, &mut atom)?;
 
             frame.add_atom(atom);
         }
@@ -168,7 +225,6 @@ impl FileFormat for XYZFormat {
     // }
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
-        println!("calling forward from XYZ");
         let mut line_position = 0;
 
         let mut line = String::new();
@@ -405,6 +461,12 @@ mod tests {
 
         let frame = trajectory.read_at(0).unwrap();
         assert_eq!(frame.size(), 192);
+
+        // Atom level properties
+        let positions = frame.positions()[0];
+        assert_approx_eq!(positions[0], 2.33827271799, 1e-9);
+        assert_approx_eq!(positions[1], 4.55315540425, 1e-9);
+        assert_approx_eq!(positions[2], 11.5841360926, 1e-9);
 
         let frame = trajectory.read_at(2).unwrap();
         assert_eq!(frame.size(), 8);

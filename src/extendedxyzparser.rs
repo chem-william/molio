@@ -1,7 +1,6 @@
-use crate::property::Property;
 use std::collections::HashMap;
 
-pub type ExtendedXyzProperties = HashMap<String, Property>;
+pub type ExtendedXyzProperties = HashMap<String, String>;
 
 pub struct ExtendedXyzParser<'a> {
     line: &'a str,
@@ -97,10 +96,10 @@ impl<'a> ExtendedXyzParser<'a> {
                 {
                     val = val[1..val.len() - 1].to_string();
                 }
-                map.insert(key.to_string(), Property::Str(val));
+                map.insert(key.to_string(), val);
             } else {
                 // no '=', treat as boolean flag
-                map.insert(tok, Property::Bool(true));
+                map.insert(tok, "true".to_string());
             }
         }
         map
@@ -115,8 +114,8 @@ mod tests {
     fn simple_flags_and_values() {
         let p = ExtendedXyzParser::new(r#"Properties=species:S:1:pos:R:3 name='test file' debug"#);
         let m = p.parse();
-        assert_eq!(m["Properties"], Property::Str("species:S:1:pos:R:3".into()));
-        assert_eq!(m["name"], Property::Str("test file".into()));
-        assert_eq!(m["debug"], Property::Bool(true));
+        assert_eq!(m["Properties"], "species:S:1:pos:R:3");
+        assert_eq!(m["name"], "test file");
+        assert_eq!(m["debug"], "true");
     }
 }
