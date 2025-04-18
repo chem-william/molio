@@ -1,7 +1,8 @@
 use assert_approx_eq::assert_approx_eq;
-use molio::property::PropertyKind;
+use molio::property::{AtomProperty, PropertyKind};
 use molio::{extendedxyzparser::ExtendedXyzParser, unit_cell::UnitCell};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use std::str::SplitWhitespace;
 use std::{
     fs::File,
     io::{BufRead, BufReader, Seek},
@@ -15,8 +16,8 @@ pub enum CError {
     UnsupportedFileFormat(String),
     #[error("{0}")]
     IoError(#[from] std::io::Error),
-    #[error("generic file error")]
-    GenericFileError,
+    #[error("generic error: {0}")]
+    GenericError(String),
     #[error("{format} format: not enough lines at step {step} (expected {expected}, got {got})")]
     UnexpectedEof {
         format: String,
@@ -40,7 +41,7 @@ pub struct Atom {
     pub x: f64,
     pub y: f64,
     pub z: f64,
-    pub properties: PropertiesList,
+    pub properties: AtomProperties,
 }
 
 #[derive(Debug, Default)]
@@ -77,32 +78,72 @@ pub trait FileFormat {
 }
 pub struct XYZFormat;
 // type PropertiesList = Vec<ExtendedProperty>;
-type PropertiesList = HashMap<String, PropertyKind>;
+type PropertiesList = BTreeMap<String, PropertyKind>;
+type AtomProperties = HashMap<String, AtomProperty>;
 impl XYZFormat {
-    // fn read_atomic_properties(properties: PropertiesList, tokens: &SplitWhitespace, atom: &Atom) {
-    //     for property in properties {
-    //         match property.kind {
-    //             PropertyKind::String=> {
-    //                 let value = tokens.next().ok_or(CError::MissingToken)?.parse()?;
-    //                 atom.properties.
-    //             },
-    //             PropertyKind::Bool => {},
-    //             PropertyKind::Double=> {},
-    //             PropertyKind::Vector3D=> {},
+    fn read_atomic_properties(
+        properties: &PropertiesList,
+        tokens: &mut SplitWhitespace,
+        atom: &mut Atom,
+    ) -> Result<(), CError> {
+        // TODO: properties are not guaranteed to be ordered in a hashmap
+        let mut bool_str = String::new();
+        for property in properties {
+            match property.1 {
+                PropertyKind::String => {
+                    let value = tokens.next().ok_or(CError::MissingToken)?.to_string();
+                    atom.properties
+                        .insert(property.0.clone(), AtomProperty::String(value));
+                }
+                PropertyKind::Bool => {
+                    let value = tokens.next().ok_or(CError::MissingToken)?;
+                    bool_str.clear();
+                    bool_str.push_str(&value.to_lowercase());
 
-    //         }
-    //     }
-    // }
+                    match &*bool_str {
+                        "t" | "true" => atom
+                            .properties
+                            .insert(property.0.clone(), AtomProperty::Bool(true)),
+                        "f" | "false" => atom
+                            .properties
+                            .insert(property.0.clone(), AtomProperty::Bool(false)),
+                        _ => {
+                            println!("value: {}", value);
+                            return Err(CError::GenericError("failed to parse bool".to_string()));
+                        }
+                    };
+                }
+                PropertyKind::Double => {
+                    let value = tokens.next().ok_or(CError::MissingToken)?.parse()?;
+                    atom.properties
+                        .insert(property.0.clone(), AtomProperty::Double(value));
+                }
+                PropertyKind::Vector3D => {
+                    let x = tokens.next().ok_or(CError::MissingToken)?.parse()?;
+                    let y = tokens.next().ok_or(CError::MissingToken)?.parse()?;
+                    let z = tokens.next().ok_or(CError::MissingToken)?.parse()?;
+
+                    atom.properties
+                        .insert(property.0.clone(), AtomProperty::Vector3D([x, y, z]));
+                }
+            }
+        }
+        Ok(())
+    }
     fn parse_property_list(line: &str) -> Result<PropertiesList, CError> {
         const PREFIX: &str = "species:S:1:pos:R:3:";
 
         let initial_input = &line;
-        let rest = line.strip_prefix(PREFIX).ok_or(CError::GenericFileError)?;
+        let rest = line
+            .strip_prefix(PREFIX)
+            .ok_or(CError::GenericError("failed to parse the rest".to_string()))?;
         let fields: Vec<&str> = rest.split(':').collect();
 
         // Ensure we have complete triples
         if fields.len() % 3 != 0 {
-            return Err(CError::GenericFileError);
+            return Err(CError::GenericError(
+                "not all triplets in properties".to_string(),
+            ));
         }
 
         let mut properties = PropertiesList::new();
@@ -113,11 +154,11 @@ impl XYZFormat {
                 "R" | "I" => PropertyKind::Double,
                 "S" => PropertyKind::String,
                 "L" => PropertyKind::Bool,
-                _ => return Err(CError::GenericFileError),
+                _ => return Err(CError::GenericError("unknown property format".to_string())),
             };
             let count = chunk[2]
                 .parse::<usize>()
-                .map_err(|_| CError::GenericFileError)?;
+                .map_err(|_| CError::GenericError("not able to parse chunk[2]".to_string()))?;
 
             match (count, kind) {
                 // Vector3D special‐case
@@ -132,14 +173,17 @@ impl XYZFormat {
 
                 // Multi‐column (n > 1)
                 (n, k) if n > 1 => {
-                    properties.reserve(n);
+                    // properties.reserve(n);
                     for i in 0..n {
-                        properties.insert(format!("{name}_{i}"), k);
+                        properties.insert(format!("{name}_{i}"), k.clone());
                     }
                 }
 
-                // Zero‐column or any other weird case
-                _ => return Err(CError::GenericFileError),
+                _ => {
+                    return Err(CError::GenericError(
+                        "zero-column or other weird case".to_string(),
+                    ));
+                }
             }
         }
         println!("properties: {:?}", properties);
@@ -191,7 +235,7 @@ impl FileFormat for XYZFormat {
         line.clear();
         let _ = reader.read_line(&mut line)?;
         let mut frame = Frame::new();
-        let properties = XYZFormat::read_extended_comment_line(&line, &mut frame);
+        let properties = XYZFormat::read_extended_comment_line(&line, &mut frame)?;
 
         for _ in 0..n_atoms {
             line.clear();
@@ -204,14 +248,14 @@ impl FileFormat for XYZFormat {
             let y: f64 = tokens.next().ok_or(CError::MissingToken)?.parse()?;
             let z: f64 = tokens.next().ok_or(CError::MissingToken)?.parse()?;
 
-            let atom = Atom {
+            let mut atom = Atom {
                 x,
                 y,
                 z,
                 id: name,
-                properties: PropertiesList::new(),
+                properties: AtomProperties::new(),
             };
-            // XYZFormat::read_atomic_properties(&properties, &tokens, &mut atom)?;
+            XYZFormat::read_atomic_properties(&properties, &mut tokens, &mut atom)?;
 
             frame.add_atom(atom);
         }
@@ -302,7 +346,7 @@ impl Format {
 
         match ext.to_lowercase().as_str() {
             "xyz" => Ok(Format::XYZ(XYZFormat)),
-            _ => Err(CError::GenericFileError),
+            _ => Err(CError::GenericError("unknown file format".to_string())),
         }
     }
     pub fn new_from_format(fmt: TextFormat, path: &Path) -> Result<Self, CError> {
@@ -379,9 +423,11 @@ impl<'a> Trajectory<'a> {
     pub fn read_at(&mut self, index: usize) -> Result<Frame, CError> {
         if index >= self.frame_positions.len() {
             if self.frame_positions.is_empty() {
-                return Err(CError::GenericFileError);
+                return Err(CError::GenericError("frame_positions is empty".to_string()));
             }
-            return Err(CError::GenericFileError);
+            return Err(CError::GenericError(
+                "index is bigger than frame_positions".to_string(),
+            ));
         }
         self.reader
             .seek(std::io::SeekFrom::Start(self.frame_positions[index]))
@@ -467,6 +513,8 @@ mod tests {
         assert_approx_eq!(positions[0], 2.33827271799, 1e-9);
         assert_approx_eq!(positions[1], 4.55315540425, 1e-9);
         assert_approx_eq!(positions[2], 11.5841360926, 1e-9);
+        assert_approx_eq!(frame.atoms[0].properties["CS_0"].expect_double(), 24.10);
+        assert_approx_eq!(frame.atoms[0].properties["CS_1"].expect_double(), 31.34);
 
         let frame = trajectory.read_at(2).unwrap();
         assert_eq!(frame.size(), 8);
@@ -484,8 +532,6 @@ mod tests {
         // CHECK(frame.get("NAME")->as_string() == "COBHUW");
         // CHECK(frame.get("IsStrange")->as_bool() == true);
 
-        // assert_eq!(frame.get("CS_0"), 24.10)
-        // assert_eq!(frame.get("CS_1"), 31.34)
         // CHECK(approx_eq(frame.positions()[0], {2.33827271799, 4.55315540425, 11.5841360926}, 1e-12));
         // CHECK(frame[0].get("CS_0")->as_double() == 24.10);
         // CHECK(frame[0].get("CS_1")->as_double() == 31.34);
