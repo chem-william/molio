@@ -1,4 +1,3 @@
-use crate::atom::Atom;
 use crate::error::CError;
 use crate::format::FileFormat;
 use crate::frame::Frame;
