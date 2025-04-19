@@ -1,4 +1,5 @@
 use nalgebra::Matrix3;
+use std::collections::HashMap;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum PropertyKind {
@@ -11,7 +12,7 @@ pub enum PropertyKind {
 }
 
 #[derive(Debug)]
-pub enum AtomProperty {
+pub enum Property {
     Bool(bool),
     Double(f64),
     String(String),
@@ -19,9 +20,12 @@ pub enum AtomProperty {
     Matrix3x3(Matrix3<f64>),
     VectorXD(Vec<f64>),
 }
-impl AtomProperty {
+
+pub type Properties = HashMap<String, Property>;
+
+impl Property {
     pub fn as_bool(&self) -> Option<bool> {
-        if let AtomProperty::Bool(b) = *self {
+        if let Property::Bool(b) = *self {
             Some(b)
         } else {
             None
@@ -29,12 +33,12 @@ impl AtomProperty {
     }
     pub fn expect_bool(&self) -> bool {
         match *self {
-            AtomProperty::Bool(b) => b,
+            Property::Bool(b) => b,
             ref other => panic!("expected Bool, found {:?}", other),
         }
     }
     pub fn as_double(&self) -> Option<f64> {
-        if let AtomProperty::Double(x) = *self {
+        if let Property::Double(x) = *self {
             Some(x)
         } else {
             None
@@ -42,12 +46,12 @@ impl AtomProperty {
     }
     pub fn expect_double(&self) -> f64 {
         match *self {
-            AtomProperty::Double(d) => d,
+            Property::Double(d) => d,
             ref other => panic!("expected Double, found {:?}", other),
         }
     }
     pub fn as_string(&self) -> Option<&str> {
-        if let AtomProperty::String(ref s) = *self {
+        if let Property::String(ref s) = *self {
             Some(s)
         } else {
             None
@@ -55,12 +59,12 @@ impl AtomProperty {
     }
     pub fn expect_string(&self) -> &str {
         match *self {
-            AtomProperty::String(ref s) => s,
+            Property::String(ref s) => s,
             ref other => panic!("expected String, found {:?}", other),
         }
     }
     pub fn as_vector3d(&self) -> Option<[f64; 3]> {
-        if let AtomProperty::Vector3D(v) = *self {
+        if let Property::Vector3D(v) = *self {
             Some(v)
         } else {
             None
@@ -68,12 +72,12 @@ impl AtomProperty {
     }
     pub fn expect_vector3d(&self) -> [f64; 3] {
         match *self {
-            AtomProperty::Vector3D(v) => v,
+            Property::Vector3D(v) => v,
             ref other => panic!("expected Vector3D, found {:?}", other),
         }
     }
     pub fn as_matrix3x3(&self) -> Option<[f64; 9]> {
-        if let AtomProperty::Matrix3x3(m) = *self {
+        if let Property::Matrix3x3(m) = *self {
             let mut array = [0.0; 9];
             array.copy_from_slice(m.as_slice());
             Some(array)
@@ -83,7 +87,7 @@ impl AtomProperty {
     }
     pub fn expect_matrix3x3(&self) -> [f64; 9] {
         match *self {
-            AtomProperty::Matrix3x3(m) => {
+            Property::Matrix3x3(m) => {
                 let mut array = [0.0; 9];
                 array.copy_from_slice(m.as_slice());
                 array
