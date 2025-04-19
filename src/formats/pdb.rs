@@ -2,12 +2,87 @@ use crate::error::CError;
 use crate::format::FileFormat;
 use crate::frame::Frame;
 use crate::property::Properties;
-use crate::unit_cell::UnitCell;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
 use std::path::Path;
 
-pub struct PDBFormat;
+struct FullResidueId {
+    /// Chain identifier
+    chain: char,
+    /// Residue id
+    resid: i64,
+    /// Residue name
+    resname: String,
+    /// Insertion code of the residue
+    insertion_code: char,
+}
+struct Residue {
+    name: String,
+    id: Option<usize>,
+    atoms: BTreeSet<usize>,
+    properties: Properties,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Record {
+    // Records containing summary data
+    HEADER,
+    TITLE,
+    // Records containing useful data
+    CRYST1,
+    ATOM,
+    HETATM,
+    CONECT,
+    // Beginning of model
+    MODEL,
+    // End of model
+    ENDMDL,
+    // End of chain. May increase atom count
+    TER,
+    // End of file
+    END,
+    // Secondary structure
+    HELIX,
+    SHEET,
+    TURN,
+    // Ignored records
+    IGNORED_,
+    // Unknown record type
+    UNKNOWN_,
+}
+
+pub fn get_record(line: &str) -> Record {
+    let rec = &line[..6];
+
+    match rec {
+        "ENDMDL" => Record::ENDMDL,
+        _ if rec.starts_with("END") => Record::END,
+        "CRYST1" => Record::CRYST1,
+        "ATOM  " => Record::ATOM,
+        "HETATM" => Record::HETATM,
+        "CONECT" => Record::CONECT,
+        _ if rec.starts_with("MODEL") => Record::MODEL,
+        _ if rec.starts_with("TER") => Record::TER,
+        "HELIX " => Record::HELIX,
+        "SHEET " => Record::SHEET,
+        "TURN  " => Record::TURN,
+        "HEADER" => Record::HEADER,
+        "TITLE " => Record::TITLE,
+        "REMARK" | "MASTER" | "AUTHOR" | "CAVEAT" | "COMPND" | "EXPDTA" | "KEYWDS" | "OBSLTE"
+        | "SOURCE" | "SPLIT " | "SPRSDE" | "JRNL  " | "SEQRES" | "HET   " | "REVDAT" | "SCALE1"
+        | "SCALE2" | "SCALE3" | "ORIGX1" | "ORIGX2" | "ORIGX3" | "ANISOU" | "SITE  " | "FORMUL"
+        | "DBREF " | "HETNAM" | "HETSYN" | "SSBOND" | "LINK  " | "SEQADV" | "MODRES" | "CISPEP" => {
+            Record::IGNORED_
+        }
+        _ if line.trim().is_empty() => Record::IGNORED_,
+        _ => Record::UNKNOWN_,
+    }
+}
+
+pub struct PDBFormat {
+    pub residues: BTreeMap<FullResidueId, Residue>,
+}
 
 impl PDBFormat {
     // fn parse_atom_line(&self, line: &str) -> Result<Atom, CError> {
@@ -127,7 +202,11 @@ impl PDBFormat {
 
 impl FileFormat for PDBFormat {
     fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
-        todo!();
+        self.residues.clear();
+        let mut line = String::new();
+
+        while reader.read_line(line)? > 0 {}
+
         // let mut frame = Frame::new();
         // let mut line = String::new();
 

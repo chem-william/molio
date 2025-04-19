@@ -2,6 +2,7 @@ use crate::error::CError;
 use crate::formats::pdb::PDBFormat;
 use crate::formats::xyz::XYZFormat;
 use crate::frame::Frame;
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -23,14 +24,18 @@ impl Format {
 
         match ext.to_lowercase().as_str() {
             "xyz" => Ok(Format::XYZ(XYZFormat)),
-            "pdb" => Ok(Format::PDB(PDBFormat)),
+            "pdb" => Ok(Format::PDB(PDBFormat {
+                residues: BTreeMap::new(),
+            })),
             _ => Err(CError::GenericError("unknown file format".to_string())),
         }
     }
     pub fn new_from_format(fmt: TextFormat, path: &Path) -> Result<Self, CError> {
         match fmt {
             TextFormat::XYZ => Ok(Format::XYZ(XYZFormat)),
-            TextFormat::PDB => Ok(Format::PDB(PDBFormat)),
+            TextFormat::PDB => Ok(Format::PDB(PDBFormat {
+                residues: BTreeMap::new(),
+            })),
             TextFormat::Guess => Self::new(path),
         }
     }
