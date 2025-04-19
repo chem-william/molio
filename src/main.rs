@@ -1,4 +1,5 @@
 use assert_approx_eq::assert_approx_eq;
+use molio::error::CError;
 use molio::property::{AtomProperty, PropertyKind};
 use molio::{extendedxyzparser::ExtendedXyzParser, unit_cell::UnitCell};
 use nalgebra::Matrix3;
@@ -9,32 +10,6 @@ use std::{
     io::{BufRead, BufReader, Seek},
     path::Path,
 };
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum CError {
-    #[error("Unsupported file format: `{0}`")]
-    UnsupportedFileFormat(String),
-    #[error("{0}")]
-    IoError(#[from] std::io::Error),
-    #[error("generic error: {0}")]
-    GenericError(String),
-    #[error("{format} format: not enough lines at step {step} (expected {expected}, got {got})")]
-    UnexpectedEof {
-        format: String,
-        step: usize,
-        expected: usize,
-        got: usize,
-    },
-    #[error("unknown format: {0}")]
-    UnknownFormat(String),
-    #[error("")]
-    UnexpectedSymbol,
-    #[error("Failed to parse float: {0}")]
-    ParseFloatError(#[from] std::num::ParseFloatError),
-    #[error("Missing token")]
-    MissingToken,
-}
 
 #[derive(Debug)]
 pub struct Atom {
@@ -229,32 +204,28 @@ impl XYZFormat {
     }
 
     fn read_extended_comment_line(line: &str, frame: &mut Frame) -> Result<PropertiesList, CError> {
-        let contains_properties = line.contains("species:S:1:pos:R:3");
-        let contains_lattice = line.contains("Lattice");
-
-        if !(contains_properties || contains_lattice) {
+        if !(line.contains("species:S:1:pos:R:3") || line.contains("Lattice")) {
             return Ok(PropertiesList::new());
         }
 
         let extxyz_parser = ExtendedXyzParser::new(line);
         let properties = extxyz_parser.parse();
 
-        for (name, value) in &properties {
-            // we defer this so we don't return early
-            if name == "Lattice" || name == "Properties" {
-                continue;
-            }
-
-            let prop = XYZFormat::parse_frame_property(value);
-            frame.properties.insert(name.clone(), prop);
+        for (k, v) in properties
+            .iter()
+            .filter(|(k, _)| k.as_str() != "Lattice" && k.as_str() != "Properties")
+        {
+            frame
+                .properties
+                .insert(k.clone(), Self::parse_frame_property(v));
         }
+
         if let Some(lattice) = properties.get("Lattice") {
-            let cell = UnitCell::parse(lattice);
-            frame.unit_cell = cell;
+            frame.unit_cell = UnitCell::parse(lattice);
         }
 
         if let Some(prop_string) = properties.get("Properties") {
-            return XYZFormat::parse_property_list(prop_string);
+            return Self::parse_property_list(prop_string);
         }
 
         Ok(PropertiesList::new())
