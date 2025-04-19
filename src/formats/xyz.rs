@@ -349,17 +349,34 @@ impl FileFormat for XYZFormat {
 mod tests {
     use std::path::Path;
 
-    use crate::{trajectory::Trajectory, unit_cell::UnitCell};
+    use crate::{frame::Frame, trajectory::Trajectory, unit_cell::UnitCell};
     use assert_approx_eq::assert_approx_eq;
 
     #[test]
-    fn trajectory() {
+    fn check_nsteps() {
+        let path = Path::new("./src/tests-data/xyz/trajectory.xyz");
+        let trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 2);
+
+        let path = Path::new("./src/tests-data/xyz/helium.xyz");
+        let trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 397);
+
+        let path = Path::new("./src/tests-data/xyz/topology.xyz");
+        let trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 1);
+    }
+
+    #[test]
+    fn extended_xyz() {
         let path = Path::new("./src/tests-data/xyz/extended.xyz");
         let mut trajectory = Trajectory::new(path).unwrap();
         assert_eq!(trajectory.size, 3);
 
         let frame = trajectory.read_at(0).unwrap();
         assert_eq!(frame.size(), 192);
+
+        // Reading the unit cell
         let mut unit_cell = UnitCell::new();
         unit_cell.cell_matrix[(0, 0)] = 8.43116035;
         unit_cell.cell_matrix[(0, 1)] = 0.158219155128;
@@ -369,14 +386,11 @@ mod tests {
         unit_cell.cell_matrix[(2, 2)] = 14.9100096405;
         assert_eq!(frame.unit_cell, unit_cell);
 
-        assert_eq!(frame.atoms[0].symbol, "O");
-        assert_eq!(frame.atoms[1].symbol, "O");
-
-        let frame = trajectory.read_at(1).unwrap();
-        assert_eq!(frame.size(), 62);
-
-        let frame = trajectory.read_at(0).unwrap();
-        assert_eq!(frame.size(), 192);
+        // Frame level properties
+        assert_eq!(frame.properties["ENERGY"].expect_double(), -2069.84934116);
+        assert_eq!(frame.properties["Natoms"].expect_double(), 192.0);
+        assert_eq!(frame.properties["NAME"].expect_string(), "COBHUW");
+        assert!(frame.properties["IsStrange"].expect_bool());
 
         // Atom level properties
         let positions = frame.positions()[0];
@@ -385,21 +399,69 @@ mod tests {
         assert_approx_eq!(positions[2], 11.5841360926, 1e-9);
         assert_approx_eq!(frame.atoms[0].properties["CS_0"].expect_double(), 24.10);
         assert_approx_eq!(frame.atoms[0].properties["CS_1"].expect_double(), 31.34);
+        assert_approx_eq!(frame.atoms[51].properties["CS_0"].expect_double(), -73.98);
+        assert_approx_eq!(frame.atoms[51].properties["CS_1"].expect_double(), -81.85);
 
-        // Frame level properties
-        assert_eq!(frame.properties["ENERGY"].expect_double(), -2069.84934116);
-        assert_eq!(frame.properties["Natoms"].expect_double(), 192.0);
-        assert_eq!(frame.properties["NAME"].expect_string(), "COBHUW");
-        assert!(frame.properties["IsStrange"].expect_bool());
+        // different types
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 62);
+        let vector3d = frame.atoms[0].properties["CS"].expect_vector3d();
+        assert_approx_eq!(vector3d[0], 198.20, 1e-12);
+        assert_approx_eq!(vector3d[1], 202.27, 1e-12);
+        assert_approx_eq!(vector3d[2], 202.27, 1e-12);
 
-        let frame = trajectory.read_at(2).unwrap();
+        // // Different syntaxes for bool values
+        let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 8);
+        assert!(frame.atoms[0].properties["bool"].expect_bool());
+        assert!(frame.atoms[1].properties["bool"].expect_bool());
+        assert!(frame.atoms[2].properties["bool"].expect_bool());
+        assert!(frame.atoms[3].properties["bool"].expect_bool());
+        assert!(!frame.atoms[4].properties["bool"].expect_bool());
+        assert!(!frame.atoms[5].properties["bool"].expect_bool());
+        assert!(!frame.atoms[6].properties["bool"].expect_bool());
+        assert!(!frame.atoms[7].properties["bool"].expect_bool());
 
-        let mut unit_cell = UnitCell::new();
-        unit_cell.cell_matrix[(0, 0)] = 4.0;
-        unit_cell.cell_matrix[(1, 1)] = 7.0;
-        unit_cell.cell_matrix[(2, 2)] = 3.0;
+        assert_eq!(frame.atoms[0].properties["int"].expect_double(), 33.0);
+        assert_eq!(
+            frame.atoms[0].properties["strings_0"].expect_string(),
+            "bar"
+        );
+        assert_eq!(
+            frame.atoms[0].properties["strings_1"].expect_string(),
+            "\"test\""
+        );
+    }
 
-        assert_eq!(frame.unit_cell, unit_cell);
+    #[test]
+    fn read_whole_file() {
+        let path = Path::new("./src/tests-data/xyz/helium.xyz");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 397);
+
+        let mut frame = Frame::new();
+        while let Some(next_frame) = trajectory.read().unwrap() {
+            frame = next_frame;
+        }
+        let positions = frame.positions();
+        assert_approx_eq!(positions[0][0], -1.186037, 1e-12);
+        assert_approx_eq!(positions[0][1], 11.439334, 1e-12);
+        assert_approx_eq!(positions[0][2], 0.529939, 1e-12);
+
+        assert_approx_eq!(positions[124][0], 5.208778, 1e-12);
+        assert_approx_eq!(positions[124][1], 12.707273, 1e-12);
+        assert_approx_eq!(positions[124][2], 10.940157, 1e-12);
+    }
+    #[test]
+    fn various_files_formatting() {
+        let path = Path::new("./src/tests-data/xyz/spaces.xyz");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 1);
+        let frame = trajectory.read().unwrap().unwrap();
+        let positions = frame.positions();
+
+        assert_approx_eq!(positions[10][0], 0.8336);
+        assert_approx_eq!(positions[10][1], 0.3006);
+        assert_approx_eq!(positions[10][2], 0.4968);
     }
 }
