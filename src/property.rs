@@ -102,3 +102,89 @@ pub struct ExtendedProperty {
     pub name: String,
     pub kind: PropertyKind,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bool_property() {
+        let prop = Property::Bool(true);
+        assert_eq!(prop.as_bool(), Some(true));
+        assert_eq!(prop.expect_bool(), true);
+        assert_eq!(prop.as_double(), None);
+    }
+
+    #[test]
+    fn test_double_property() {
+        let prop = Property::Double(3.14);
+        assert_eq!(prop.as_double(), Some(3.14));
+        assert_eq!(prop.expect_double(), 3.14);
+        assert_eq!(prop.as_bool(), None);
+    }
+
+    #[test]
+    fn test_string_property() {
+        let prop = Property::String("test".to_string());
+        assert_eq!(prop.as_string(), Some("test"));
+        assert_eq!(prop.expect_string(), "test");
+        assert_eq!(prop.as_double(), None);
+    }
+
+    #[test]
+    fn test_vector3d_property() {
+        let vec = [1.0, 2.0, 3.0];
+        let prop = Property::Vector3D(vec);
+        assert_eq!(prop.as_vector3d(), Some(vec));
+        assert_eq!(prop.expect_vector3d(), vec);
+        assert_eq!(prop.as_double(), None);
+    }
+
+    #[test]
+    fn test_matrix3x3_property() {
+        let matrix = Matrix3::new(
+            1.0, 2.0, 3.0,
+            4.0, 5.0, 6.0,
+            7.0, 8.0, 9.0
+        );
+        let prop = Property::Matrix3x3(matrix);
+        assert_eq!(prop.as_matrix3x3(), Some([1.0, 4.0, 7.0, 2.0, 5.0, 8.0, 3.0, 6.0, 9.0]));
+        assert_eq!(prop.expect_matrix3x3(), [1.0, 4.0, 7.0, 2.0, 5.0, 8.0, 3.0, 6.0, 9.0]);
+        assert_eq!(prop.as_double(), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "expected Bool")]
+    fn test_expect_bool_panic() {
+        let prop = Property::Double(1.0);
+        prop.expect_bool();
+    }
+
+    #[test]
+    #[should_panic(expected = "expected Double")]
+    fn test_expect_double_panic() {
+        let prop = Property::String("test".to_string());
+        prop.expect_double();
+    }
+
+    #[test]
+    #[should_panic(expected = "expected String")]
+    fn test_expect_string_panic() {
+        let prop = Property::Double(1.0);
+        prop.expect_string();
+    }
+
+    #[test]
+    #[should_panic(expected = "expected Vector3D")]
+    fn test_expect_vector3d_panic() {
+        let prop = Property::Double(1.0);
+        prop.expect_vector3d();
+    }
+
+    #[test]
+    #[should_panic(expected = "expected Matrix3x3")]
+    fn test_expect_matrix3x3_panic() {
+        let prop = Property::Double(1.0);
+        prop.expect_matrix3x3();
+    }
+}
