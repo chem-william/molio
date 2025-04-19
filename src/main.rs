@@ -77,6 +77,9 @@ mod tests {
         unit_cell.cell_matrix[(2, 2)] = 14.9100096405;
         assert_eq!(frame.unit_cell, unit_cell);
 
+        assert_eq!(frame.atoms[0].symbol, "O");
+        assert_eq!(frame.atoms[1].symbol, "O");
+
         let frame = trajectory.read_at(1).unwrap();
         assert_eq!(frame.size(), 62);
 
