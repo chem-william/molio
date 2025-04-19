@@ -340,3 +340,62 @@ impl FileFormat for XYZFormat {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use crate::{trajectory::Trajectory, unit_cell::UnitCell};
+    use assert_approx_eq::assert_approx_eq;
+
+    #[test]
+    fn trajectory() {
+        let path = Path::new("./src/tests-data/xyz/extended.xyz");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 3);
+
+        let frame = trajectory.read_at(0).unwrap();
+        assert_eq!(frame.size(), 192);
+        let mut unit_cell = UnitCell::new();
+        unit_cell.cell_matrix[(0, 0)] = 8.43116035;
+        unit_cell.cell_matrix[(0, 1)] = 0.158219155128;
+        unit_cell.cell_matrix[(1, 1)] = 14.5042431863;
+        unit_cell.cell_matrix[(0, 2)] = 1.16980663624;
+        unit_cell.cell_matrix[(1, 2)] = 4.4685149855;
+        unit_cell.cell_matrix[(2, 2)] = 14.9100096405;
+        assert_eq!(frame.unit_cell, unit_cell);
+
+        assert_eq!(frame.atoms[0].symbol, "O");
+        assert_eq!(frame.atoms[1].symbol, "O");
+
+        let frame = trajectory.read_at(1).unwrap();
+        assert_eq!(frame.size(), 62);
+
+        let frame = trajectory.read_at(0).unwrap();
+        assert_eq!(frame.size(), 192);
+
+        // Atom level properties
+        let positions = frame.positions()[0];
+        assert_approx_eq!(positions[0], 2.33827271799, 1e-9);
+        assert_approx_eq!(positions[1], 4.55315540425, 1e-9);
+        assert_approx_eq!(positions[2], 11.5841360926, 1e-9);
+        assert_approx_eq!(frame.atoms[0].properties["CS_0"].expect_double(), 24.10);
+        assert_approx_eq!(frame.atoms[0].properties["CS_1"].expect_double(), 31.34);
+
+        // Frame level properties
+        assert_eq!(frame.properties["ENERGY"].expect_double(), -2069.84934116);
+        assert_eq!(frame.properties["Natoms"].expect_double(), 192.0);
+        assert_eq!(frame.properties["NAME"].expect_string(), "COBHUW");
+        assert!(frame.properties["IsStrange"].expect_bool());
+
+        let frame = trajectory.read_at(2).unwrap();
+        assert_eq!(frame.size(), 8);
+
+        let mut unit_cell = UnitCell::new();
+        unit_cell.cell_matrix[(0, 0)] = 4.0;
+        unit_cell.cell_matrix[(1, 1)] = 7.0;
+        unit_cell.cell_matrix[(2, 2)] = 3.0;
+
+        assert_eq!(frame.unit_cell, unit_cell);
+    }
+}
