@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 pub type ExtendedXyzProperties = BTreeMap<String, String>;
 
