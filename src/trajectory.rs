@@ -74,3 +74,49 @@ impl<'a> Trajectory<'a> {
         frame_positions
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    const TEST_XYZ_PATH: &str = "./src/tests-data/xyz/extended.xyz";
+
+    #[test]
+    fn test_trajectory_new() {
+        let path = PathBuf::from(TEST_XYZ_PATH);
+        let trajectory = Trajectory::new(&path).unwrap();
+        assert_eq!(trajectory.size, 3);
+    }
+
+    #[test]
+    fn test_trajectory_with_format() {
+        let path = PathBuf::from(TEST_XYZ_PATH);
+        let trajectory = Trajectory::with_format(&path, TextFormat::XYZ).unwrap();
+        assert_eq!(trajectory.size, 3);
+    }
+
+    #[test]
+    fn test_read_at() {
+        let path = PathBuf::from(TEST_XYZ_PATH);
+        let mut trajectory = Trajectory::new(&path).unwrap();
+
+        // Read first frame
+        let frame0 = trajectory.read_at(0).unwrap();
+        assert_eq!(frame0.atoms.len(), 192);
+
+        // Read second frame
+        let frame1 = trajectory.read_at(1).unwrap();
+        assert_eq!(frame1.atoms.len(), 62);
+    }
+
+    #[test]
+    fn test_read_at_invalid_index() {
+        let path = PathBuf::from(TEST_XYZ_PATH);
+        let mut trajectory = Trajectory::new(&path).unwrap();
+
+        // Try to read frame at invalid index
+        let result = trajectory.read_at(4);
+        assert!(result.is_err());
+    }
+}
