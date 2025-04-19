@@ -77,7 +77,6 @@ pub trait FileFormat {
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError>;
 }
 pub struct XYZFormat;
-// type PropertiesList = Vec<ExtendedProperty>;
 type PropertiesList = BTreeMap<String, PropertyKind>;
 type AtomProperties = HashMap<String, AtomProperty>;
 impl XYZFormat {
@@ -86,7 +85,6 @@ impl XYZFormat {
         tokens: &mut SplitWhitespace,
         atom: &mut Atom,
     ) -> Result<(), CError> {
-        // TODO: properties are not guaranteed to be ordered in a hashmap
         let mut bool_str = String::new();
         for property in properties {
             match property.1 {
@@ -173,7 +171,6 @@ impl XYZFormat {
 
                 // Multi‐column (n > 1)
                 (n, k) if n > 1 => {
-                    // properties.reserve(n);
                     for i in 0..n {
                         properties.insert(format!("{name}_{i}"), k.clone());
                     }

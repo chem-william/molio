@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
-pub type ExtendedXyzProperties = HashMap<String, String>;
+pub type ExtendedXyzProperties = BTreeMap<String, String>;
 
 pub struct ExtendedXyzParser<'a> {
     line: &'a str,
@@ -85,7 +85,7 @@ impl<'a> ExtendedXyzParser<'a> {
 
     /// Parses a single line of KEY=VALUE and standalone flags into a HashMap.
     pub fn parse(&self) -> ExtendedXyzProperties {
-        let mut map = HashMap::new();
+        let mut map = BTreeMap::new();
         for tok in ExtendedXyzParser::split_tokens(self.line) {
             if let Some(idx) = tok.find('=') {
                 let key = &tok[..idx];
