@@ -188,7 +188,6 @@ impl XYZFormat {
         Ok(properties)
     }
     fn read_extended_comment_line(line: &str, frame: &mut Frame) -> Result<PropertiesList, CError> {
-        println!("what is the line: {line}");
         let contains_properties = line.contains("species:S:1:pos:R:3");
         let contains_lattice = line.contains("Lattice");
 
