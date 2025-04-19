@@ -272,7 +272,7 @@ impl FileFormat for XYZFormat {
                 x,
                 y,
                 z,
-                id: name,
+                symbol: name,
                 properties: Properties::new(),
             };
             XYZFormat::read_atomic_properties(&properties, &mut tokens, &mut atom)?;
