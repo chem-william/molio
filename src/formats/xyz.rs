@@ -1,9 +1,9 @@
 use crate::atom::Atom;
-use crate::property::Properties;
 use crate::error::CError;
 use crate::extendedxyzparser::ExtendedXyzParser;
 use crate::format::FileFormat;
 use crate::frame::Frame;
+use crate::property::Properties;
 use crate::property::{Property, PropertyKind};
 use crate::unit_cell::UnitCell;
 use nalgebra::Matrix3;
@@ -40,14 +40,18 @@ impl ValueParser for BoolParser {
         match value.to_lowercase().as_str() {
             "t" | "true" => Ok(Property::Bool(true)),
             "f" | "false" => Ok(Property::Bool(false)),
-            _ => Err(CError::GenericError(format!("Invalid boolean value: {}", value))),
+            _ => Err(CError::GenericError(format!(
+                "Invalid boolean value: {}",
+                value
+            ))),
         }
     }
 }
 
 impl ValueParser for DoubleParser {
     fn parse(value: &str) -> Result<Property, CError> {
-        value.parse::<f64>()
+        value
+            .parse::<f64>()
             .map(Property::Double)
             .map_err(|e| CError::GenericError(format!("Failed to parse number: {}", e)))
     }
@@ -63,11 +67,14 @@ impl ValueParser for Vector3DParser {
                 parts
             )));
         }
-        let x = parts[0].parse::<f64>()
+        let x = parts[0]
+            .parse::<f64>()
             .map_err(|e| CError::GenericError(format!("Failed to parse x component: {}", e)))?;
-        let y = parts[1].parse::<f64>()
+        let y = parts[1]
+            .parse::<f64>()
             .map_err(|e| CError::GenericError(format!("Failed to parse y component: {}", e)))?;
-        let z = parts[2].parse::<f64>()
+        let z = parts[2]
+            .parse::<f64>()
             .map_err(|e| CError::GenericError(format!("Failed to parse z component: {}", e)))?;
         Ok(Property::Vector3D([x, y, z]))
     }
@@ -140,10 +147,12 @@ impl XYZFormat {
         const PREFIX: &str = "species:S:1:pos:R:3:";
 
         let initial_input = &line;
-        let rest = line
-            .strip_prefix(PREFIX)
-            .ok_or_else(|| CError::GenericError("Invalid property list format: missing expected prefix".to_string()))?;
-        
+        let rest = line.strip_prefix(PREFIX).ok_or_else(|| {
+            CError::GenericError(
+                "Invalid property list format: missing expected prefix".to_string(),
+            )
+        })?;
+
         let fields: Vec<&str> = rest.split(':').collect();
 
         if fields.len() % 3 != 0 {
@@ -160,17 +169,23 @@ impl XYZFormat {
                 "R" | "I" => PropertyKind::Double,
                 "S" => PropertyKind::String,
                 "L" => PropertyKind::Bool,
-                unknown => return Err(CError::GenericError(format!("Unknown property type: {}", unknown))),
+                unknown => {
+                    return Err(CError::GenericError(format!(
+                        "Unknown property type: {}",
+                        unknown
+                    )));
+                }
             };
-            
+
             let count = chunk[2].parse::<usize>().map_err(|e| {
                 CError::GenericError(format!("Invalid property count '{}': {}", chunk[2], e))
             })?;
 
             if count == 0 {
-                return Err(CError::GenericError(
-                    format!("Invalid count of 0 for property '{}'", name)
-                ));
+                return Err(CError::GenericError(format!(
+                    "Invalid count of 0 for property '{}'",
+                    name
+                )));
             }
 
             match (count, &kind) {
