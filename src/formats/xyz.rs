@@ -397,15 +397,15 @@ mod tests {
         assert_approx_eq!(positions[0], 2.33827271799, 1e-9);
         assert_approx_eq!(positions[1], 4.55315540425, 1e-9);
         assert_approx_eq!(positions[2], 11.5841360926, 1e-9);
-        assert_approx_eq!(frame.atoms[0].properties["CS_0"].expect_double(), 24.10);
-        assert_approx_eq!(frame.atoms[0].properties["CS_1"].expect_double(), 31.34);
-        assert_approx_eq!(frame.atoms[51].properties["CS_0"].expect_double(), -73.98);
-        assert_approx_eq!(frame.atoms[51].properties["CS_1"].expect_double(), -81.85);
+        assert_approx_eq!(frame[0].properties["CS_0"].expect_double(), 24.10);
+        assert_approx_eq!(frame[0].properties["CS_1"].expect_double(), 31.34);
+        assert_approx_eq!(frame[51].properties["CS_0"].expect_double(), -73.98);
+        assert_approx_eq!(frame[51].properties["CS_1"].expect_double(), -81.85);
 
         // different types
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 62);
-        let vector3d = frame.atoms[0].properties["CS"].expect_vector3d();
+        let vector3d = frame[0].properties["CS"].expect_vector3d();
         assert_approx_eq!(vector3d[0], 198.20, 1e-12);
         assert_approx_eq!(vector3d[1], 202.27, 1e-12);
         assert_approx_eq!(vector3d[2], 202.27, 1e-12);
@@ -413,24 +413,18 @@ mod tests {
         // // Different syntaxes for bool values
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 8);
-        assert!(frame.atoms[0].properties["bool"].expect_bool());
-        assert!(frame.atoms[1].properties["bool"].expect_bool());
-        assert!(frame.atoms[2].properties["bool"].expect_bool());
-        assert!(frame.atoms[3].properties["bool"].expect_bool());
-        assert!(!frame.atoms[4].properties["bool"].expect_bool());
-        assert!(!frame.atoms[5].properties["bool"].expect_bool());
-        assert!(!frame.atoms[6].properties["bool"].expect_bool());
-        assert!(!frame.atoms[7].properties["bool"].expect_bool());
+        assert!(frame[0].properties["bool"].expect_bool());
+        assert!(frame[1].properties["bool"].expect_bool());
+        assert!(frame[2].properties["bool"].expect_bool());
+        assert!(frame[3].properties["bool"].expect_bool());
+        assert!(!frame[4].properties["bool"].expect_bool());
+        assert!(!frame[5].properties["bool"].expect_bool());
+        assert!(!frame[6].properties["bool"].expect_bool());
+        assert!(!frame[7].properties["bool"].expect_bool());
 
-        assert_eq!(frame.atoms[0].properties["int"].expect_double(), 33.0);
-        assert_eq!(
-            frame.atoms[0].properties["strings_0"].expect_string(),
-            "bar"
-        );
-        assert_eq!(
-            frame.atoms[0].properties["strings_1"].expect_string(),
-            "\"test\""
-        );
+        assert_eq!(frame[0].properties["int"].expect_double(), 33.0);
+        assert_eq!(frame[0].properties["strings_0"].expect_string(), "bar");
+        assert_eq!(frame[0].properties["strings_1"].expect_string(), "\"test\"");
     }
 
     #[test]

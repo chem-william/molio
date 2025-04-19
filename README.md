@@ -19,6 +19,6 @@ let frame = trajectory.read_at(0)?;
 let energy = frame.properties["Energy"].expect_double();
 
 // Access atomic properties
-let atom = &frame.atoms[0];
+let atom = &frame[0];
 let charge = atom.properties["charge"].expect_double();
 ```
