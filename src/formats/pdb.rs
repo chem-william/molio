@@ -158,23 +158,20 @@ impl FileFormat for PDBFormat {
         let mut line = String::new();
 
         while reader.read_line(&mut line)? > 0 {
-            let trimmed = line.trim();
+            if line.starts_with(Self::ENDMDL_RECORD) {
+                let mut next_line = String::new();
+                let bytes = reader.read_line(&mut next_line)?;
 
-            if trimmed.starts_with(Self::ENDMDL_RECORD) {
-                line.clear();
-
-                if reader.read_line(&mut line)? > 0 && !line.trim().starts_with(Self::END_RECORD) {
-                    // If it's not an END record, seek back to the start of this line
-                    let bytes = line.len();
-                    reader.seek_relative(
-                        -(i64::try_from(bytes).expect("failed to convert bytes offset")),
-                    )?;
+                reader.seek_relative(
+                    -(i64::try_from(bytes).expect("failed to convert bytes offset")),
+                )?;
+                if next_line.trim().starts_with(Self::END_RECORD) {
+                    next_line.clear();
+                    continue;
                 }
-                line.clear();
-                continue;
             }
 
-            if trimmed.starts_with(Self::END_RECORD) {
+            if line.starts_with(Self::END_RECORD) {
                 return Ok(Some(reader.stream_position()?));
             }
 
@@ -210,5 +207,9 @@ mod tests {
         let path = Path::new("./src/tests-data/pdb/water.pdb");
         let trajectory = Trajectory::new(path).unwrap();
         assert_eq!(trajectory.size, 100);
+
+        let path = Path::new("./src/tests-data/pdb/2hkb.pdb");
+        let trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 11);
     }
 }
