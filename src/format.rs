@@ -35,7 +35,7 @@ impl Format {
 
 pub trait FileFormat {
     fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError>;
-    // fn read(&self) -> Result<Frame, CError>;
+    fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError>;
     // fn read_at(&mut self, index: usize) -> Result<Frame, CError>;
     fn write(&self, path: &Path, frame: &Frame) -> Result<(), CError>;
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError>;
@@ -47,11 +47,11 @@ impl FileFormat for Format {
             Format::XYZ(format) => format.read_next(reader),
         }
     }
-    // fn read(&self) -> Result<Frame, CError> {
-    //     match self {
-    //         Format::XYZ(format) => format.read(),
-    //     }
-    // }
+    fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
+        match self {
+            Format::XYZ(format) => format.read(reader),
+        }
+    }
 
     fn write(&self, path: &Path, frame: &Frame) -> Result<(), CError> {
         match self {

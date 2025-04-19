@@ -42,9 +42,9 @@ impl<'a> Trajectory<'a> {
         })
     }
 
-    // pub fn read(&mut self) -> Result<Frame, CError> {
-    //     self.strategy.read()
-    // }
+    pub fn read(&mut self) -> Result<Option<Frame>, CError> {
+        self.strategy.read(&mut self.reader)
+    }
 
     pub fn read_at(&mut self, index: usize) -> Result<Frame, CError> {
         if index >= self.frame_positions.len() {

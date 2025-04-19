@@ -298,10 +298,14 @@ impl FileFormat for XYZFormat {
         Ok(frame)
     }
 
-    // fn read(&self) -> Result<Frame, CError> {
-    //     println!("Reading as XYZ format");
-    //     Ok(Frame { atoms: vec![] })
-    // }
+    fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
+        // TODO: replace with has_data_left when stabilized
+        if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
+            Ok(Some(self.read_next(reader).unwrap()))
+        } else {
+            Ok(None)
+        }
+    }
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
         let mut line_position = 0;
