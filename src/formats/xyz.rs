@@ -410,7 +410,7 @@ mod tests {
         assert_approx_eq!(vector3d[1], 202.27, 1e-12);
         assert_approx_eq!(vector3d[2], 202.27, 1e-12);
 
-        // // Different syntaxes for bool values
+        // Different syntaxes for bool values
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 8);
         assert!(frame[0].properties["bool"].expect_bool());
@@ -457,5 +457,61 @@ mod tests {
         assert_approx_eq!(positions[10][0], 0.8336);
         assert_approx_eq!(positions[10][1], 0.3006);
         assert_approx_eq!(positions[10][2], 0.4968);
+    }
+
+    macro_rules! assert_read_at_fails {
+        ($index:expr) => {
+            let path = Path::new(BAD_EXTENDED);
+            let mut trajectory = Trajectory::new(path).unwrap();
+            trajectory.read_at($index).unwrap();
+        };
+    }
+
+    const BAD_EXTENDED: &str = "./src/tests-data/xyz/bad_extended.xyz";
+
+    #[test]
+    #[should_panic(expected = "MissingToken")]
+    fn read_bad_files0() {
+        assert_read_at_fails!(0);
+    }
+    #[test]
+    #[should_panic(expected = "Failed to parse number")]
+    fn read_bad_files1() {
+        assert_read_at_fails!(1);
+    }
+    #[test]
+    #[should_panic(expected = "MissingToken")]
+    fn read_bad_files2() {
+        assert_read_at_fails!(2);
+    }
+    #[test]
+    #[should_panic(expected = "Failed to parse number")]
+    fn read_bad_files3() {
+        assert_read_at_fails!(3);
+    }
+    #[test]
+    #[should_panic(expected = "MissingToken")]
+    fn read_bad_files4() {
+        assert_read_at_fails!(4);
+    }
+    #[test]
+    #[should_panic(expected = "Failed to parse z component")]
+    fn read_bad_files5() {
+        assert_read_at_fails!(5);
+    }
+    #[test]
+    #[should_panic(expected = "MissingToken")]
+    fn read_bad_files6() {
+        assert_read_at_fails!(6);
+    }
+    #[test]
+    #[should_panic(expected = "Invalid boolean value: ok")]
+    fn read_bad_files7() {
+        assert_read_at_fails!(7);
+    }
+    #[test]
+    #[should_panic(expected = "MissingToken")]
+    fn read_bad_files8() {
+        assert_read_at_fails!(8);
     }
 }

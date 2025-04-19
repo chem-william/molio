@@ -1,0 +1,27 @@
+1
+invalid="missing value in double" Properties=species:S:1:pos:R:3:bad:R:1
+H 1.0 4.0 2.3
+1
+invalid="invalid value in double" Properties=species:S:1:pos:R:3:bad:R:1
+H 1.0 4.0 2.3 ff
+1
+invalid="missing value in int" Properties=species:S:1:pos:R:3:bad:I:1
+H 1.0 4.0 2.3
+1
+invalid="invalid value in int" Properties=species:S:1:pos:R:3:bad:I:1
+H 1.0 4.0 2.3 ze
+1
+invalid="missing value in Vector3D" Properties=species:S:1:pos:R:3:bad:R:3
+H 1.0 4.0 2.3 3 4
+1
+invalid="invalid value in Vector3D" Properties=species:S:1:pos:R:3:bad:R:3
+H 1.0 4.0 2.3 3 4 ff
+1
+invalid="missing value in bool" Properties=species:S:1:pos:R:3:bad:L:1
+H 1.0 4.0 2.3
+1
+invalid="invalid value in bool" Properties=species:S:1:pos:R:3:bad:L:1
+H 1.0 4.0 2.3 ok
+1
+invalid="missing string" Properties=species:S:1:pos:R:3:bad:S:1
+H 1.0 4.0 2.3
