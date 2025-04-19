@@ -1,6 +1,7 @@
 use assert_approx_eq::assert_approx_eq;
 use molio::property::{AtomProperty, PropertyKind};
 use molio::{extendedxyzparser::ExtendedXyzParser, unit_cell::UnitCell};
+use nalgebra::Matrix3;
 use std::collections::{BTreeMap, HashMap};
 use std::str::SplitWhitespace;
 use std::{
@@ -44,10 +45,12 @@ pub struct Atom {
     pub properties: AtomProperties,
 }
 
+type FrameProperties = HashMap<String, AtomProperty>;
 #[derive(Debug, Default)]
 pub struct Frame {
     pub atoms: Vec<Atom>,
     pub unit_cell: UnitCell,
+    pub properties: FrameProperties,
 }
 
 impl Frame {
@@ -55,6 +58,7 @@ impl Frame {
         Frame {
             atoms: vec![],
             unit_cell: UnitCell::new(),
+            properties: FrameProperties::new(),
         }
     }
     pub fn size(&self) -> usize {
@@ -124,6 +128,12 @@ impl XYZFormat {
                     atom.properties
                         .insert(property.0.clone(), AtomProperty::Vector3D([x, y, z]));
                 }
+                PropertyKind::Matrix3x3 => {
+                    unreachable!("there should not be a matrix3 in atom-properties")
+                }
+                PropertyKind::VectorXD => {
+                    unreachable!("there should not be a vectorXD in atom-properties")
+                }
             }
         }
         Ok(())
@@ -187,6 +197,37 @@ impl XYZFormat {
 
         Ok(properties)
     }
+
+    fn parse_frame_property(value: &str) -> AtomProperty {
+        let lowercased = value.to_lowercase();
+
+        if lowercased == "t" || lowercased == "true" {
+            return AtomProperty::Bool(true);
+        }
+        if lowercased == "f" || lowercased == "false" {
+            return AtomProperty::Bool(false);
+        }
+
+        if let Ok(num) = value.parse::<f64>() {
+            return AtomProperty::Double(num);
+        }
+
+        // attempt to parse arrays and matrices
+        let parts: Vec<&str> = value.split_whitespace().collect();
+        let numbers: Result<Vec<f64>, _> = parts.iter().map(|p| p.parse::<f64>()).collect();
+
+        if let Ok(nums) = numbers {
+            match nums.len() {
+                3 => return AtomProperty::Vector3D([nums[0], nums[1], nums[2]]),
+                9 => return AtomProperty::Matrix3x3(Matrix3::from_iterator(nums)),
+                _ => return AtomProperty::VectorXD(nums),
+            }
+        }
+
+        // if we haven't matched on anything else, treat it as a string
+        AtomProperty::String(value.to_string())
+    }
+
     fn read_extended_comment_line(line: &str, frame: &mut Frame) -> Result<PropertiesList, CError> {
         let contains_properties = line.contains("species:S:1:pos:R:3");
         let contains_lattice = line.contains("Lattice");
@@ -197,15 +238,16 @@ impl XYZFormat {
 
         let extxyz_parser = ExtendedXyzParser::new(line);
         let properties = extxyz_parser.parse();
-        println!("are there properties: {:?}", properties);
 
         for (name, value) in &properties {
+            // we defer this so we don't return early
             if name == "Lattice" || name == "Properties" {
                 continue;
             }
-            // frame.set(name.clone(), value.clone());
-        }
 
+            let prop = XYZFormat::parse_frame_property(value);
+            frame.properties.insert(name.clone(), prop);
+        }
         if let Some(lattice) = properties.get("Lattice") {
             let cell = UnitCell::parse(lattice);
             frame.unit_cell = cell;
@@ -218,6 +260,7 @@ impl XYZFormat {
         Ok(PropertiesList::new())
     }
 }
+
 impl FileFormat for XYZFormat {
     fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         let mut line = String::new();
@@ -512,6 +555,13 @@ mod tests {
         assert_approx_eq!(frame.atoms[0].properties["CS_0"].expect_double(), 24.10);
         assert_approx_eq!(frame.atoms[0].properties["CS_1"].expect_double(), 31.34);
 
+        // Frame level properties
+        println!("frame property: {:?}", frame.properties);
+        assert_eq!(frame.properties["ENERGY"].expect_double(), -2069.84934116);
+        assert_eq!(frame.properties["Natoms"].expect_double(), 192.0);
+        assert_eq!(frame.properties["NAME"].expect_string(), "COBHUW");
+        assert!(frame.properties["IsStrange"].expect_bool());
+
         let frame = trajectory.read_at(2).unwrap();
         assert_eq!(frame.size(), 8);
 
@@ -521,15 +571,5 @@ mod tests {
         unit_cell.cell_matrix[(2, 2)] = 3.0;
 
         assert_eq!(frame.unit_cell, unit_cell);
-
-        // frame level properties
-        // CHECK(frame.get("ENERGY")->as_string() == "-2069.84934116");
-        // CHECK(frame.get("Natoms")->as_string() == "192");
-        // CHECK(frame.get("NAME")->as_string() == "COBHUW");
-        // CHECK(frame.get("IsStrange")->as_bool() == true);
-
-        // CHECK(approx_eq(frame.positions()[0], {2.33827271799, 4.55315540425, 11.5841360926}, 1e-12));
-        // CHECK(frame[0].get("CS_0")->as_double() == 24.10);
-        // CHECK(frame[0].get("CS_1")->as_double() == 31.34);
     }
 }

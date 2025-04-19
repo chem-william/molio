@@ -1,3 +1,5 @@
+use nalgebra::{Matrix3, VectorN};
+
 // #[derive(Debug, Clone, PartialEq)]
 // pub enum PropertyKind {
 //     Bool(bool),
@@ -11,6 +13,8 @@ pub enum PropertyKind {
     Double,
     String,
     Vector3D,
+    Matrix3x3,
+    VectorXD,
 }
 
 #[derive(Debug)]
@@ -19,6 +23,8 @@ pub enum AtomProperty {
     Double(f64),
     String(String),
     Vector3D([f64; 3]),
+    Matrix3x3(Matrix3<f64>),
+    VectorXD(Vec<f64>),
 }
 impl AtomProperty {
     pub fn as_bool(&self) -> Option<bool> {
@@ -71,6 +77,25 @@ impl AtomProperty {
         match *self {
             AtomProperty::Vector3D(v) => v,
             ref other => panic!("expected Vector3D, found {:?}", other),
+        }
+    }
+    pub fn as_matrix3x3(&self) -> Option<[f64; 9]> {
+        if let AtomProperty::Matrix3x3(m) = *self {
+            let mut array = [0.0; 9];
+            array.copy_from_slice(m.as_slice());
+            Some(array)
+        } else {
+            None
+        }
+    }
+    pub fn expect_matrix3x3(&self) -> [f64; 9] {
+        match *self {
+            AtomProperty::Matrix3x3(m) => {
+                let mut array = [0.0; 9];
+                array.copy_from_slice(m.as_slice());
+                array
+            }
+            ref other => panic!("expected Matrix3x3, found {:?}", other),
         }
     }
 }
