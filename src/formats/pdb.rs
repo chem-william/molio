@@ -347,8 +347,7 @@ impl FileFormat for PDBFormat {
 mod tests {
     use std::path::Path;
 
-    use crate::{frame::Frame, trajectory::Trajectory, unit_cell::UnitCell};
-    use assert_approx_eq::assert_approx_eq;
+    use crate::{formats::pdb::decode_hybrid36, trajectory::Trajectory};
 
     #[test]
     fn check_nsteps() {

@@ -23,4 +23,10 @@ pub enum CError {
     ParseFloatError(#[from] std::num::ParseFloatError),
     #[error("Missing token")]
     MissingToken,
+    #[error("{expected_record_type} record '{actual_record_type}': {reason}")]
+    InvalidRecord {
+        expected_record_type: String,
+        actual_record_type: String,
+        reason: String,
+    },
 }
