@@ -2,12 +2,15 @@ use crate::error::CError;
 use crate::format::FileFormat;
 use crate::frame::Frame;
 use crate::property::Properties;
+use crate::property::Property;
+use crate::unit_cell::UnitCell;
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
 use std::path::Path;
 
-struct FullResidueId {
+pub struct FullResidueId {
     /// Chain identifier
     chain: char,
     /// Residue id
@@ -17,7 +20,7 @@ struct FullResidueId {
     /// Insertion code of the residue
     insertion_code: char,
 }
-struct Residue {
+pub struct Residue {
     name: String,
     id: Option<usize>,
     atoms: BTreeSet<usize>,
@@ -151,10 +154,30 @@ pub(crate) fn decode_hybrid36(width: usize, line: &str) -> Result<i64, CError> {
 }
 
 pub struct PDBFormat {
-    pub residues: BTreeMap<FullResidueId, Residue>,
+    /// Residue information in the current step
+    pub residues: RefCell<BTreeMap<FullResidueId, Residue>>,
+
+    /// List of all atom offsets. This maybe pushed in read_ATOM or if a TER
+    /// record is found. It is reset every time a frame is read.
+    pub atom_offsets: Vec<usize>,
 }
 
 impl PDBFormat {
+    fn parse_atom(&self, frame: &mut Frame, line: &str, is_hetatm: bool) -> Result<(), CError> {
+        debug_assert!(&line[..6] == "ATOM" || &line[..6] == "HETATM");
+        if line.len() < 54 {
+            return Err(CError::InvalidRecord {
+                expected_record_type: "ATOM".to_string(),
+                actual_record_type: line.to_string(),
+                reason: "line too short".to_string(),
+            });
+        }
+
+        if self.atom_offsets.is_empty() {
+            let initial_offset = decode_hybrid36(5, &line[6..11]);
+        }
+        Ok(())
+    }
     // fn parse_atom_line(&self, line: &str) -> Result<Atom, CError> {
     //     if line.len() < 54 {
     //         return Err(CError::InvalidRecord {
@@ -217,75 +240,131 @@ impl PDBFormat {
     //     })
     // }
 
-    // fn parse_cryst1_line(&self, line: &str) -> Result<UnitCell, CError> {
-    //     if line.len() < 54 {
-    //         return Err(CError::InvalidRecord {
-    //             record_type: "CRYST1".to_string(),
-    //             reason: "line too short".to_string(),
-    //         });
-    //     }
+    fn parse_cryst1(frame: &mut Frame, line: &str) -> Result<(), CError> {
+        assert_eq!(&line[..6], "CRYST1");
+        if line.len() < 54 {
+            return Err(CError::InvalidRecord {
+                expected_record_type: "CRYST1".to_string(),
+                actual_record_type: line.to_string(),
+                reason: "line too short".to_string(),
+            });
+        }
 
-    //     let a = line[6..15].trim().parse::<f64>().map_err(|e| CError::ParseError {
-    //         record_type: "CRYST1".to_string(),
-    //         field: "a parameter".to_string(),
-    //         error: e.to_string(),
-    //     })?;
-    //     let b = line[15..24].trim().parse::<f64>().map_err(|e| CError::ParseError {
-    //         record_type: "CRYST1".to_string(),
-    //         field: "b parameter".to_string(),
-    //         error: e.to_string(),
-    //     })?;
-    //     let c = line[24..33].trim().parse::<f64>().map_err(|e| CError::ParseError {
-    //         record_type: "CRYST1".to_string(),
-    //         field: "c parameter".to_string(),
-    //         error: e.to_string(),
-    //     })?;
-    //     let alpha = line[33..40].trim().parse::<f64>().map_err(|e| CError::ParseError {
-    //         record_type: "CRYST1".to_string(),
-    //         field: "alpha angle".to_string(),
-    //         error: e.to_string(),
-    //     })?;
-    //     let beta = line[40..47].trim().parse::<f64>().map_err(|e| CError::ParseError {
-    //         record_type: "CRYST1".to_string(),
-    //         field: "beta angle".to_string(),
-    //         error: e.to_string(),
-    //     })?;
-    //     let gamma = line[47..54].trim().parse::<f64>().map_err(|e| CError::ParseError {
-    //         record_type: "CRYST1".to_string(),
-    //         field: "gamma angle".to_string(),
-    //         error: e.to_string(),
-    //     })?;
+        let a = line[6..15]
+            .trim()
+            .parse::<f64>()
+            .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
+        let b = line[15..24]
+            .trim()
+            .parse::<f64>()
+            .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
+        let c = line[24..33]
+            .trim()
+            .parse::<f64>()
+            .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
+        let alpha = line[33..40]
+            .trim()
+            .parse::<f64>()
+            .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
+        let beta = line[40..47]
+            .trim()
+            .parse::<f64>()
+            .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
+        let gamma = line[47..54]
+            .trim()
+            .parse::<f64>()
+            .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
 
-    //     Ok(UnitCell {
-    //         a,
-    //         b,
-    //         c,
-    //         alpha,
-    //         beta,
-    //         gamma,
-    //     })
-    // }
+        let unit_cell =
+            UnitCell::cell_matrix_from_lengths_angles([a, b, c], &mut [alpha, beta, gamma])?;
+        frame.unit_cell = unit_cell;
 
+        if line.len() >= 55 {
+            let space_group = &line[55..65].trim();
+            // TODO: handle this as a warning (somehow)?
+            if space_group != &"P 1" && space_group != &"P1" {
+                println!("ignoring custom spce group ({space_group}), using P1 instead");
+            }
+        }
+
+        Ok(())
+    }
+    pub fn new() -> Self {
+        PDBFormat {
+            residues: RefCell::new(BTreeMap::new()),
+            atom_offsets: Vec::new(),
+        }
+    }
     const END_RECORD: &str = "END";
     const ENDMDL_RECORD: &str = "ENDMDL";
 }
 
 impl FileFormat for PDBFormat {
     fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
-        self.residues.clear();
+        self.residues.borrow_mut().clear();
         let mut line = String::new();
+        let mut frame = Frame::new();
 
-        while reader.read_line(line)? > 0 {}
+        while reader.read_line(&mut line)? > 0 {
+            let record = get_record(&line);
+            let name = String::new();
 
-        // let mut frame = Frame::new();
-        // let mut line = String::new();
-
-        // while reader.read_line(&mut line)? > 0 {
-        //     let trimmed = line.trim();
-        //     if trimmed.is_empty() {
-        //         continue;
-        //     }
-
+            match record {
+                Record::HEADER => {
+                    if line.len() >= 50 {
+                        frame.properties.insert(
+                            "classification".to_string(),
+                            Property::String(line[10..50].trim().to_string()),
+                        );
+                    }
+                    if line.len() >= 59 {
+                        frame.properties.insert(
+                            "deposition_date".to_string(),
+                            Property::String(line[50..59].trim().to_string()),
+                        );
+                    }
+                    if line.len() >= 66 {
+                        frame.properties.insert(
+                            "pdb_idcode".to_string(),
+                            Property::String(line[62..66].trim().to_string()),
+                        );
+                    }
+                }
+                Record::TITLE => {
+                    if line.len() < 11 {
+                        continue;
+                    }
+                    let title = line[10..80].trim();
+                    let current = frame
+                        .properties
+                        .get("name")
+                        .and_then(|p| p.as_string())
+                        .unwrap_or_default();
+                    let new_title = if current.is_empty() {
+                        title.to_string()
+                    } else {
+                        format!("{} {}", current, title)
+                    };
+                    frame
+                        .properties
+                        .insert("name".to_string(), Property::String(new_title));
+                }
+                Record::CRYST1 => PDBFormat::parse_cryst1(&mut frame, &line).unwrap(),
+                Record::ATOM => self.parse_atom(&mut frame, &line, false).unwrap(),
+                // Record::HETATM => {}
+                // Record::CONECT => {}
+                // Record::MODEL => {}
+                // Record::ENDMDL => {}
+                // Record::HELIX => {}
+                // Record::SHEET => {}
+                // Record::TURN => {}
+                // Record::TER => {}
+                // Record::END => {}
+                // Record::IGNORED_ => {}
+                // Record::UNKNOWN_ => {}
+                _ => {}
+            }
+        }
         //     if trimmed.starts_with("CRYST1") {
         //         let unit_cell = Self::parse_cryst1_line(self, trimmed)?;
         //         // frame.unit_cell = unit_cell;
@@ -299,7 +378,7 @@ impl FileFormat for PDBFormat {
         //     line.clear();
         // }
 
-        // Ok(frame)
+        Ok(frame)
     }
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {

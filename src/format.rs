@@ -23,18 +23,14 @@ impl Format {
 
         match ext.to_lowercase().as_str() {
             "xyz" => Ok(Format::XYZ(XYZFormat)),
-            "pdb" => Ok(Format::PDB(PDBFormat {
-                residues: BTreeMap::new(),
-            })),
+            "pdb" => Ok(Format::PDB(PDBFormat::new())),
             _ => Err(CError::GenericError("unknown file format".to_string())),
         }
     }
     pub fn new_from_format(fmt: TextFormat, path: &Path) -> Result<Self, CError> {
         match fmt {
             TextFormat::XYZ => Ok(Format::XYZ(XYZFormat)),
-            TextFormat::PDB => Ok(Format::PDB(PDBFormat {
-                residues: BTreeMap::new(),
-            })),
+            TextFormat::PDB => Ok(Format::PDB(PDBFormat::new())),
             TextFormat::Guess => Self::new(path),
         }
     }
