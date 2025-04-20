@@ -80,6 +80,76 @@ pub fn get_record(line: &str) -> Record {
     }
 }
 
+const DIGITS_UPPER: &str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const DIGITS_LOWER: &str = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+fn decode_pure(s: &str) -> i64 {
+    let mut result: i64 = 0;
+    let base = 36; // Supports 0-9, A-Z, a-z, but lowercase maps like uppercase
+
+    for c in s.chars() {
+        result *= base;
+        result += digit_to_value(c) as i64;
+    }
+
+    result
+}
+
+fn digit_to_value(c: char) -> i32 {
+    match c {
+        '0'..='9' => (c as u8 - b'0') as i32,
+        'A'..='Z' => (c as u8 - b'A') as i32 + 10,
+        'a'..='z' => (c as u8 - b'a') as i32 + 10,
+        _ => panic!("Invalid character: {}", c),
+    }
+}
+
+fn pow_int(base: usize, power: usize) -> i64 {
+    (base.pow(power as u32)) as i64
+}
+
+pub(crate) fn decode_hybrid36(width: usize, line: &str) -> Result<i64, CError> {
+    if line.len() > width {
+        return Err(CError::GenericError(format!(
+            "length of '{line}' is greater than the width '{width}'. this is a bug"
+        )));
+    }
+
+    let f = line.chars().next().unwrap();
+    if let Some(f) = line.chars().next() {
+        if f == '-' || f == ' ' {
+            // Negative or space-prefixed numbers are not encoded → return 0
+            return Ok(0);
+        } else if f.is_ascii_digit() {
+            // Try to parse as a number
+            return line.parse::<i64>().map_err(|_e| {
+                CError::GenericError(format!("expected negative number. got '{f}'"))
+            });
+        }
+    }
+
+    if line.is_empty() {
+        return Ok(0);
+    }
+
+    if DIGITS_UPPER.contains(f) {
+        let is_valid = line
+            .chars()
+            .all(|c| c.is_ascii_digit() || c.is_ascii_uppercase());
+
+        if !is_valid {
+            return Err(CError::GenericError(format!(
+                "the value '{}' is not a valid hybrid 36 number",
+                line
+            )));
+        }
+
+        return Ok(decode_pure(line) - 10 * pow_int(36, width - 1) + pow_int(10, width));
+    }
+
+    Ok(1)
+}
+
 pub struct PDBFormat {
     pub residues: BTreeMap<FullResidueId, Residue>,
 }
@@ -289,5 +359,11 @@ mod tests {
         let path = Path::new("./src/tests-data/pdb/2hkb.pdb");
         let trajectory = Trajectory::new(path).unwrap();
         assert_eq!(trajectory.size, 11);
+    }
+
+    #[test]
+    fn hybrid_decode() {
+        assert_eq!(decode_hybrid36(4, "    ").unwrap(), 0);
+        assert_eq!(decode_hybrid36(4, "  -0").unwrap(), 0);
     }
 }
