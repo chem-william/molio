@@ -390,6 +390,36 @@ mod tests {
         assert_eq!(frame.properties["ENERGY"].expect_double(), -2069.84934116);
         assert_eq!(frame.properties["Natoms"].expect_double(), 192.0);
         assert_eq!(frame.properties["NAME"].expect_string(), "COBHUW");
+        let virial = frame.properties["virial"].expect_matrix3x3();
+        let true_virial = [
+            222.64807906606316,
+            21.561432674983322,
+            57.08570699995725,
+            21.561432674983322,
+            247.82551996948678,
+            -13.553549356442273,
+            57.08570699995725,
+            -13.553549356442273,
+            156.87636103904026,
+        ];
+        for i in 0..9 {
+            assert_approx_eq!(virial[i], true_virial[i], 1e-12);
+        }
+        let stress = frame.properties["stress"].expect_matrix3x3();
+        let true_stress = [
+            -0.0002564107895985581,
+            0.0,
+            0.0,
+            0.0,
+            -1.221_130_654_549_481e-5,
+            0.0,
+            0.0,
+            0.0,
+            -0.00026623200192425463,
+        ];
+        for i in 0..9 {
+            assert_approx_eq!(stress[i], true_stress[i], 1e-12);
+        }
         assert!(frame.properties["IsStrange"].expect_bool());
 
         // Atom level properties
