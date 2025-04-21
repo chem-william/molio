@@ -277,7 +277,7 @@ impl FileFormat for XYZFormat {
             let _ = reader.read_line(&mut line)?;
             let mut tokens = line.split_whitespace();
 
-            let name = tokens.next().ok_or(CError::UnexpectedSymbol)?.to_string();
+            let symbol = tokens.next().ok_or(CError::UnexpectedSymbol)?.to_string();
 
             let x: f64 = tokens.next().ok_or(CError::MissingToken)?.parse()?;
             let y: f64 = tokens.next().ok_or(CError::MissingToken)?.parse()?;

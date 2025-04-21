@@ -160,7 +160,7 @@ pub struct PDBFormat {
 
     /// List of all atom offsets. This maybe pushed in read_ATOM or if a TER
     /// record is found. It is reset every time a frame is read.
-    pub atom_offsets: Vec<usize>,
+    pub atom_offsets: RefCell<Vec<usize>>,
 }
 
 impl PDBFormat {
@@ -174,27 +174,48 @@ impl PDBFormat {
             });
         }
 
-        if self.atom_offsets.is_empty() {
+        if self.atom_offsets.borrow().is_empty() {
             let initial_offset = decode_hybrid36(5, &line[6..11]);
+            println!(
+                "{} is not a valid atom id, assuming '1'",
+                initial_offset.as_ref().unwrap()
+            );
+            self.atom_offsets.borrow_mut().push(0);
+            if initial_offset.is_err() {
+                println!(
+                    "{} is not a valid atom id, assuming '1'",
+                    initial_offset.as_ref().unwrap()
+                );
+                self.atom_offsets.borrow_mut().push(0);
+            }
+
+            if *initial_offset.as_ref().unwrap() <= 0 {
+                println!(
+                    "warning: '{}' is too small, assuming id is '1'",
+                    initial_offset.as_ref().unwrap()
+                );
+                self.atom_offsets.borrow_mut().push(0);
+            } else {
+                self.atom_offsets.borrow_mut().push(
+                    usize::try_from(*initial_offset.as_ref().unwrap())
+                        .expect("decode_hybrid36 returned a negative number"),
+                );
+            };
+        }
+
+        let mut atom = Atom::default();
+        let name = &line[12..16];
+        if line.len() >= 78 {
+            let atom_type = &line[76..78];
+            atom.name = name.to_string();
+            atom.symbol = atom_type.to_string();
+        } else {
+            // Read just the atom name and hope for the best
+            atom.name = name.to_string();
         }
         Ok(())
     }
     // fn parse_atom_line(&self, line: &str) -> Result<Atom, CError> {
-    //     if line.len() < 54 {
-    //         return Err(CError::InvalidRecord {
-    //             record_type: "ATOM".to_string(),
-    //             reason: "line too short".to_string(),
-    //         });
-    //     }
-
-    //     let serial = line[6..11].trim().parse::<usize>().map_err(|e| CError::ParseError {
-    //         record_type: "ATOM".to_string(),
-    //         field: "serial number".to_string(),
-    //         error: e.to_string(),
-    //     })?;
-
-    //     let name = line[12..16].trim().to_string();
-    //     let alt_loc = line[16..17].trim().to_string();
     //     let res_name = line[17..20].trim().to_string();
     //     let chain_id = line[21..22].trim().to_string();
     //     let res_seq = line[22..26].trim().parse::<i32>().map_err(|e| CError::ParseError {
@@ -293,7 +314,7 @@ impl PDBFormat {
     pub fn new() -> Self {
         PDBFormat {
             residues: RefCell::new(BTreeMap::new()),
-            atom_offsets: Vec::new(),
+            atom_offsets: RefCell::new(Vec::new()),
         }
     }
     const END_RECORD: &str = "END";
