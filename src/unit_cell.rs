@@ -11,6 +11,150 @@ pub enum CellShape {
     Infinite,
 }
 
+mod utils {
+    use super::*;
+
+    pub fn deg2rad(x: f64) -> f64 {
+        x * f64::consts::PI / 180.0
+    }
+
+    pub fn rad2deg(x: f64) -> f64 {
+        x * 180.0 / f64::consts::PI
+    }
+
+    pub fn cos_degree(theta: f64) -> f64 {
+        utils::deg2rad(theta).cos()
+    }
+
+    pub fn sin_degree(theta: f64) -> f64 {
+        utils::deg2rad(theta).sin()
+    }
+
+    pub fn is_roughly_zero(x: f64) -> bool {
+        x.abs() < 1e-5
+    }
+
+    pub fn is_roughly_90(value: f64) -> bool {
+        // We think that 89.999° is close enough to 90°
+        (value - 90.0).abs() < 1e-3
+    }
+
+    pub fn calc_lengths_from_matrix(matrix: Matrix3<f64>) -> Vec3D {
+        let v1 = matrix.row(0);
+        let v2 = matrix.row(1);
+        let v3 = matrix.row(2);
+
+        [v1.norm(), v2.norm(), v3.norm()]
+    }
+
+    pub fn calc_angles_from_matrix(matrix: Matrix3<f64>) -> Vec3D {
+        let v1 = matrix.row(0);
+        let v2 = matrix.row(1);
+        let v3 = matrix.row(2);
+
+        [
+            rad2deg((v2.dot(&v3) / (v2.norm() * v3.norm())).acos()),
+            rad2deg((v1.dot(&v3) / (v1.norm() * v3.norm())).acos()),
+            rad2deg((v1.dot(&v2) / (v1.norm() * v2.norm())).acos()),
+        ]
+    }
+
+    pub fn is_orthorhombic(lengths: Vec3D, angles: Vec3D) -> bool {
+        if is_infinite(lengths) {
+            return false;
+        };
+
+        // we support cells with one or two lengths of 0 which results in NaN angles
+        (is_roughly_90(angles[0]) || angles[0].is_nan())
+            && (is_roughly_90(angles[1]) || angles[1].is_nan())
+            && (is_roughly_90(angles[2]) || angles[2].is_nan())
+    }
+
+    pub fn is_infinite(lengths: Vec3D) -> bool {
+        is_roughly_zero(lengths[0]) && is_roughly_zero(lengths[1]) && is_roughly_zero(lengths[2])
+    }
+
+    pub fn is_diagonal(matrix: Matrix3<f64>) -> bool {
+        is_roughly_zero(matrix[(1, 0)])
+            && is_roughly_zero(matrix[(2, 0)])
+            && is_roughly_zero(matrix[(0, 1)])
+            && is_roughly_zero(matrix[(2, 1)])
+            && is_roughly_zero(matrix[(0, 2)])
+            && is_roughly_zero(matrix[(1, 2)])
+    }
+}
+
+mod validation {
+    use super::*;
+
+    pub fn check_lengths(lengths: &Vec3D) -> Result<(), CError> {
+        if lengths.iter().any(|&x| x < 0.0) {
+            return Err(CError::GenericError(
+                "lengths cannot be negative".to_string(),
+            ));
+        };
+
+        Ok(())
+    }
+
+    pub fn check_angles(angles: &Vec3D) -> Result<(), CError> {
+        if angles.iter().any(|&x| x < 0.0) {
+            return Err(CError::GenericError(
+                "angles cannot be negative".to_string(),
+            ));
+        };
+
+        if angles.iter().any(|&x| utils::is_roughly_zero(x)) {
+            return Err(CError::GenericError(
+                "angles cannot be (roughly) zero".to_string(),
+            ));
+        }
+
+        if angles.iter().any(|&x| x >= 180.0) {
+            return Err(CError::GenericError(
+                "angles cannot be larger than or equal to 180 degrees".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+mod matrix {
+    use super::*;
+
+    pub fn cell_matrix_from_lengths_angles(
+        lengths: Vec3D,
+        angles: &mut Vec3D,
+    ) -> Result<Matrix3<f64>, CError> {
+        validation::check_lengths(&lengths)?;
+        validation::check_angles(angles)?;
+
+        if angles.iter().all(|&x| utils::is_roughly_90(x)) {
+            angles.iter_mut().for_each(|x| *x = 90.0);
+        }
+        let mut cell_matrix: Matrix3<f64> = Matrix3::zeros();
+        cell_matrix[(0, 0)] = lengths[0];
+
+        cell_matrix[(1, 0)] = utils::cos_degree(angles[2]) * lengths[1];
+        cell_matrix[(1, 1)] = utils::sin_degree(angles[2]) * lengths[1];
+
+        cell_matrix[(2, 0)] = utils::cos_degree(angles[1]);
+        cell_matrix[(2, 1)] = (utils::cos_degree(angles[0])
+            - utils::cos_degree(angles[1]) * utils::cos_degree(angles[2]))
+            / utils::sin_degree(angles[2]);
+        cell_matrix[(2, 2)] = (1.0
+            - cell_matrix[(2, 0)] * cell_matrix[(2, 0)]
+            - cell_matrix[(2, 1)] * cell_matrix[(2, 1)])
+            .sqrt();
+        cell_matrix[(2, 0)] *= lengths[2];
+        cell_matrix[(2, 1)] *= lengths[2];
+        cell_matrix[(2, 2)] *= lengths[2];
+
+        Ok(cell_matrix)
+    }
+}
+
 #[derive(Debug)]
 pub struct UnitCell {
     pub matrix: Matrix3<f64>,
@@ -26,119 +170,8 @@ impl PartialEq for UnitCell {
             .all(|(a, b)| (a - b).abs() < f64::EPSILON)
     }
 }
-fn deg2rad(x: f64) -> f64 {
-    x * f64::consts::PI / 180.0
-}
-
-fn rad2deg(x: f64) -> f64 {
-    x * 180.0 / f64::consts::PI
-}
-
-fn is_roughly_zero(x: f64) -> bool {
-    x.abs() < 1e-5
-}
-
-fn calc_lengths_from_matrix(matrix: Matrix3<f64>) -> Vec3D {
-    let v1 = matrix.row(0);
-    let v2 = matrix.row(1);
-    let v3 = matrix.row(2);
-
-    [v1.norm(), v2.norm(), v3.norm()]
-}
-
-fn calc_angles_from_matrix(matrix: Matrix3<f64>) -> Vec3D {
-    let v1 = matrix.row(0);
-    let v2 = matrix.row(1);
-    let v3 = matrix.row(2);
-
-    [
-        rad2deg((v2.dot(&v3) / (v2.norm() * v3.norm())).acos()),
-        rad2deg((v1.dot(&v3) / (v1.norm() * v3.norm())).acos()),
-        rad2deg((v1.dot(&v2) / (v1.norm() * v2.norm())).acos()),
-    ]
-}
-
-fn is_roughly_90(value: f64) -> bool {
-    // We think that 89.999° is close enough to 90°
-    (value - 90.0).abs() < 1e-3
-}
-
-fn is_diagonal(matrix: Matrix3<f64>) -> bool {
-    is_roughly_zero(matrix[(1, 0)])
-        && is_roughly_zero(matrix[(2, 0)])
-        && is_roughly_zero(matrix[(0, 1)])
-        && is_roughly_zero(matrix[(2, 1)])
-        && is_roughly_zero(matrix[(0, 2)])
-        && is_roughly_zero(matrix[(1, 2)])
-}
-
-fn is_infinite(lengths: Vec3D) -> bool {
-    is_roughly_zero(lengths[0]) && is_roughly_zero(lengths[1]) && is_roughly_zero(lengths[2])
-}
-
-fn is_orthorhombic(lengths: Vec3D, angles: Vec3D) -> bool {
-    if is_infinite(lengths) {
-        return false;
-    };
-
-    // we support cells with one or two lengths of 0 which results in NaN angles
-    (is_roughly_90(angles[0]) || angles[0].is_nan())
-        && (is_roughly_90(angles[1]) || angles[1].is_nan())
-        && (is_roughly_90(angles[2]) || angles[2].is_nan())
-}
-
-// fn volume(shape: &CellShape, matrix: Matrix3<f64>) -> f64 {
-//     match shape {
-//         CellShape::Infinite => 0.0,
-//         CellShape::Orthorhombic | CellShape::Triclinic => matrix.determinant(),
-//     }
-// }
 
 impl UnitCell {
-    fn cos_degree(theta: f64) -> f64 {
-        deg2rad(theta).cos()
-    }
-
-    fn sin_degree(theta: f64) -> f64 {
-        deg2rad(theta).sin()
-    }
-
-    // fn volume(&self) -> f64 {
-    //     volume(&self.shape, self.matrix)
-    // }
-
-    fn check_lengths(lengths: &Vec3D) -> Result<(), CError> {
-        if lengths.iter().any(|&x| x < 0.0) {
-            return Err(CError::GenericError(
-                "lengths cannot be negative".to_string(),
-            ));
-        };
-
-        Ok(())
-    }
-
-    fn check_angles(angles: &Vec3D) -> Result<(), CError> {
-        if angles.iter().any(|&x| x < 0.0) {
-            return Err(CError::GenericError(
-                "angles cannot be negative".to_string(),
-            ));
-        };
-
-        if angles.iter().any(|&x| is_roughly_zero(x)) {
-            return Err(CError::GenericError(
-                "angles cannot be (roughly) zero".to_string(),
-            ));
-        }
-
-        if angles.iter().any(|&x| x >= 180.0) {
-            return Err(CError::GenericError(
-                "angles cannot be larger than or equal to 180 degrees".to_string(),
-            ));
-        }
-
-        Ok(())
-    }
-
     pub fn new() -> Self {
         UnitCell::new_from_lengths([0.0, 0.0, 0.0])
     }
@@ -148,7 +181,7 @@ impl UnitCell {
     }
 
     pub fn new_from_lengths_angles(lengths: Vec3D, angles: &mut Vec3D) -> Result<Self, CError> {
-        let matrix = Self::cell_matrix_from_lengths_angles(lengths, angles).unwrap();
+        let matrix = matrix::cell_matrix_from_lengths_angles(lengths, angles)?;
         Self::new_from_matrix(matrix)
     }
 
@@ -159,16 +192,16 @@ impl UnitCell {
             ));
         };
 
-        let lengths = calc_lengths_from_matrix(matrix);
-        let angles = calc_angles_from_matrix(matrix);
+        let lengths = utils::calc_lengths_from_matrix(matrix);
+        let angles = utils::calc_angles_from_matrix(matrix);
 
-        let is_diagonal_matrix = is_diagonal(matrix);
-        if !is_diagonal_matrix && is_orthorhombic(lengths, angles) {
+        let is_diagonal_matrix = utils::is_diagonal(matrix);
+        if !is_diagonal_matrix && utils::is_orthorhombic(lengths, angles) {
             return Err(CError::GenericError("orthorhombic cell must have their a vector along x axis, b vector along y axis and c vector along z axis".to_string()));
         };
 
         let shape = if is_diagonal_matrix {
-            if matrix.diagonal().iter().all(|&x| is_roughly_zero(x)) {
+            if matrix.diagonal().iter().all(|&x| utils::is_roughly_zero(x)) {
                 CellShape::Infinite
             } else {
                 CellShape::Orthorhombic
@@ -186,37 +219,6 @@ impl UnitCell {
         })
     }
 
-    pub fn cell_matrix_from_lengths_angles(
-        lengths: Vec3D,
-        angles: &mut Vec3D,
-    ) -> Result<Matrix3<f64>, CError> {
-        Self::check_lengths(&lengths)?;
-        Self::check_angles(angles)?;
-
-        if angles.iter().all(|&x| is_roughly_90(x)) {
-            angles.iter_mut().for_each(|x| *x = 90.0);
-        }
-        let mut cell_matrix: Matrix3<f64> = Matrix3::zeros();
-        cell_matrix[(0, 0)] = lengths[0];
-
-        cell_matrix[(1, 0)] = Self::cos_degree(angles[2]) * lengths[1];
-        cell_matrix[(1, 1)] = Self::sin_degree(angles[2]) * lengths[1];
-
-        cell_matrix[(2, 0)] = Self::cos_degree(angles[1]);
-        cell_matrix[(2, 1)] = (Self::cos_degree(angles[0])
-            - Self::cos_degree(angles[1]) * Self::cos_degree(angles[2]))
-            / Self::sin_degree(angles[2]);
-        cell_matrix[(2, 2)] = (1.0
-            - cell_matrix[(2, 0)] * cell_matrix[(2, 0)]
-            - cell_matrix[(2, 1)] * cell_matrix[(2, 1)])
-            .sqrt();
-        cell_matrix[(2, 0)] *= lengths[2];
-        cell_matrix[(2, 1)] *= lengths[2];
-        cell_matrix[(2, 2)] *= lengths[2];
-
-        Ok(cell_matrix)
-    }
-
     pub fn lengths(&self) -> Vec3D {
         match self.shape {
             CellShape::Infinite => [0.0, 0.0, 0.0],
@@ -225,14 +227,14 @@ impl UnitCell {
                 self.matrix[(1, 1)],
                 self.matrix[(2, 2)],
             ],
-            CellShape::Triclinic => calc_lengths_from_matrix(self.matrix),
+            CellShape::Triclinic => utils::calc_lengths_from_matrix(self.matrix),
         }
     }
 
     pub fn angles(&self) -> Vec3D {
         match self.shape {
             CellShape::Infinite | CellShape::Orthorhombic => [90.0, 90.0, 90.0],
-            CellShape::Triclinic => calc_angles_from_matrix(self.matrix),
+            CellShape::Triclinic => utils::calc_angles_from_matrix(self.matrix),
         }
     }
 }
@@ -251,20 +253,20 @@ mod tests {
     #[test]
     fn test_check_lengths_valid() {
         let lengths = [1.0, 2.0, 3.0];
-        assert!(UnitCell::check_lengths(&lengths).is_ok());
+        assert!(validation::check_lengths(&lengths).is_ok());
     }
 
     #[test]
     #[should_panic(expected = "lengths cannot be negative")]
     fn test_check_lengths_invalid() {
         let lengths = [-1.0, -2.0, -3.0];
-        UnitCell::check_lengths(&lengths).unwrap();
+        validation::check_lengths(&lengths).unwrap();
     }
 
     #[test]
     fn test_check_angles_valid() {
         let angles = [90.0, 90.0, 90.0];
-        assert!(UnitCell::check_angles(&angles).is_ok());
+        assert!(validation::check_angles(&angles).is_ok());
     }
 
     #[test]
@@ -289,21 +291,21 @@ mod tests {
     #[should_panic(expected = "angles cannot be negative")]
     fn test_check_angles_invalid_negative() {
         let angles = [-90.0, -90.0, -90.0];
-        UnitCell::check_angles(&angles).unwrap();
+        validation::check_angles(&angles).unwrap();
     }
 
     #[test]
     #[should_panic(expected = "angles cannot be (roughly) zero")]
     fn test_check_angles_invalid_zero() {
         let angles = [0.0, 0.0, 0.0];
-        UnitCell::check_angles(&angles).unwrap();
+        validation::check_angles(&angles).unwrap();
     }
 
     #[test]
     #[should_panic(expected = "angles cannot be larger than or equal to 180 degrees")]
     fn test_check_angles_invalid_180() {
         let angles = [180.0, 180.0, 180.0];
-        UnitCell::check_angles(&angles).unwrap();
+        validation::check_angles(&angles).unwrap();
     }
 
     #[test]
@@ -311,6 +313,6 @@ mod tests {
     fn test_cell_matrix_from_lengths_angles_invalid() {
         let lengths = [-10.0, 20.0, 30.0];
         let mut angles = [90.0, 90.0, 90.0];
-        UnitCell::cell_matrix_from_lengths_angles(lengths, &mut angles).unwrap();
+        matrix::cell_matrix_from_lengths_angles(lengths, &mut angles).unwrap();
     }
 }
