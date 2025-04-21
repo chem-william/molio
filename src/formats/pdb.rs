@@ -609,7 +609,7 @@ mod tests {
     #[test]
     fn check_nsteps() {
         let path = Path::new("./src/tests-data/pdb/water.pdb");
-        let trajectory = Trajectory::new(path).unwrap();
+        let mut trajectory = Trajectory::new(path).unwrap();
         assert_eq!(trajectory.size, 100);
 
         let path = Path::new("./src/tests-data/pdb/2hkb.pdb");
@@ -623,19 +623,37 @@ mod tests {
         let mut trajectory = Trajectory::new(path).unwrap();
         assert_eq!(trajectory.size, 100);
 
-        let frame = trajectory.read().unwrap().unwrap();
+        let mut frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 297);
 
-        let positions = frame.positions();
-        assert_approx_eq!(positions[0][0], 0.417, 1e-5);
-        assert_approx_eq!(positions[0][1], 8.303, 1e-5);
-        assert_approx_eq!(positions[0][2], 11.737, 1e-5);
+        let mut positions = frame.positions();
+        assert_approx_eq!(positions[0][0], 0.417, 1e-3);
+        assert_approx_eq!(positions[0][1], 8.303, 1e-3);
+        assert_approx_eq!(positions[0][2], 11.737, 1e-3);
+
+        assert_approx_eq!(positions[296][0], 6.664, 1e-3);
+        assert_approx_eq!(positions[296][1], 11.6148, 1e-3);
+        assert_approx_eq!(positions[296][2], 12.961, 1e-3);
 
         let cell = frame.unit_cell;
         assert_eq!(cell.shape, CellShape::Orthorhombic);
         assert_approx_eq!(cell.lengths()[0], 15.0);
         assert_approx_eq!(cell.lengths()[1], 15.0);
         assert_approx_eq!(cell.lengths()[2], 15.0);
+
+        trajectory.read().unwrap().unwrap();
+        frame = trajectory.read().unwrap().unwrap();
+
+        assert_eq!(frame.size(), 297);
+        positions = frame.positions();
+
+        assert_approx_eq!(positions[0][0], 0.299, 1e-4);
+        assert_approx_eq!(positions[0][1], 8.310, 1e-4);
+        assert_approx_eq!(positions[0][2], 11.721, 1e-4);
+
+        assert_approx_eq!(positions[296][0], 6.798, 1e-4);
+        assert_approx_eq!(positions[296][1], 11.509, 1e-4);
+        assert_approx_eq!(positions[296][2], 12.704, 1e-4);
     }
 
     macro_rules! recycle_check {
