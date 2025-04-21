@@ -3,7 +3,7 @@ use crate::property::Properties;
 use crate::unit_cell::UnitCell;
 use std::ops::{Index, IndexMut};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Frame {
     pub atoms: Vec<Atom>,
     pub unit_cell: UnitCell,

@@ -381,8 +381,7 @@ impl PDBFormat {
             .parse::<f64>()
             .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
 
-        let unit_cell =
-            UnitCell::cell_matrix_from_lengths_angles([a, b, c], &mut [alpha, beta, gamma])?;
+        let unit_cell = UnitCell::new_from_lengths_angles([a, b, c], &mut [alpha, beta, gamma])?;
         frame.unit_cell = unit_cell;
 
         if line.len() >= 55 {
@@ -527,7 +526,9 @@ impl FileFormat for PDBFormat {
 mod tests {
     use std::path::Path;
 
-    use crate::{formats::pdb::decode_hybrid36, trajectory::Trajectory};
+    use assert_approx_eq::assert_approx_eq;
+
+    use crate::{formats::pdb::decode_hybrid36, trajectory::Trajectory, unit_cell::CellShape};
 
     #[test]
     fn check_nsteps() {
@@ -548,6 +549,17 @@ mod tests {
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 297);
+
+        let positions = frame.positions();
+        assert_approx_eq!(positions[0][0], 0.417, 1e-5);
+        assert_approx_eq!(positions[0][1], 8.303, 1e-5);
+        assert_approx_eq!(positions[0][2], 11.737, 1e-5);
+
+        let cell = frame.unit_cell;
+        assert_eq!(cell.shape, CellShape::Orthorhombic);
+        assert_approx_eq!(cell.lengths()[0], 15.0);
+        assert_approx_eq!(cell.lengths()[1], 15.0);
+        assert_approx_eq!(cell.lengths()[2], 15.0);
     }
 
     #[test]

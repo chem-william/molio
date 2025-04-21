@@ -4,55 +4,107 @@ use nalgebra::Matrix3;
 
 type Vec3D = [f64; 3];
 
-#[derive(Default, Debug)]
+#[derive(Debug, PartialEq, Eq)]
+pub enum CellShape {
+    Orthorhombic,
+    Triclinic,
+    Infinite,
+}
+
+#[derive(Debug)]
 pub struct UnitCell {
-    pub cell_matrix: Matrix3<f64>,
+    pub matrix: Matrix3<f64>,
+    pub shape: CellShape,
+    pub matrix_inv_transposed: Option<Matrix3<f64>>,
 }
 
 impl PartialEq for UnitCell {
     fn eq(&self, other: &Self) -> bool {
-        self.cell_matrix
+        self.matrix
             .iter()
-            .zip(other.cell_matrix.iter())
+            .zip(other.matrix.iter())
             .all(|(a, b)| (a - b).abs() < f64::EPSILON)
+    }
+}
+fn deg2rad(x: f64) -> f64 {
+    x * f64::consts::PI / 180.0
+}
+
+fn rad2deg(x: f64) -> f64 {
+    x * 180.0 / f64::consts::PI
+}
+
+fn is_roughly_zero(x: f64) -> bool {
+    x.abs() < 1e-5
+}
+
+fn calc_lengths_from_matrix(matrix: Matrix3<f64>) -> Vec3D {
+    let v1 = matrix.row(0);
+    let v2 = matrix.row(1);
+    let v3 = matrix.row(2);
+
+    [v1.norm(), v2.norm(), v3.norm()]
+}
+
+fn calc_angles_from_matrix(matrix: Matrix3<f64>) -> Vec3D {
+    let v1 = matrix.row(0);
+    let v2 = matrix.row(1);
+    let v3 = matrix.row(2);
+
+    [
+        rad2deg((v2.dot(&v3) / (v2.norm() * v3.norm())).acos()),
+        rad2deg((v1.dot(&v3) / (v1.norm() * v3.norm())).acos()),
+        rad2deg((v1.dot(&v2) / (v1.norm() * v2.norm())).acos()),
+    ]
+}
+
+fn is_roughly_90(value: f64) -> bool {
+    // We think that 89.999° is close enough to 90°
+    (value - 90.0).abs() < 1e-3
+}
+
+fn is_diagonal(matrix: Matrix3<f64>) -> bool {
+    is_roughly_zero(matrix[(1, 0)])
+        && is_roughly_zero(matrix[(2, 0)])
+        && is_roughly_zero(matrix[(0, 1)])
+        && is_roughly_zero(matrix[(2, 1)])
+        && is_roughly_zero(matrix[(0, 2)])
+        && is_roughly_zero(matrix[(1, 2)])
+}
+
+fn is_infinite(lengths: Vec3D) -> bool {
+    is_roughly_zero(lengths[0]) && is_roughly_zero(lengths[1]) && is_roughly_zero(lengths[2])
+}
+
+fn is_orthorhombic(lengths: Vec3D, angles: Vec3D) -> bool {
+    if is_infinite(lengths) {
+        return false;
+    };
+
+    // we support cells with one or two lengths of 0 which results in NaN angles
+    (is_roughly_90(angles[0]) || angles[0].is_nan())
+        && (is_roughly_90(angles[1]) || angles[1].is_nan())
+        && (is_roughly_90(angles[2]) || angles[2].is_nan())
+}
+
+fn volume(shape: &CellShape, matrix: Matrix3<f64>) -> f64 {
+    match shape {
+        CellShape::Infinite => 0.0,
+        CellShape::Orthorhombic | CellShape::Triclinic => matrix.determinant(),
     }
 }
 
 impl UnitCell {
-    const EPSILON: f64 = 1e-5;
-
-    fn deg2rad(x: f64) -> f64 {
-        x * f64::consts::PI / 180.0
-    }
-
-    fn rad2deg(x: f64) -> f64 {
-        x * 180.0 / f64::consts::PI
-    }
-
     fn cos_degree(theta: f64) -> f64 {
-        Self::deg2rad(theta).cos()
+        deg2rad(theta).cos()
     }
 
     fn sin_degree(theta: f64) -> f64 {
-        Self::deg2rad(theta).sin()
+        deg2rad(theta).sin()
     }
 
-    pub fn new() -> Self {
-        UnitCell {
-            cell_matrix: Matrix3::zeros(),
-        }
-    }
-
-    pub fn parse(lattice: &str) -> Self {
-        let mut cell_matrix = Matrix3::zeros();
-
-        cell_matrix
-            .iter_mut()
-            .zip(lattice.split_whitespace())
-            .for_each(|(matrix_entry, lattice_item)| {
-                *matrix_entry = lattice_item.parse::<f64>().expect("expected float");
-            });
-        UnitCell { cell_matrix }
+    fn volume(&self) -> f64 {
+        volume(&self.shape, self.matrix)
     }
 
     fn check_lengths(lengths: &Vec3D) -> Result<(), CError> {
@@ -72,7 +124,7 @@ impl UnitCell {
             ));
         };
 
-        if angles.iter().any(|&x| x.abs() < Self::EPSILON) {
+        if angles.iter().any(|&x| is_roughly_zero(x)) {
             return Err(CError::GenericError(
                 "angles cannot be (roughly) zero".to_string(),
             ));
@@ -86,14 +138,62 @@ impl UnitCell {
 
         Ok(())
     }
+
+    pub fn new() -> Self {
+        UnitCell::new_from_lengths([0.0, 0.0, 0.0])
+    }
+
+    pub fn new_from_lengths(lengths: Vec3D) -> Self {
+        UnitCell::new_from_lengths_angles(lengths, &mut [90.0, 90.0, 90.0]).unwrap()
+    }
+
+    pub fn new_from_lengths_angles(lengths: Vec3D, angles: &mut Vec3D) -> Result<Self, CError> {
+        let matrix = Self::cell_matrix_from_lengths_angles(lengths, angles).unwrap();
+        Self::new_from_matrix(matrix)
+    }
+
+    pub fn new_from_matrix(matrix: Matrix3<f64>) -> Result<Self, CError> {
+        if matrix.determinant() < 0.0 {
+            return Err(CError::GenericError(
+                "invalid unit cell matrix with negative determinant".to_string(),
+            ));
+        };
+
+        let lengths = calc_lengths_from_matrix(matrix);
+        let angles = calc_angles_from_matrix(matrix);
+
+        let is_diagonal_matrix = is_diagonal(matrix);
+        if !is_diagonal_matrix && is_orthorhombic(lengths, angles) {
+            return Err(CError::GenericError("orthorhombic cell must have their a vector along x axis, b vector along y axis and c vector along z axis".to_string()));
+        };
+
+        let shape = if is_diagonal_matrix {
+            if matrix.diagonal().iter().all(|&x| is_roughly_zero(x)) {
+                CellShape::Infinite
+            } else {
+                CellShape::Orthorhombic
+            }
+        } else {
+            CellShape::Triclinic
+        };
+
+        let matrix_inv_transposed = matrix.try_inverse().map(|m| m.transpose());
+
+        Ok(UnitCell {
+            matrix,
+            shape,
+            matrix_inv_transposed,
+        })
+    }
+
     pub fn cell_matrix_from_lengths_angles(
         lengths: Vec3D,
         angles: &mut Vec3D,
-    ) -> Result<Self, CError> {
+    ) -> Result<Matrix3<f64>, CError> {
         Self::check_lengths(&lengths)?;
         Self::check_angles(angles)?;
 
-        if angles.iter().all(|&x| (x - 90.0).abs() < 1e-3) {
+        if angles.iter().all(|&x| is_roughly_90(x)) {
             angles.iter_mut().for_each(|x| *x = 90.0);
         }
         let mut cell_matrix: Matrix3<f64> = Matrix3::zeros();
@@ -114,7 +214,26 @@ impl UnitCell {
         cell_matrix[(2, 1)] *= lengths[2];
         cell_matrix[(2, 2)] *= lengths[2];
 
-        Ok(UnitCell { cell_matrix })
+        Ok(cell_matrix)
+    }
+
+    pub fn lengths(&self) -> Vec3D {
+        match self.shape {
+            CellShape::Infinite => [0.0, 0.0, 0.0],
+            CellShape::Orthorhombic => [
+                self.matrix[(0, 0)],
+                self.matrix[(1, 1)],
+                self.matrix[(2, 2)],
+            ],
+            CellShape::Triclinic => calc_lengths_from_matrix(self.matrix),
+        }
+    }
+
+    pub fn angles(&self) -> Vec3D {
+        match self.shape {
+            CellShape::Infinite | CellShape::Orthorhombic => [90.0, 90.0, 90.0],
+            CellShape::Triclinic => calc_angles_from_matrix(self.matrix),
+        }
     }
 }
 
@@ -126,16 +245,7 @@ mod tests {
     #[test]
     fn test_unit_cell_new() {
         let cell = UnitCell::new();
-        assert_eq!(cell.cell_matrix, Matrix3::zeros());
-    }
-
-    #[test]
-    fn test_unit_cell_parse() {
-        let lattice = "1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0";
-        let cell = UnitCell::parse(lattice);
-
-        let expected = Matrix3::new(1.0, 4.0, 7.0, 2.0, 5.0, 8.0, 3.0, 6.0, 9.0);
-        assert_eq!(cell.cell_matrix, expected);
+        assert_eq!(cell.matrix, Matrix3::zeros());
     }
 
     #[test]
@@ -159,19 +269,19 @@ mod tests {
 
     #[test]
     fn from_lengths_angles() {
-        let expected = UnitCell::cell_matrix_from_lengths_angles(
+        let expected = UnitCell::new_from_lengths_angles(
             [8.43116035, 14.50510613, 15.60911468],
             &mut [73.31699212, 85.70200582, 89.37501529],
         )
         .unwrap();
         let mut true_cell = UnitCell::new();
-        true_cell.cell_matrix[(0, 0)] = 8.43116035;
-        true_cell.cell_matrix[(1, 0)] = 0.158219155128;
-        true_cell.cell_matrix[(1, 1)] = 14.5042431863;
-        true_cell.cell_matrix[(2, 0)] = 1.16980663624;
-        true_cell.cell_matrix[(2, 1)] = 4.4685149855;
-        true_cell.cell_matrix[(2, 2)] = 14.9100096405;
-        let diff = expected.cell_matrix - true_cell.cell_matrix;
+        true_cell.matrix[(0, 0)] = 8.43116035;
+        true_cell.matrix[(1, 0)] = 0.158219155128;
+        true_cell.matrix[(1, 1)] = 14.5042431863;
+        true_cell.matrix[(2, 0)] = 1.16980663624;
+        true_cell.matrix[(2, 1)] = 4.4685149855;
+        true_cell.matrix[(2, 2)] = 14.9100096405;
+        let diff = expected.matrix - true_cell.matrix;
         assert!((diff).iter().all(|&x| x.abs() < 1e-6), "diff: {diff}");
     }
 

@@ -1,3 +1,5 @@
+use nalgebra::Matrix3;
+
 use crate::atom::Atom;
 use crate::error::CError;
 use crate::extendedxyzparser::ExtendedXyzParser;
@@ -16,6 +18,18 @@ pub struct XYZFormat;
 type PropertiesList = BTreeMap<String, PropertyKind>;
 
 impl XYZFormat {
+    pub fn parse_unitcell(lattice: &str) -> UnitCell {
+        let mut matrix = Matrix3::zeros();
+
+        matrix.iter_mut().zip(lattice.split_whitespace()).for_each(
+            |(matrix_entry, lattice_item)| {
+                *matrix_entry = lattice_item.parse::<f64>().expect("expected float");
+            },
+        );
+
+        UnitCell::new_from_matrix(matrix).expect("failed to convert lattice to unit cell")
+    }
+
     fn read_atomic_properties(
         properties: &PropertiesList,
         tokens: &mut SplitWhitespace,
@@ -145,7 +159,7 @@ impl XYZFormat {
         }
 
         if let Some(lattice) = properties.get("Lattice") {
-            frame.unit_cell = UnitCell::parse(lattice);
+            frame.unit_cell = XYZFormat::parse_unitcell(lattice);
         }
 
         if let Some(prop_string) = properties.get("Properties") {
@@ -278,12 +292,12 @@ mod tests {
 
         // Reading the unit cell
         let mut unit_cell = UnitCell::new();
-        unit_cell.cell_matrix[(0, 0)] = 8.43116035;
-        unit_cell.cell_matrix[(0, 1)] = 0.158219155128;
-        unit_cell.cell_matrix[(1, 1)] = 14.5042431863;
-        unit_cell.cell_matrix[(0, 2)] = 1.16980663624;
-        unit_cell.cell_matrix[(1, 2)] = 4.4685149855;
-        unit_cell.cell_matrix[(2, 2)] = 14.9100096405;
+        unit_cell.matrix[(0, 0)] = 8.43116035;
+        unit_cell.matrix[(0, 1)] = 0.158219155128;
+        unit_cell.matrix[(1, 1)] = 14.5042431863;
+        unit_cell.matrix[(0, 2)] = 1.16980663624;
+        unit_cell.matrix[(1, 2)] = 4.4685149855;
+        unit_cell.matrix[(2, 2)] = 14.9100096405;
         assert_eq!(frame.unit_cell, unit_cell);
 
         // Frame level properties
