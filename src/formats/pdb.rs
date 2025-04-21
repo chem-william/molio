@@ -436,6 +436,14 @@ impl PDBFormat {
         Ok(())
     }
 
+    fn parse_conect(frame: &mut Frame, line: &str) -> Result<(), CError> {
+        debug_assert_eq!(&line[..6], "CONECT");
+
+        let line_length = line.trim().len();
+
+        Ok(())
+    }
+
     pub fn new() -> Self {
         PDBFormat {
             residues: RefCell::new(BTreeMap::new()),
