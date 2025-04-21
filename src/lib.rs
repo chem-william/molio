@@ -1,11 +1,13 @@
 pub mod angle;
 pub mod atom;
 pub mod bond;
+pub mod dihedral;
 pub mod error;
 pub mod extendedxyzparser;
 pub mod format;
 pub mod formats;
 pub mod frame;
+pub mod improper;
 pub mod property;
 pub mod residue;
 pub mod trajectory;
