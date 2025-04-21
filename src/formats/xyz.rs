@@ -6,7 +6,6 @@ use crate::frame::Frame;
 use crate::property::Properties;
 use crate::property::{Property, PropertyKind};
 use crate::unit_cell::UnitCell;
-use nalgebra::Matrix3;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
