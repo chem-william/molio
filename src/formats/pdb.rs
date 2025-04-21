@@ -2,44 +2,14 @@ use crate::atom::Atom;
 use crate::error::CError;
 use crate::format::FileFormat;
 use crate::frame::Frame;
-use crate::property::Properties;
 use crate::property::Property;
+use crate::residue::{FullResidueId, Residue};
 use crate::unit_cell::UnitCell;
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
 use std::path::Path;
-
-mod residue {
-    use super::*;
-
-    #[derive(Default, PartialEq, Eq, PartialOrd, Ord)]
-    pub struct FullResidueId {
-        /// Chain identifier
-        pub chain: char,
-        /// Residue id
-        pub resid: i64,
-        /// Residue name
-        pub resname: String,
-        /// Insertion code of the residue
-        pub insertion_code: char,
-    }
-
-    #[derive(Default)]
-    pub struct Residue {
-        pub name: String,
-        pub id: Option<i64>,
-        pub atoms: BTreeSet<usize>,
-        pub properties: Properties,
-    }
-
-    impl Residue {
-        pub fn add_atom(&mut self, index: usize) {
-            self.atoms.insert(index);
-        }
-    }
-}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Record {
@@ -239,7 +209,7 @@ pub(crate) fn encode_hybrid36(width: usize, value: i64) -> String {
 
 pub struct PDBFormat {
     /// Residue information in the current step
-    pub residues: RefCell<BTreeMap<residue::FullResidueId, residue::Residue>>,
+    pub residues: RefCell<BTreeMap<FullResidueId, Residue>>,
 
     /// List of all atom offsets. This maybe pushed in read_ATOM or if a TER
     /// record is found. It is reset every time a frame is read.
@@ -248,13 +218,13 @@ pub struct PDBFormat {
     /// This will be None when no secondary structure information should be
     /// read. Else it is set to the final residue of a secondary structure and
     /// the text description which should be set.
-    pub current_secinfo: RefCell<Option<(residue::FullResidueId, String)>>,
+    pub current_secinfo: RefCell<Option<(FullResidueId, String)>>,
 
     /// Store secondary structure information. Keys are the
     /// starting residue of the secondary structure, and values are pairs
     /// containing the ending residue and a string which is a written
     /// description of the secondary structure
-    pub secinfo: BTreeMap<residue::FullResidueId, (residue::FullResidueId, String)>,
+    pub secinfo: BTreeMap<FullResidueId, (FullResidueId, String)>,
 }
 
 impl PDBFormat {
@@ -332,7 +302,7 @@ impl PDBFormat {
 
         let chain = &line.chars().nth(21).unwrap();
         let resname = line[17..20].trim().to_string();
-        let full_residue_id = residue::FullResidueId {
+        let full_residue_id = FullResidueId {
             chain: *chain,
             resid,
             resname: resname.to_string(),
@@ -340,7 +310,7 @@ impl PDBFormat {
         };
 
         if self.residues.borrow().len() == 0 {
-            let mut residue = residue::Residue {
+            let mut residue = Residue {
                 name: resname,
                 id: Some(resid),
                 ..Default::default()
