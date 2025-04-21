@@ -114,6 +114,26 @@ fn decode_pure(s: &str) -> i64 {
     result
 }
 
+fn encode_pure(digits: &str, value: i64) -> String {
+    if value == 0 {
+        return digits.chars().nth(1).unwrap().to_string();
+    };
+
+    let n = i64::try_from(digits.len()).unwrap();
+    let mut result = String::new();
+    let mut val = value;
+
+    while val != 0 {
+        let rest = val / n;
+        let rem = usize::try_from(val - rest * n).unwrap();
+        let ch = digits.chars().nth(rem).expect("digit index out of bounds");
+        result.push(ch);
+        val = rest;
+    }
+
+    result.chars().rev().collect()
+}
+
 fn digit_to_value(c: char) -> i32 {
     match c {
         '0'..='9' => (c as u8 - b'0') as i32,
@@ -135,12 +155,12 @@ pub(crate) fn decode_hybrid36(width: usize, line: &str) -> Result<i64, CError> {
         )));
     }
 
-    let f = line.chars().next().unwrap();
-    if let Some(f) = line.chars().next() {
-        if f == '-' || f == ' ' {
-            // Negative or space-prefixed numbers are not encoded → return 0
+    let f = line.chars().next();
+    if let Some(f) = f {
+        if f == ' ' {
+            // Space-prefixed numbers are not encoded => return 0
             return Ok(0);
-        } else if f.is_ascii_digit() {
+        } else if f == '-' || f.is_ascii_digit() {
             // Try to parse as a number
             return line.parse::<i64>().map_err(|_e| {
                 CError::GenericError(format!("expected negative number. got '{f}'"))
@@ -152,7 +172,7 @@ pub(crate) fn decode_hybrid36(width: usize, line: &str) -> Result<i64, CError> {
         return Ok(0);
     }
 
-    if DIGITS_UPPER.contains(f) {
+    if DIGITS_UPPER.contains(f.unwrap()) {
         let is_valid = line
             .chars()
             .all(|c| c.is_ascii_digit() || c.is_ascii_uppercase());
@@ -167,7 +187,54 @@ pub(crate) fn decode_hybrid36(width: usize, line: &str) -> Result<i64, CError> {
         return Ok(decode_pure(line) - 10 * pow_int(36, width - 1) + pow_int(10, width));
     }
 
-    Ok(1)
+    if DIGITS_LOWER.contains(f.unwrap()) {
+        let is_valid = line
+            .chars()
+            .all(|c| c.is_ascii_digit() || c.is_ascii_lowercase());
+
+        if !is_valid {
+            return Err(CError::GenericError(format!(
+                "the value '{}' is not a valid hybrid 36 number",
+                line
+            )));
+        }
+
+        return Ok(decode_pure(line) + 16 * pow_int(36, width - 1) + pow_int(10, width));
+    }
+
+    Err(CError::GenericError(format!(
+        "the value '{line}' is not a valid hybrid 36 number"
+    )))
+}
+
+pub(crate) fn encode_hybrid36(width: usize, value: i64) -> String {
+    // the number is too negative to be encoded
+    if value < (1 - pow_int(10, width - 1)) {
+        return "*".repeat(width);
+    };
+
+    // no need to encode
+    if value < pow_int(10, width) {
+        return value.to_string();
+    };
+
+    // use upper case set
+    let mut val = value;
+    val -= pow_int(10, width);
+    if val < 26 * pow_int(36, width - 1) {
+        val += 10 * pow_int(36, width - 1);
+        return encode_pure(DIGITS_UPPER, val);
+    };
+
+    // use lower case set
+    val -= 26 * pow_int(36, width - 1);
+    if val < 26 * pow_int(36, width - 1) {
+        val += 10 * pow_int(36, width - 1);
+        return encode_pure(DIGITS_LOWER, val);
+    }
+
+    // too large to be encoded
+    "*".repeat(width)
 }
 
 pub struct PDBFormat {
@@ -534,7 +601,10 @@ mod tests {
 
     use assert_approx_eq::assert_approx_eq;
 
-    use crate::{formats::pdb::decode_hybrid36, trajectory::Trajectory, unit_cell::CellShape};
+    use crate::{
+        formats::pdb::decode_hybrid36, formats::pdb::encode_hybrid36, trajectory::Trajectory,
+        unit_cell::CellShape,
+    };
 
     #[test]
     fn check_nsteps() {
@@ -568,9 +638,160 @@ mod tests {
         assert_approx_eq!(cell.lengths()[2], 15.0);
     }
 
+    macro_rules! recycle_check {
+        ($width:expr, $value:expr, $hybrid:expr) => {
+            assert_eq!(encode_hybrid36($width, $value), $hybrid);
+            assert_eq!(
+                decode_hybrid36($width, $hybrid).expect(
+                    format!(
+                        "decode failed with width '{0}' and hybrid '{1}'",
+                        $width, $hybrid
+                    )
+                    .as_str()
+                ),
+                $value
+            );
+        };
+    }
+
     #[test]
-    fn hybrid_decode() {
+    fn hybrid_encode_decode() {
         assert_eq!(decode_hybrid36(4, "    ").unwrap(), 0);
         assert_eq!(decode_hybrid36(4, "  -0").unwrap(), 0);
+
+        recycle_check!(4, -999, "-999");
+        recycle_check!(4, -78, "-78");
+        recycle_check!(4, -6, "-6");
+        recycle_check!(4, 0, "0");
+        recycle_check!(4, 9999, "9999");
+        recycle_check!(4, 10000, "A000");
+        recycle_check!(4, 10001, "A001");
+        recycle_check!(4, 10002, "A002");
+        recycle_check!(4, 10003, "A003");
+        recycle_check!(4, 10004, "A004");
+        recycle_check!(4, 10005, "A005");
+        recycle_check!(4, 10006, "A006");
+        recycle_check!(4, 10007, "A007");
+        recycle_check!(4, 10008, "A008");
+        recycle_check!(4, 10009, "A009");
+        recycle_check!(4, 10010, "A00A");
+        recycle_check!(4, 10011, "A00B");
+        recycle_check!(4, 10012, "A00C");
+        recycle_check!(4, 10013, "A00D");
+        recycle_check!(4, 10014, "A00E");
+        recycle_check!(4, 10015, "A00F");
+        recycle_check!(4, 10016, "A00G");
+        recycle_check!(4, 10017, "A00H");
+        recycle_check!(4, 10018, "A00I");
+        recycle_check!(4, 10019, "A00J");
+        recycle_check!(4, 10020, "A00K");
+        recycle_check!(4, 10021, "A00L");
+        recycle_check!(4, 10022, "A00M");
+        recycle_check!(4, 10023, "A00N");
+        recycle_check!(4, 10024, "A00O");
+        recycle_check!(4, 10025, "A00P");
+        recycle_check!(4, 10026, "A00Q");
+        recycle_check!(4, 10027, "A00R");
+        recycle_check!(4, 10028, "A00S");
+        recycle_check!(4, 10029, "A00T");
+        recycle_check!(4, 10030, "A00U");
+        recycle_check!(4, 10031, "A00V");
+        recycle_check!(4, 10032, "A00W");
+        recycle_check!(4, 10033, "A00X");
+        recycle_check!(4, 10034, "A00Y");
+        recycle_check!(4, 10035, "A00Z");
+        recycle_check!(4, 10036, "A010");
+        recycle_check!(4, 10046, "A01A");
+        recycle_check!(4, 10071, "A01Z");
+        recycle_check!(4, 10072, "A020");
+        recycle_check!(4, 10000 + 36 * 36 - 1, "A0ZZ");
+        recycle_check!(4, 10000 + 36 * 36, "A100");
+        recycle_check!(4, 10000 + 36 * 36 * 36 - 1, "AZZZ");
+        recycle_check!(4, 10000 + 36 * 36 * 36, "B000");
+        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 - 1, "ZZZZ");
+        recycle_check!(4, 10000 + 26 * 36 * 36 * 36, "a000");
+        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 + 35, "a00z");
+        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 + 36, "a010");
+        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 + 36 * 36 - 1, "a0zz");
+        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 + 36 * 36, "a100");
+        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 + 36 * 36 * 36 - 1, "azzz");
+        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 + 36 * 36 * 36, "b000");
+        recycle_check!(4, 10000 + 2 * 26 * 36 * 36 * 36 - 1, "zzzz");
+
+        assert_eq!(decode_hybrid36(5, "    ").unwrap(), 0);
+        assert_eq!(decode_hybrid36(5, "  -0").unwrap(), 0);
+        recycle_check!(5, -9999, "-9999");
+        recycle_check!(5, -123, "-123");
+        recycle_check!(5, -45, "-45");
+        recycle_check!(5, -6, "-6");
+        recycle_check!(5, 0, "0");
+        recycle_check!(5, 12, "12");
+        recycle_check!(5, 345, "345");
+        recycle_check!(5, 6789, "6789");
+        recycle_check!(5, 99999, "99999");
+        recycle_check!(5, 100000, "A0000");
+        recycle_check!(5, 100010, "A000A");
+        recycle_check!(5, 100035, "A000Z");
+        recycle_check!(5, 100036, "A0010");
+        recycle_check!(5, 100046, "A001A");
+        recycle_check!(5, 100071, "A001Z");
+        recycle_check!(5, 100072, "A0020");
+        recycle_check!(5, 100000 + 36 * 36 - 1, "A00ZZ");
+        recycle_check!(5, 100000 + 36 * 36, "A0100");
+        recycle_check!(5, 100000 + 36 * 36 * 36 - 1, "A0ZZZ");
+        recycle_check!(5, 100000 + 36 * 36 * 36, "A1000");
+        recycle_check!(5, 100000 + 36 * 36 * 36 * 36 - 1, "AZZZZ");
+        recycle_check!(5, 100000 + 36 * 36 * 36 * 36, "B0000");
+        recycle_check!(5, 100000 + 2 * 36 * 36 * 36 * 36, "C0000");
+        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36 - 1, "ZZZZZ");
+        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36, "a0000");
+        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36 + 36 - 1, "a000z");
+        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36 + 36, "a0010");
+        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 - 1, "a00zz");
+        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36 + 36 * 36, "a0100");
+        recycle_check!(
+            5,
+            100000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 * 36 - 1,
+            "a0zzz"
+        );
+        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 * 36, "a1000");
+        recycle_check!(
+            5,
+            100000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 * 36 * 36 - 1,
+            "azzzz"
+        );
+        recycle_check!(
+            5,
+            100000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 * 36 * 36,
+            "b0000"
+        );
+        recycle_check!(5, 100000 + 2 * 26 * 36 * 36 * 36 * 36 - 1, "zzzzz");
+
+        assert_eq!(encode_hybrid36(4, -99999), "****");
+        assert_eq!(encode_hybrid36(4, 9999999), "****");
+    }
+
+    #[test]
+    #[should_panic(expected = "the value '*0000' is not a valid hybrid 36 number")]
+    fn decode_bad1() {
+        decode_hybrid36(5, "*0000").unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "the value 'A*000' is not a valid hybrid 36 number")]
+    fn decode_bad2() {
+        decode_hybrid36(5, "A*000").unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "the value 'a*000' is not a valid hybrid 36 number")]
+    fn decode_bad3() {
+        decode_hybrid36(5, "a*000").unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "length of '12345' is greater than the width '2'. this is a bug")]
+    fn decode_bad4() {
+        decode_hybrid36(2, "12345").unwrap();
     }
 }
