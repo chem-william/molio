@@ -112,6 +112,7 @@ fn pow_int(base: usize, power: usize) -> i64 {
     (base.pow(power as u32)) as i64
 }
 
+// TODO: maybe this should be changed to u64? can it even return negative numbers?
 pub(crate) fn decode_hybrid36(width: usize, line: &str) -> Result<i64, CError> {
     if line.len() > width {
         return Err(CError::GenericError(format!(
