@@ -11,29 +11,33 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
 use std::path::Path;
 
-#[derive(Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct FullResidueId {
-    /// Chain identifier
-    chain: char,
-    /// Residue id
-    resid: i64,
-    /// Residue name
-    resname: String,
-    /// Insertion code of the residue
-    insertion_code: char,
-}
+mod residue {
+    use super::*;
 
-#[derive(Default)]
-pub struct Residue {
-    name: String,
-    id: Option<i64>,
-    atoms: BTreeSet<usize>,
-    properties: Properties,
-}
+    #[derive(Default, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct FullResidueId {
+        /// Chain identifier
+        pub chain: char,
+        /// Residue id
+        pub resid: i64,
+        /// Residue name
+        pub resname: String,
+        /// Insertion code of the residue
+        pub insertion_code: char,
+    }
 
-impl Residue {
-    fn add_atom(&mut self, index: usize) {
-        self.atoms.insert(index);
+    #[derive(Default)]
+    pub struct Residue {
+        pub name: String,
+        pub id: Option<i64>,
+        pub atoms: BTreeSet<usize>,
+        pub properties: Properties,
+    }
+
+    impl Residue {
+        pub fn add_atom(&mut self, index: usize) {
+            self.atoms.insert(index);
+        }
     }
 }
 
@@ -168,7 +172,7 @@ pub(crate) fn decode_hybrid36(width: usize, line: &str) -> Result<i64, CError> {
 
 pub struct PDBFormat {
     /// Residue information in the current step
-    pub residues: RefCell<BTreeMap<FullResidueId, Residue>>,
+    pub residues: RefCell<BTreeMap<residue::FullResidueId, residue::Residue>>,
 
     /// List of all atom offsets. This maybe pushed in read_ATOM or if a TER
     /// record is found. It is reset every time a frame is read.
@@ -177,13 +181,13 @@ pub struct PDBFormat {
     /// This will be None when no secondary structure information should be
     /// read. Else it is set to the final residue of a secondary structure and
     /// the text description which should be set.
-    pub current_secinfo: RefCell<Option<(FullResidueId, String)>>,
+    pub current_secinfo: RefCell<Option<(residue::FullResidueId, String)>>,
 
     /// Store secondary structure information. Keys are the
     /// starting residue of the secondary structure, and values are pairs
     /// containing the ending residue and a string which is a written
     /// description of the secondary structure
-    pub secinfo: BTreeMap<FullResidueId, (FullResidueId, String)>,
+    pub secinfo: BTreeMap<residue::FullResidueId, (residue::FullResidueId, String)>,
 }
 
 impl PDBFormat {
@@ -261,7 +265,7 @@ impl PDBFormat {
 
         let chain = &line.chars().nth(21).unwrap();
         let resname = line[17..20].trim().to_string();
-        let full_residue_id = FullResidueId {
+        let full_residue_id = residue::FullResidueId {
             chain: *chain,
             resid,
             resname: resname.to_string(),
@@ -269,7 +273,7 @@ impl PDBFormat {
         };
 
         if self.residues.borrow().len() == 0 {
-            let mut residue = Residue {
+            let mut residue = residue::Residue {
                 name: resname,
                 id: Some(resid),
                 ..Default::default()
@@ -394,6 +398,7 @@ impl PDBFormat {
 
         Ok(())
     }
+
     pub fn new() -> Self {
         PDBFormat {
             residues: RefCell::new(BTreeMap::new()),
@@ -402,6 +407,7 @@ impl PDBFormat {
             secinfo: BTreeMap::new(),
         }
     }
+
     const END_RECORD: &str = "END";
     const ENDMDL_RECORD: &str = "ENDMDL";
 }
@@ -409,8 +415,8 @@ impl PDBFormat {
 impl FileFormat for PDBFormat {
     fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         self.residues.borrow_mut().clear();
-        let mut line = String::new();
         let mut frame = Frame::new();
+        let mut line = String::new();
 
         while reader.read_line(&mut line)? > 0 {
             let record = get_record(&line);

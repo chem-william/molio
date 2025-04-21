@@ -87,12 +87,12 @@ fn is_orthorhombic(lengths: Vec3D, angles: Vec3D) -> bool {
         && (is_roughly_90(angles[2]) || angles[2].is_nan())
 }
 
-fn volume(shape: &CellShape, matrix: Matrix3<f64>) -> f64 {
-    match shape {
-        CellShape::Infinite => 0.0,
-        CellShape::Orthorhombic | CellShape::Triclinic => matrix.determinant(),
-    }
-}
+// fn volume(shape: &CellShape, matrix: Matrix3<f64>) -> f64 {
+//     match shape {
+//         CellShape::Infinite => 0.0,
+//         CellShape::Orthorhombic | CellShape::Triclinic => matrix.determinant(),
+//     }
+// }
 
 impl UnitCell {
     fn cos_degree(theta: f64) -> f64 {
@@ -103,9 +103,9 @@ impl UnitCell {
         deg2rad(theta).sin()
     }
 
-    fn volume(&self) -> f64 {
-        volume(&self.shape, self.matrix)
-    }
+    // fn volume(&self) -> f64 {
+    //     volume(&self.shape, self.matrix)
+    // }
 
     fn check_lengths(lengths: &Vec3D) -> Result<(), CError> {
         if lengths.iter().any(|&x| x < 0.0) {
