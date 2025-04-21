@@ -216,52 +216,6 @@ impl PDBFormat {
         }
         Ok(())
     }
-    // fn parse_atom_line(&self, line: &str) -> Result<Atom, CError> {
-    //     let res_name = line[17..20].trim().to_string();
-    //     let chain_id = line[21..22].trim().to_string();
-    //     let res_seq = line[22..26].trim().parse::<i32>().map_err(|e| CError::ParseError {
-    //         record_type: "ATOM".to_string(),
-    //         field: "residue sequence number".to_string(),
-    //         error: e.to_string(),
-    //     })?;
-    //     let i_code = line[26..27].trim().to_string();
-
-    //     let x = line[30..38].trim().parse::<f64>().map_err(|e| CError::ParseError {
-    //         record_type: "ATOM".to_string(),
-    //         field: "x coordinate".to_string(),
-    //         error: e.to_string(),
-    //     })?;
-    //     let y = line[38..46].trim().parse::<f64>().map_err(|e| CError::ParseError {
-    //         record_type: "ATOM".to_string(),
-    //         field: "y coordinate".to_string(),
-    //         error: e.to_string(),
-    //     })?;
-    //     let z = line[46..54].trim().parse::<f64>().map_err(|e| CError::ParseError {
-    //         record_type: "ATOM".to_string(),
-    //         field: "z coordinate".to_string(),
-    //         error: e.to_string(),
-    //     })?;
-
-    //     let element = if line.len() >= 78 {
-    //         line[76..78].trim().to_string()
-    //     } else {
-    //         "".to_string()
-    //     };
-
-    //     Ok(Atom {
-    //         serial,
-    //         name,
-    //         alt_loc,
-    //         res_name,
-    //         chain_id,
-    //         res_seq,
-    //         i_code,
-    //         x,
-    //         y,
-    //         z,
-    //         element,
-    //     })
-    // }
 
     fn parse_cryst1(frame: &mut Frame, line: &str) -> Result<(), CError> {
         assert_eq!(&line[..6], "CRYST1");
