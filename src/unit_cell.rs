@@ -14,31 +14,17 @@ pub enum CellShape {
 mod utils {
     use super::*;
 
-    pub fn deg2rad(x: f64) -> f64 {
-        x * f64::consts::PI / 180.0
-    }
-
-    pub fn rad2deg(x: f64) -> f64 {
-        x * 180.0 / f64::consts::PI
-    }
-
-    pub fn cos_degree(theta: f64) -> f64 {
-        utils::deg2rad(theta).cos()
-    }
-
-    pub fn sin_degree(theta: f64) -> f64 {
-        utils::deg2rad(theta).sin()
-    }
-
+    /// Check if a value is approximately zero (within 1e-5)
     pub fn is_roughly_zero(x: f64) -> bool {
         x.abs() < 1e-5
     }
 
+    /// Check if an angle is approximately 90 degrees (within 1e-3)
     pub fn is_roughly_90(value: f64) -> bool {
-        // We think that 89.999° is close enough to 90°
         (value - 90.0).abs() < 1e-3
     }
 
+    /// Calculate the lengths of the cell vectors from the matrix
     pub fn calc_lengths_from_matrix(matrix: Matrix3<f64>) -> Vec3D {
         let v1 = matrix.row(0);
         let v2 = matrix.row(1);
@@ -47,40 +33,51 @@ mod utils {
         [v1.norm(), v2.norm(), v3.norm()]
     }
 
+    /// Calculate the angles between cell vectors from the matrix
     pub fn calc_angles_from_matrix(matrix: Matrix3<f64>) -> Vec3D {
         let v1 = matrix.row(0);
         let v2 = matrix.row(1);
         let v3 = matrix.row(2);
 
         [
-            rad2deg((v2.dot(&v3) / (v2.norm() * v3.norm())).acos()),
-            rad2deg((v1.dot(&v3) / (v1.norm() * v3.norm())).acos()),
-            rad2deg((v1.dot(&v2) / (v1.norm() * v2.norm())).acos()),
+            (v2.dot(&v3) / (v2.norm() * v3.norm())).acos().to_degrees(),
+            (v1.dot(&v3) / (v1.norm() * v3.norm())).acos().to_degrees(),
+            (v1.dot(&v2) / (v1.norm() * v2.norm())).acos().to_degrees(),
         ]
     }
 
+    /// Calculate cosine of an angle in degrees
+    pub fn cos_degree(theta: f64) -> f64 {
+        theta.to_radians().cos()
+    }
+
+    /// Calculate sine of an angle in degrees
+    pub fn sin_degree(theta: f64) -> f64 {
+        theta.to_radians().sin()
+    }
+
+    /// Check if a cell is orthorhombic based on its lengths and angles
     pub fn is_orthorhombic(lengths: Vec3D, angles: Vec3D) -> bool {
         if is_infinite(lengths) {
             return false;
-        };
+        }
 
         // we support cells with one or two lengths of 0 which results in NaN angles
-        (is_roughly_90(angles[0]) || angles[0].is_nan())
-            && (is_roughly_90(angles[1]) || angles[1].is_nan())
-            && (is_roughly_90(angles[2]) || angles[2].is_nan())
+        angles.iter().all(|&angle| is_roughly_90(angle) || angle.is_nan())
     }
 
+    /// Check if a cell is infinite (all lengths are zero)
     pub fn is_infinite(lengths: Vec3D) -> bool {
-        is_roughly_zero(lengths[0]) && is_roughly_zero(lengths[1]) && is_roughly_zero(lengths[2])
+        lengths.iter().all(|&x| is_roughly_zero(x))
     }
 
+    /// Check if a matrix is diagonal (all off-diagonal elements are zero)
     pub fn is_diagonal(matrix: Matrix3<f64>) -> bool {
-        is_roughly_zero(matrix[(1, 0)])
-            && is_roughly_zero(matrix[(2, 0)])
-            && is_roughly_zero(matrix[(0, 1)])
-            && is_roughly_zero(matrix[(2, 1)])
-            && is_roughly_zero(matrix[(0, 2)])
-            && is_roughly_zero(matrix[(1, 2)])
+        matrix
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| i % 4 != 0) // Skip diagonal elements
+            .all(|(_, &x)| is_roughly_zero(x))
     }
 }
 
@@ -97,6 +94,14 @@ mod validation {
         Ok(())
     }
 
+    /// Validate cell angles
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Any angle is negative
+    /// - Any angle is zero
+    /// - Any angle is 180 degrees or greater
     pub fn check_angles(angles: &Vec3D) -> Result<(), CError> {
         if angles.iter().any(|&x| x < 0.0) {
             return Err(CError::GenericError(
@@ -123,6 +128,11 @@ mod validation {
 mod matrix {
     use super::*;
 
+    /// Create a cell matrix from lengths and angles
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the lengths or angles are invalid
     pub fn cell_matrix_from_lengths_angles(
         lengths: Vec3D,
         angles: &mut Vec3D,
@@ -130,23 +140,25 @@ mod matrix {
         validation::check_lengths(&lengths)?;
         validation::check_angles(angles)?;
 
+        // Normalize angles to 90 degrees if they're close enough
         if angles.iter().all(|&x| utils::is_roughly_90(x)) {
             angles.iter_mut().for_each(|x| *x = 90.0);
         }
-        let mut cell_matrix: Matrix3<f64> = Matrix3::zeros();
+
+        let mut cell_matrix = Matrix3::zeros();
         cell_matrix[(0, 0)] = lengths[0];
 
-        cell_matrix[(1, 0)] = utils::cos_degree(angles[2]) * lengths[1];
-        cell_matrix[(1, 1)] = utils::sin_degree(angles[2]) * lengths[1];
+        let cos_gamma = utils::cos_degree(angles[2]);
+        let sin_gamma = utils::sin_degree(angles[2]);
+        cell_matrix[(1, 0)] = cos_gamma * lengths[1];
+        cell_matrix[(1, 1)] = sin_gamma * lengths[1];
 
-        cell_matrix[(2, 0)] = utils::cos_degree(angles[1]);
-        cell_matrix[(2, 1)] = (utils::cos_degree(angles[0])
-            - utils::cos_degree(angles[1]) * utils::cos_degree(angles[2]))
-            / utils::sin_degree(angles[2]);
-        cell_matrix[(2, 2)] = (1.0
-            - cell_matrix[(2, 0)] * cell_matrix[(2, 0)]
-            - cell_matrix[(2, 1)] * cell_matrix[(2, 1)])
-            .sqrt();
+        let cos_beta = utils::cos_degree(angles[1]);
+        let cos_alpha = utils::cos_degree(angles[0]);
+
+        cell_matrix[(2, 0)] = cos_beta;
+        cell_matrix[(2, 1)] = (cos_alpha - cos_beta * cos_gamma) / sin_gamma;
+        cell_matrix[(2, 2)] = (1.0 - cell_matrix[(2, 0)].powi(2) - cell_matrix[(2, 1)].powi(2)).sqrt();
         cell_matrix[(2, 0)] *= lengths[2];
         cell_matrix[(2, 1)] *= lengths[2];
         cell_matrix[(2, 2)] *= lengths[2];
