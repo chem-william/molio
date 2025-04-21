@@ -38,27 +38,9 @@ pub enum BondOrder {
     Aromatic,
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct Bond {
     pub data: [usize; 2],
-}
-
-impl PartialEq for Bond {
-    fn eq(&self, other: &Self) -> bool {
-        self.data == other.data
-    }
-}
-impl Eq for Bond {}
-
-impl PartialOrd for Bond {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.data.partial_cmp(&other.data)
-    }
-}
-
-impl Ord for Bond {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.data.cmp(&other.data)
-    }
 }
 
 impl Index<usize> for Bond {
@@ -71,7 +53,7 @@ impl Index<usize> for Bond {
     /// Panics if `index >= 2`.
     fn index(&self, index: usize) -> &Self::Output {
         if index >= 2 {
-            panic!("can not access atom n° {} in bond", index);
+            panic!("cannot access atom n° {} in bond", index);
         }
         &self.data[index]
     }
