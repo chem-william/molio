@@ -85,11 +85,11 @@ mod validation {
     use super::*;
 
     pub fn check_lengths(lengths: &Vec3D) -> Result<(), CError> {
-        if lengths.iter().any(|&x| x < 0.0) {
+        if let Some(&length) = lengths.iter().find(|&&x| x < 0.0) {
             return Err(CError::GenericError(
-                "lengths cannot be negative".to_string(),
+                format!("negative length found: {}", length),
             ));
-        };
+        }
 
         Ok(())
     }
@@ -103,21 +103,21 @@ mod validation {
     /// - Any angle is zero
     /// - Any angle is 180 degrees or greater
     pub fn check_angles(angles: &Vec3D) -> Result<(), CError> {
-        if angles.iter().any(|&x| x < 0.0) {
+        if let Some(&angle) = angles.iter().find(|&&x| x < 0.0) {
             return Err(CError::GenericError(
-                "angles cannot be negative".to_string(),
-            ));
-        };
-
-        if angles.iter().any(|&x| utils::is_roughly_zero(x)) {
-            return Err(CError::GenericError(
-                "angles cannot be (roughly) zero".to_string(),
+                format!("negative angle found: {}", angle),
             ));
         }
 
-        if angles.iter().any(|&x| x >= 180.0) {
+        if let Some(&angle) = angles.iter().find(|&&x| utils::is_roughly_zero(x)) {
             return Err(CError::GenericError(
-                "angles cannot be larger than or equal to 180 degrees".to_string(),
+                format!("zero angle found: {}", angle),
+            ));
+        }
+
+        if let Some(&angle) = angles.iter().find(|&&x| x >= 180.0) {
+            return Err(CError::GenericError(
+                format!("angle too large: {}", angle),
             ));
         }
 
@@ -260,6 +260,52 @@ mod tests {
     fn test_unit_cell_new() {
         let cell = UnitCell::new();
         assert_eq!(cell.matrix, Matrix3::zeros());
+        assert_eq!(cell.shape, CellShape::Infinite);
+        assert!(cell.matrix_inv_transposed.is_none());
+    }
+
+    #[test]
+    fn test_unit_cell_from_lengths() {
+        let lengths = [10.0, 20.0, 30.0];
+        let cell = UnitCell::new_from_lengths(lengths);
+        assert_eq!(cell.matrix[(0, 0)], 10.0);
+        assert_eq!(cell.matrix[(1, 1)], 20.0);
+        assert_eq!(cell.matrix[(2, 2)], 30.0);
+        assert_eq!(cell.shape, CellShape::Orthorhombic);
+    }
+
+    #[test]
+    fn test_unit_cell_from_lengths_angles() {
+        let lengths = [10.0, 20.0, 30.0];
+        let mut angles = [90.0, 90.0, 90.0];
+        let cell = UnitCell::new_from_lengths_angles(lengths, &mut angles).unwrap();
+        assert_eq!(cell.matrix[(0, 0)], 10.0);
+        assert_eq!(cell.matrix[(1, 1)], 20.0);
+        assert_eq!(cell.matrix[(2, 2)], 30.0);
+        assert_eq!(cell.shape, CellShape::Orthorhombic);
+    }
+
+    #[test]
+    fn test_unit_cell_from_matrix() {
+        let mut matrix = Matrix3::zeros();
+        matrix[(0, 0)] = 10.0;
+        matrix[(1, 1)] = 20.0;
+        matrix[(2, 2)] = 30.0;
+        let cell = UnitCell::new_from_matrix(matrix).unwrap();
+        assert_eq!(cell.matrix, matrix);
+        assert_eq!(cell.shape, CellShape::Orthorhombic);
+    }
+
+    #[test]
+    fn test_unit_cell_lengths() {
+        let cell = UnitCell::new_from_lengths([10.0, 20.0, 30.0]);
+        assert_eq!(cell.lengths(), [10.0, 20.0, 30.0]);
+    }
+
+    #[test]
+    fn test_unit_cell_angles() {
+        let cell = UnitCell::new_from_lengths([10.0, 20.0, 30.0]);
+        assert_eq!(cell.angles(), [90.0, 90.0, 90.0]);
     }
 
     #[test]
@@ -269,9 +315,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "lengths cannot be negative")]
-    fn test_check_lengths_invalid() {
-        let lengths = [-1.0, -2.0, -3.0];
+    #[should_panic(expected = "negative length found: -1")]
+    fn test_check_lengths_invalid_first_negative() {
+        let lengths = [-1.0, 2.0, 3.0];
         validation::check_lengths(&lengths).unwrap();
     }
 
@@ -279,6 +325,92 @@ mod tests {
     fn test_check_angles_valid() {
         let angles = [90.0, 90.0, 90.0];
         assert!(validation::check_angles(&angles).is_ok());
+    }
+
+    #[test]
+    fn test_check_angles_valid_non_orthogonal() {
+        let angles = [60.0, 60.0, 60.0];
+        assert!(validation::check_angles(&angles).is_ok());
+    }
+
+    #[test]
+    #[should_panic(expected = "negative angle found: -90")]
+    fn test_check_angles_invalid_negative() {
+        let angles = [-90.0, 90.0, 90.0];
+        validation::check_angles(&angles).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "zero angle found: 0")]
+    fn test_check_angles_invalid_zero() {
+        let angles = [0.0, 90.0, 90.0];
+        validation::check_angles(&angles).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "angle too large: 180")]
+    fn test_check_angles_invalid_180_and_greater() {
+        let angles = [180.0, 90.0, 90.0];
+        validation::check_angles(&angles).unwrap();
+        let angles = [200.0, 90.0, 90.0];
+        validation::check_angles(&angles).unwrap();
+    }
+
+    #[test]
+    fn test_cell_matrix_from_lengths_angles_valid() {
+        let lengths = [10.0, 20.0, 30.0];
+        let mut angles = [90.0, 90.0, 90.0];
+        let matrix = matrix::cell_matrix_from_lengths_angles(lengths, &mut angles).unwrap();
+        assert_eq!(matrix[(0, 0)], 10.0);
+        assert_eq!(matrix[(1, 1)], 20.0);
+        assert_eq!(matrix[(2, 2)], 30.0);
+    }
+
+    #[test]
+    fn test_cell_matrix_from_lengths_angles_triclinic() {
+        let lengths = [10.0, 20.0, 30.0];
+        let mut angles = [60.0, 60.0, 60.0];
+        let matrix = matrix::cell_matrix_from_lengths_angles(lengths, &mut angles).unwrap();
+        assert!(!utils::is_diagonal(matrix));
+    }
+
+    #[test]
+    fn test_is_orthorhombic() {
+        let lengths = [10.0, 20.0, 30.0];
+        let angles = [90.0, 90.0, 90.0];
+        assert!(utils::is_orthorhombic(lengths, angles));
+    }
+
+    #[test]
+    fn test_is_orthorhombic_with_nan() {
+        let lengths = [10.0, 20.0, 0.0];
+        let angles = [90.0, 90.0, f64::NAN];
+        assert!(utils::is_orthorhombic(lengths, angles));
+    }
+
+    #[test]
+    fn test_is_infinite() {
+        let lengths = [0.0, 0.0, 0.0];
+        assert!(utils::is_infinite(lengths));
+    }
+
+    #[test]
+    fn test_is_diagonal() {
+        let mut matrix = Matrix3::zeros();
+        matrix[(0, 0)] = 1.0;
+        matrix[(1, 1)] = 2.0;
+        matrix[(2, 2)] = 3.0;
+        assert!(utils::is_diagonal(matrix));
+    }
+
+    #[test]
+    fn test_is_not_diagonal() {
+        let mut matrix = Matrix3::zeros();
+        matrix[(0, 0)] = 1.0;
+        matrix[(1, 1)] = 2.0;
+        matrix[(2, 2)] = 3.0;
+        matrix[(0, 1)] = 0.1;
+        assert!(!utils::is_diagonal(matrix));
     }
 
     #[test]
@@ -297,34 +429,5 @@ mod tests {
         true_cell.matrix[(2, 2)] = 14.9100096405;
         let diff = expected.matrix - true_cell.matrix;
         assert!((diff).iter().all(|&x| x.abs() < 1e-6), "diff: {diff}");
-    }
-
-    #[test]
-    #[should_panic(expected = "angles cannot be negative")]
-    fn test_check_angles_invalid_negative() {
-        let angles = [-90.0, -90.0, -90.0];
-        validation::check_angles(&angles).unwrap();
-    }
-
-    #[test]
-    #[should_panic(expected = "angles cannot be (roughly) zero")]
-    fn test_check_angles_invalid_zero() {
-        let angles = [0.0, 0.0, 0.0];
-        validation::check_angles(&angles).unwrap();
-    }
-
-    #[test]
-    #[should_panic(expected = "angles cannot be larger than or equal to 180 degrees")]
-    fn test_check_angles_invalid_180() {
-        let angles = [180.0, 180.0, 180.0];
-        validation::check_angles(&angles).unwrap();
-    }
-
-    #[test]
-    #[should_panic(expected = "lengths cannot be negative")]
-    fn test_cell_matrix_from_lengths_angles_invalid() {
-        let lengths = [-10.0, 20.0, 30.0];
-        let mut angles = [90.0, 90.0, 90.0];
-        matrix::cell_matrix_from_lengths_angles(lengths, &mut angles).unwrap();
     }
 }
