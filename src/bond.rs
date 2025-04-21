@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, ops::Index};
+use std::ops::Index;
 
 pub enum BondOrder {
     /// Bond order is unknown or unspecified
