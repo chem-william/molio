@@ -1,54 +1,15 @@
-// pub struct PDBFormat;
-// impl FileFormat for PDBFormat {
-//     fn read_next(&self, path: &Path) -> Result<Frame, CError> {
-//         println!("Reading {:?} as PDB format", path);
-//         // Replace with real parsing logic.
-//         Ok(Frame { atoms: vec![] })
-//     }
+use std::{hint::black_box, path::Path};
 
-//     fn write(&self, path: &Path, frame: &Frame) -> Result<(), CError> {
-//         println!(
-//             "Writing {:?} as PDB format with {} atoms",
-//             path,
-//             frame.size()
-//         );
-//         Ok(())
-//     }
-//     fn read(&self) -> Result<Frame, CError> {
-//         println!("Reading as PDB format");
-//         // Replace with real parsing logic.
-//         Ok(Frame { atoms: vec![] })
-//     }
-// }
-
-// fn main() -> Result<(), CError> {
-//     let path = Path::new("structure.xyz");
-//     let mut trajectory = Trajectory::new(path)?;
-
-//     let frame = trajectory.read_at(0)?;
-//     println!(
-//         "There are {} atoms in the first frame using read_at(0)",
-//         frame.size()
-//     );
-//     let frame = trajectory.read_at(1)?;
-//     println!(
-//         "There are {} atoms in the second frame using read_at(1)",
-//         frame.size()
-//     );
-//     let frame = trajectory.read_at(0)?;
-//     println!(
-//         "There are {} atoms in the first frame using read_at(0)",
-//         frame.size()
-//     );
-//     let frame = trajectory.read_at(2)?;
-//     println!(
-//         "There are {} atoms in the first frame using read_at(2)",
-//         frame.size()
-//     );
-
-//     Ok(())
-// }
+use molio::{frame::Frame, trajectory::Trajectory};
 
 fn main() {
-    println!("hellow world");
+    let path = Path::new("./helium.xyz");
+    let mut trajectory = Trajectory::new(path).unwrap();
+    let mut frame = Frame::new();
+    let mut dummy = 0;
+    while let Some(next_frame) = trajectory.read().unwrap() {
+        frame = next_frame;
+        dummy += frame.size();
+    }
+    black_box(dummy);
 }
