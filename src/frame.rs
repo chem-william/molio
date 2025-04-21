@@ -58,6 +58,7 @@ mod tests {
             y: 2.0,
             z: 3.0,
             symbol: "H".to_string(),
+            name: "hydrogen".to_string(),
             properties: Properties::new(),
         };
         let atom2 = Atom {
@@ -65,6 +66,7 @@ mod tests {
             y: 5.0,
             z: 6.0,
             symbol: "O".to_string(),
+            name: "oxygen".to_string(),
             properties: Properties::new(),
         };
 

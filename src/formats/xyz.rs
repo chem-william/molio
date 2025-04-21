@@ -287,7 +287,8 @@ impl FileFormat for XYZFormat {
                 x,
                 y,
                 z,
-                symbol: name,
+                symbol,
+                name: "".to_string(),
                 properties: Properties::new(),
             };
             XYZFormat::read_atomic_properties(&properties, &mut tokens, &mut atom)?;
