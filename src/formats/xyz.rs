@@ -15,107 +15,7 @@ use std::str::SplitWhitespace;
 pub struct XYZFormat;
 type PropertiesList = BTreeMap<String, PropertyKind>;
 
-// Helper trait for parsing values
-trait ValueParser {
-    fn parse(value: &str) -> Result<Property, CError>;
-}
-
-// Implement parsers for each property type
-struct StringParser;
-struct BoolParser;
-struct DoubleParser;
-struct Vector3DParser;
-struct Matrix3x3Parser;
-struct VectorXDParser;
-
-impl ValueParser for StringParser {
-    fn parse(value: &str) -> Result<Property, CError> {
-        Ok(Property::String(value.to_string()))
-    }
-}
-
-impl ValueParser for BoolParser {
-    fn parse(value: &str) -> Result<Property, CError> {
-        match value.to_lowercase().as_str() {
-            "t" | "true" => Ok(Property::Bool(true)),
-            "f" | "false" => Ok(Property::Bool(false)),
-            _ => Err(CError::GenericError(format!(
-                "Invalid boolean value: {}",
-                value
-            ))),
-        }
-    }
-}
-
-impl ValueParser for DoubleParser {
-    fn parse(value: &str) -> Result<Property, CError> {
-        value
-            .parse::<f64>()
-            .map(Property::Double)
-            .map_err(|e| CError::GenericError(format!("Failed to parse number: {}", e)))
-    }
-}
-
-impl ValueParser for Vector3DParser {
-    fn parse(value: &str) -> Result<Property, CError> {
-        let parts: Vec<&str> = value.split_whitespace().collect();
-        if parts.len() != 3 {
-            return Err(CError::GenericError(format!(
-                "Vector3D requires exactly 3 components, got {}: {:?}",
-                parts.len(),
-                parts
-            )));
-        }
-        let x = parts[0]
-            .parse::<f64>()
-            .map_err(|e| CError::GenericError(format!("Failed to parse x component: {}", e)))?;
-        let y = parts[1]
-            .parse::<f64>()
-            .map_err(|e| CError::GenericError(format!("Failed to parse y component: {}", e)))?;
-        let z = parts[2]
-            .parse::<f64>()
-            .map_err(|e| CError::GenericError(format!("Failed to parse z component: {}", e)))?;
-        Ok(Property::Vector3D([x, y, z]))
-    }
-}
-
-impl ValueParser for Matrix3x3Parser {
-    fn parse(value: &str) -> Result<Property, CError> {
-        let parts: Vec<&str> = value.split_whitespace().collect();
-        if parts.len() != 9 {
-            return Err(CError::GenericError(format!(
-                "Matrix3x3 requires exactly 9 components, got {}: {:?}",
-                parts.len(),
-                parts
-            )));
-        }
-        let nums: Result<Vec<f64>, _> = parts.iter().map(|p| p.parse::<f64>()).collect();
-        nums.map(|n| Property::Matrix3x3(Matrix3::from_iterator(n)))
-            .map_err(|e| CError::GenericError(format!("Failed to parse matrix components: {}", e)))
-    }
-}
-
-impl ValueParser for VectorXDParser {
-    fn parse(value: &str) -> Result<Property, CError> {
-        let parts: Vec<&str> = value.split_whitespace().collect();
-        let nums: Result<Vec<f64>, _> = parts.iter().map(|p| p.parse::<f64>()).collect();
-        nums.map(Property::VectorXD)
-            .map_err(|e| CError::GenericError(format!("Failed to parse vector components: {}", e)))
-    }
-}
-
 impl XYZFormat {
-    fn parse_value(value: &str, kind: PropertyKind) -> Result<Property, CError> {
-        match kind {
-            PropertyKind::String => StringParser::parse(value),
-            PropertyKind::Bool => BoolParser::parse(value),
-            PropertyKind::Double => DoubleParser::parse(value),
-            PropertyKind::Vector3D => Vector3DParser::parse(value),
-            PropertyKind::Matrix3x3 => Matrix3x3Parser::parse(value),
-            PropertyKind::VectorXD => VectorXDParser::parse(value),
-        }
-    }
-
     fn read_atomic_properties(
         properties: &PropertiesList,
         tokens: &mut SplitWhitespace,
@@ -129,12 +29,12 @@ impl XYZFormat {
                     let y = tokens.next().ok_or(CError::MissingToken)?;
                     let z = tokens.next().ok_or(CError::MissingToken)?;
                     let value = format!("{} {} {}", x, y, z);
-                    let property = Self::parse_value(&value, kind.clone())?;
+                    let property = Property::parse_value(&value, kind.clone())?;
                     atom.properties.insert(name.clone(), property);
                 }
                 _ => {
                     let value = tokens.next().ok_or(CError::MissingToken)?;
-                    let property = Self::parse_value(value, kind.clone())?;
+                    let property = Property::parse_value(value, kind.clone())?;
                     atom.properties.insert(name.clone(), property);
                 }
             }
@@ -209,20 +109,20 @@ impl XYZFormat {
         // Try parsing as bool first
         let lowercased = value.to_lowercase();
         if ["t", "true", "f", "false"].contains(&lowercased.as_str()) {
-            return Self::parse_value(&lowercased, PropertyKind::Bool)
+            return Property::parse_value(&lowercased, PropertyKind::Bool)
                 .unwrap_or_else(|_| Property::String(value.to_string()));
         }
 
         // Try parsing as vector/matrix
         let parts: Vec<&str> = value.split_whitespace().collect();
         match parts.len() {
-            1 => Self::parse_value(value, PropertyKind::Double)
+            1 => Property::parse_value(value, PropertyKind::Double)
                 .unwrap_or_else(|_| Property::String(value.to_string())),
-            3 => Self::parse_value(value, PropertyKind::Vector3D)
+            3 => Property::parse_value(value, PropertyKind::Vector3D)
                 .unwrap_or_else(|_| Property::String(value.to_string())),
-            9 => Self::parse_value(value, PropertyKind::Matrix3x3)
+            9 => Property::parse_value(value, PropertyKind::Matrix3x3)
                 .unwrap_or_else(|_| Property::String(value.to_string())),
-            _ => Self::parse_value(value, PropertyKind::VectorXD)
+            _ => Property::parse_value(value, PropertyKind::VectorXD)
                 .unwrap_or_else(|_| Property::String(value.to_string())),
         }
     }

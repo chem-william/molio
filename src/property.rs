@@ -1,6 +1,8 @@
 use nalgebra::Matrix3;
 use std::collections::HashMap;
 
+use crate::error::CError;
+
 #[derive(PartialEq, Clone, Debug)]
 pub enum PropertyKind {
     Bool,
@@ -95,6 +97,104 @@ impl Property {
             ref other => panic!("expected Matrix3x3, found {:?}", other),
         }
     }
+
+    pub fn parse_value(value: &str, kind: PropertyKind) -> Result<Property, CError> {
+        match kind {
+            PropertyKind::String => StringParser::parse(value),
+            PropertyKind::Bool => BoolParser::parse(value),
+            PropertyKind::Double => DoubleParser::parse(value),
+            PropertyKind::Vector3D => Vector3DParser::parse(value),
+            PropertyKind::Matrix3x3 => Matrix3x3Parser::parse(value),
+            PropertyKind::VectorXD => VectorXDParser::parse(value),
+        }
+    }
+}
+/// Helper trait for parsing values into Property
+pub trait ValueParser {
+    fn parse(value: &str) -> Result<Property, CError>;
+}
+
+pub struct StringParser;
+pub struct BoolParser;
+pub struct DoubleParser;
+pub struct Vector3DParser;
+pub struct Matrix3x3Parser;
+pub struct VectorXDParser;
+
+impl ValueParser for StringParser {
+    fn parse(value: &str) -> Result<Property, CError> {
+        Ok(Property::String(value.to_string()))
+    }
+}
+
+impl ValueParser for BoolParser {
+    fn parse(value: &str) -> Result<Property, CError> {
+        match value.to_lowercase().as_str() {
+            "t" | "true" => Ok(Property::Bool(true)),
+            "f" | "false" => Ok(Property::Bool(false)),
+            _ => Err(CError::GenericError(format!(
+                "Invalid boolean value: {}",
+                value
+            ))),
+        }
+    }
+}
+
+impl ValueParser for DoubleParser {
+    fn parse(value: &str) -> Result<Property, CError> {
+        value
+            .parse::<f64>()
+            .map(Property::Double)
+            .map_err(|e| CError::GenericError(format!("Failed to parse number: {}", e)))
+    }
+}
+
+impl ValueParser for Vector3DParser {
+    fn parse(value: &str) -> Result<Property, CError> {
+        let parts: Vec<&str> = value.split_whitespace().collect();
+        if parts.len() != 3 {
+            return Err(CError::GenericError(format!(
+                "Vector3D requires exactly 3 components, got {}: {:?}",
+                parts.len(),
+                parts
+            )));
+        }
+        let x = parts[0]
+            .parse::<f64>()
+            .map_err(|e| CError::GenericError(format!("Failed to parse x component: {}", e)))?;
+        let y = parts[1]
+            .parse::<f64>()
+            .map_err(|e| CError::GenericError(format!("Failed to parse y component: {}", e)))?;
+        let z = parts[2]
+            .parse::<f64>()
+            .map_err(|e| CError::GenericError(format!("Failed to parse z component: {}", e)))?;
+        Ok(Property::Vector3D([x, y, z]))
+    }
+}
+
+impl ValueParser for Matrix3x3Parser {
+    fn parse(value: &str) -> Result<Property, CError> {
+        let parts: Vec<&str> = value.split_whitespace().collect();
+        if parts.len() != 9 {
+            return Err(CError::GenericError(format!(
+                "Matrix3x3 requires exactly 9 components, got {}: {:?}",
+                parts.len(),
+                parts
+            )));
+        }
+        let nums: Result<Vec<f64>, _> = parts.iter().map(|p| p.parse::<f64>()).collect();
+        nums.map(|n| Property::Matrix3x3(Matrix3::from_iterator(n)))
+            .map_err(|e| CError::GenericError(format!("Failed to parse matrix components: {}", e)))
+    }
+}
+
+impl ValueParser for VectorXDParser {
+    fn parse(value: &str) -> Result<Property, CError> {
+        let parts: Vec<&str> = value.split_whitespace().collect();
+        let nums: Result<Vec<f64>, _> = parts.iter().map(|p| p.parse::<f64>()).collect();
+        nums.map(Property::VectorXD)
+            .map_err(|e| CError::GenericError(format!("Failed to parse vector components: {}", e)))
+    }
 }
 
 #[derive(Debug)]
@@ -142,14 +242,16 @@ mod tests {
 
     #[test]
     fn test_matrix3x3_property() {
-        let matrix = Matrix3::new(
-            1.0, 2.0, 3.0,
-            4.0, 5.0, 6.0,
-            7.0, 8.0, 9.0
-        );
+        let matrix = Matrix3::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
         let prop = Property::Matrix3x3(matrix);
-        assert_eq!(prop.as_matrix3x3(), Some([1.0, 4.0, 7.0, 2.0, 5.0, 8.0, 3.0, 6.0, 9.0]));
-        assert_eq!(prop.expect_matrix3x3(), [1.0, 4.0, 7.0, 2.0, 5.0, 8.0, 3.0, 6.0, 9.0]);
+        assert_eq!(
+            prop.as_matrix3x3(),
+            Some([1.0, 4.0, 7.0, 2.0, 5.0, 8.0, 3.0, 6.0, 9.0])
+        );
+        assert_eq!(
+            prop.expect_matrix3x3(),
+            [1.0, 4.0, 7.0, 2.0, 5.0, 8.0, 3.0, 6.0, 9.0]
+        );
         assert_eq!(prop.as_double(), None);
     }
 
