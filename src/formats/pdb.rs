@@ -11,6 +11,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
 use std::path::Path;
 
+#[derive(Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FullResidueId {
     /// Chain identifier
     chain: char,
@@ -21,11 +22,19 @@ pub struct FullResidueId {
     /// Insertion code of the residue
     insertion_code: char,
 }
+
+#[derive(Default)]
 pub struct Residue {
     name: String,
-    id: Option<usize>,
+    id: Option<i64>,
     atoms: BTreeSet<usize>,
     properties: Properties,
+}
+
+impl Residue {
+    fn add_atom(&mut self, index: usize) {
+        self.atoms.insert(index);
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -57,7 +66,9 @@ pub enum Record {
 }
 
 pub fn get_record(line: &str) -> Record {
-    let rec = &line[..6];
+    // let rec: String = line.chars().take(6).collect();
+
+    let rec = if line.len() >= 6 { &line[..6] } else { line };
 
     match rec {
         "ENDMDL" => Record::ENDMDL,
@@ -162,11 +173,22 @@ pub struct PDBFormat {
     /// List of all atom offsets. This maybe pushed in read_ATOM or if a TER
     /// record is found. It is reset every time a frame is read.
     pub atom_offsets: RefCell<Vec<usize>>,
+
+    /// This will be None when no secondary structure information should be
+    /// read. Else it is set to the final residue of a secondary structure and
+    /// the text description which should be set.
+    pub current_secinfo: RefCell<Option<(FullResidueId, String)>>,
+
+    /// Store secondary structure information. Keys are the
+    /// starting residue of the secondary structure, and values are pairs
+    /// containing the ending residue and a string which is a written
+    /// description of the secondary structure
+    pub secinfo: BTreeMap<FullResidueId, (FullResidueId, String)>,
 }
 
 impl PDBFormat {
     fn parse_atom(&self, frame: &mut Frame, line: &str, is_hetatm: bool) -> Result<(), CError> {
-        debug_assert!(&line[..6] == "ATOM" || &line[..6] == "HETATM");
+        debug_assert!(line[..6] == *"ATOM  " || line[..6] == *"HETATM");
         if line.len() < 54 {
             return Err(CError::InvalidRecord {
                 expected_record_type: "ATOM".to_string(),
@@ -208,12 +230,119 @@ impl PDBFormat {
         let name = &line[12..16];
         if line.len() >= 78 {
             let atom_type = &line[76..78];
-            atom.name = name.to_string();
+            atom.name = name.trim().to_string();
             atom.symbol = atom_type.to_string();
         } else {
             // Read just the atom name and hope for the best
             atom.name = name.to_string();
         }
+
+        let altloc = &line[16..17];
+        if altloc != " " {
+            atom.properties
+                .insert("altloc".to_string(), Property::String(altloc.to_string()));
+        }
+
+        let x = Property::parse_value(&line[30..38], crate::property::PropertyKind::Double)?;
+        let y = Property::parse_value(&line[38..46], crate::property::PropertyKind::Double)?;
+        let z = Property::parse_value(&line[46..54], crate::property::PropertyKind::Double)?;
+        atom.x = x.expect_double();
+        atom.y = y.expect_double();
+        atom.z = z.expect_double();
+        frame.add_atom(atom);
+
+        let atom_id = frame.size() - 1;
+        let insertion_code = line.chars().nth(26).unwrap();
+        let resid = match decode_hybrid36(4, &line[22..26]) {
+            Ok(resid) => resid,
+            // No residue information so return early
+            Err(_) => return Ok(()),
+        };
+
+        let chain = &line.chars().nth(21).unwrap();
+        let resname = line[17..20].trim().to_string();
+        let full_residue_id = FullResidueId {
+            chain: *chain,
+            resid,
+            resname: resname.to_string(),
+            ..Default::default()
+        };
+
+        if self.residues.borrow().len() == 0 {
+            let mut residue = Residue {
+                name: resname,
+                id: Some(resid),
+                ..Default::default()
+            };
+            residue.add_atom(atom_id);
+
+            if insertion_code != ' ' {
+                residue.properties.insert(
+                    "insertion_code".to_string(),
+                    Property::String(insertion_code.to_string()),
+                );
+            }
+
+            // Set whether or not the residue is standardized
+            residue
+                .properties
+                .insert("is_standard_pdb".to_string(), Property::Bool(!is_hetatm));
+
+            // This is saved as a string (instead of a number) on purpose
+            // to match MMTF format
+            residue.properties.insert(
+                "chainid".to_string(),
+                Property::String(line.chars().nth(21).unwrap().to_string()),
+            );
+
+            // PDB format makes no distinction between chainid and chainname
+            residue.properties.insert(
+                "chainname".to_string(),
+                Property::String(line.chars().nth(21).unwrap().to_string()),
+            );
+
+            // segment name is not part of the standard, but something added by
+            // CHARM/NAMD in the un-used character range 73-76
+            if line.len() > 72 {
+                let segname = line[72..76].trim();
+                if !segname.is_empty() {
+                    residue
+                        .properties
+                        .insert("segname".to_string(), Property::String(segname.to_string()));
+                }
+            }
+
+            // Are we within a secondary information sequence?
+            if let Some(secinfo) = self.current_secinfo.borrow().as_ref() {
+                residue.properties.insert(
+                    "secondary_structure".to_string(),
+                    Property::String(secinfo.1.clone()),
+                );
+
+                if secinfo.0 == full_residue_id {
+                    self.current_secinfo.replace(None);
+                }
+            }
+
+            // Are we the start of a secondary information sequence?
+            if let Some(secinfo_for_residue) = self.secinfo.get(&full_residue_id) {
+                self.current_secinfo.replace(None);
+                residue.properties.insert(
+                    "secondary_structure".to_string(),
+                    Property::String(secinfo_for_residue.1.clone()),
+                );
+            }
+
+            self.residues.borrow_mut().insert(full_residue_id, residue);
+        } else {
+            // Just add this atom to the residue
+            self.residues
+                .borrow_mut()
+                .get_mut(&full_residue_id)
+                .unwrap()
+                .add_atom(atom_id);
+        }
+
         Ok(())
     }
 
@@ -270,6 +399,8 @@ impl PDBFormat {
         PDBFormat {
             residues: RefCell::new(BTreeMap::new()),
             atom_offsets: RefCell::new(Vec::new()),
+            current_secinfo: RefCell::new(None),
+            secinfo: BTreeMap::new(),
         }
     }
     const END_RECORD: &str = "END";
@@ -336,24 +467,13 @@ impl FileFormat for PDBFormat {
                 // Record::SHEET => {}
                 // Record::TURN => {}
                 // Record::TER => {}
-                // Record::END => {}
+                Record::END => break,
                 // Record::IGNORED_ => {}
                 // Record::UNKNOWN_ => {}
                 _ => {}
             }
+            line.clear();
         }
-        //     if trimmed.starts_with("CRYST1") {
-        //         let unit_cell = Self::parse_cryst1_line(self, trimmed)?;
-        //         // frame.unit_cell = unit_cell;
-        //     } else if trimmed.starts_with("ATOM") || trimmed.starts_with("HETATM") {
-        //         let atom = Self::parse_atom_line(self, trimmed)?;
-        //         frame.add_atom(atom);
-        //     } else if trimmed.starts_with("END") {
-        //         break;
-        //     }
-
-        //     line.clear();
-        // }
 
         Ok(frame)
     }
@@ -395,7 +515,11 @@ impl FileFormat for PDBFormat {
     }
 
     fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        todo!();
+        if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
+            Ok(Some(self.read_next(reader).unwrap()))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -414,6 +538,16 @@ mod tests {
         let path = Path::new("./src/tests-data/pdb/2hkb.pdb");
         let trajectory = Trajectory::new(path).unwrap();
         assert_eq!(trajectory.size, 11);
+    }
+
+    #[test]
+    fn sanity_check() {
+        let path = Path::new("./src/tests-data/pdb/water.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 100);
+
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 297);
     }
 
     #[test]

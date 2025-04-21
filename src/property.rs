@@ -143,6 +143,7 @@ impl ValueParser for BoolParser {
 impl ValueParser for DoubleParser {
     fn parse(value: &str) -> Result<Property, CError> {
         value
+            .trim()
             .parse::<f64>()
             .map(Property::Double)
             .map_err(|e| CError::GenericError(format!("Failed to parse number: {}", e)))
