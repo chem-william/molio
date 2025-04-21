@@ -5,11 +5,13 @@ use std::ops::Index;
 ///
 /// An improper dihedral angle is formed by three bonds around a central atom:
 ///
+/// ```text
 ///     |  i       k  |
 ///     |    \   /    |
 ///     |      j      |
 ///     |      |      |
 ///     |      m      |
+/// ```
 ///
 ///
 /// The second atom of the improper is always the central atom.

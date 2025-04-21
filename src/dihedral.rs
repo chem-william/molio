@@ -5,9 +5,11 @@ use std::ops::Index;
 ///
 /// A dihedral angle is formed by three consecutive bonds:
 ///
+/// ```text
 ///     |  i       k     |
 ///     |    \   /   \   |
 ///     |      j      m  |
+/// ```
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct Dihedral {
     data: [usize; 4],
