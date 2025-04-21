@@ -509,7 +509,7 @@ impl FileFormat for PDBFormat {
                 }
                 Record::CRYST1 => PDBFormat::parse_cryst1(&mut frame, &line).unwrap(),
                 Record::ATOM => self.parse_atom(&mut frame, &line, false).unwrap(),
-                // Record::HETATM => {}
+                Record::HETATM => self.parse_atom(&mut frame, &line, true).unwrap(),
                 // Record::CONECT => {}
                 // Record::MODEL => {}
                 // Record::ENDMDL => {}
@@ -632,6 +632,13 @@ mod tests {
         assert_approx_eq!(positions[296][0], 6.798, 1e-4);
         assert_approx_eq!(positions[296][1], 11.509, 1e-4);
         assert_approx_eq!(positions[296][2], 12.704, 1e-4);
+    }
+
+    #[test]
+    fn read_bonds() {
+        let path = Path::new("./src/tests-data/pdb/MOF-5.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
     }
 
     macro_rules! recycle_check {
