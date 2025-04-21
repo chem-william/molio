@@ -1,5 +1,6 @@
 use std::ops::Index;
 
+/// Stores the type of bond
 pub enum BondOrder {
     /// Bond order is unknown or unspecified
     Unknown,
@@ -38,6 +39,7 @@ pub enum BondOrder {
     Aromatic,
 }
 
+/// Ensure a canonical representation of a bond two atoms
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct Bond {
     pub data: [usize; 2],
