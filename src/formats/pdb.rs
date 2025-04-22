@@ -1,4 +1,5 @@
 use crate::atom::Atom;
+use crate::bond::BondOrder;
 use crate::error::CError;
 use crate::format::FileFormat;
 use crate::frame::Frame;
@@ -230,6 +231,7 @@ pub struct PDBFormat {
 impl PDBFormat {
     fn parse_atom(&self, frame: &mut Frame, line: &str, is_hetatm: bool) -> Result<(), CError> {
         debug_assert!(line[..6] == *"ATOM  " || line[..6] == *"HETATM");
+
         if line.len() < 54 {
             return Err(CError::InvalidRecord {
                 expected_record_type: "ATOM".to_string(),
@@ -239,30 +241,19 @@ impl PDBFormat {
         }
 
         if self.atom_offsets.borrow().is_empty() {
-            let initial_offset = decode_hybrid36(5, &line[6..11]);
-            println!(
-                "{} is not a valid atom id, assuming '1'",
-                initial_offset.as_ref().unwrap()
-            );
-            self.atom_offsets.borrow_mut().push(0);
-            if initial_offset.is_err() {
-                println!(
-                    "{} is not a valid atom id, assuming '1'",
-                    initial_offset.as_ref().unwrap()
-                );
-                self.atom_offsets.borrow_mut().push(0);
-            }
+            let initial_offset = decode_hybrid36(5, line[6..11].trim()).unwrap();
 
-            if *initial_offset.as_ref().unwrap() <= 0 {
+            if initial_offset <= 0 {
                 println!(
                     "warning: '{}' is too small, assuming id is '1'",
-                    initial_offset.as_ref().unwrap()
+                    initial_offset
                 );
                 self.atom_offsets.borrow_mut().push(0);
             } else {
                 self.atom_offsets.borrow_mut().push(
-                    usize::try_from(*initial_offset.as_ref().unwrap())
-                        .expect("decode_hybrid36 returned a negative number"),
+                    usize::try_from(initial_offset)
+                        .expect("decode_hybrid36 returned a negative number")
+                        - 1,
                 );
             };
         }
@@ -435,11 +426,74 @@ impl PDBFormat {
 
         Ok(())
     }
+    fn _read_index(&self, line: &str, initial: usize) -> Result<usize, CError> {
+        let trimmed_line = &line[initial..initial + 5].trim();
+        let mut pdb_atom_id = decode_hybrid36(5, trimmed_line)?;
+        println!("atom offsets: {:?}", self.atom_offsets);
+        println!("pdb atom id: {}", pdb_atom_id);
 
-    fn parse_conect(frame: &mut Frame, line: &str) -> Result<(), CError> {
+        // Find the lower bound index
+        let lower = self
+            .atom_offsets
+            .borrow()
+            .binary_search(&(pdb_atom_id as usize))
+            .unwrap_or_else(|insert_pos| insert_pos)
+            - 1;
+        println!("lower: {}", lower);
+
+        println!(
+            "atom offset: {}",
+            self.atom_offsets.borrow().first().copied().unwrap()
+        );
+        pdb_atom_id -= lower as i64 - self.atom_offsets.borrow().first().copied().unwrap() as i64;
+
+        println!("pdb_atom_id: {}", pdb_atom_id);
+        println!("line: {}", line);
+        Ok(usize::try_from(pdb_atom_id).unwrap())
+    }
+
+    fn _add_bond(&self, frame: &mut Frame, line: &str, i: usize, j: usize) {
+        if i >= frame.size() || j >= frame.size() {
+            println!(
+                "warning: PDB reader: ignoring CONECT ('{}') with atomic indexes bigger than frame size ({})",
+                line.trim(),
+                frame.size()
+            );
+            return;
+        }
+        frame
+            .add_bond(i, j, BondOrder::Unknown)
+            .expect("could not add bond on frame when parsing CONECT");
+    }
+
+    fn parse_conect(&self, frame: &mut Frame, line: &str) -> Result<(), CError> {
         debug_assert_eq!(&line[..6], "CONECT");
 
         let line_length = line.trim().len();
+
+        let index_i = self
+            ._read_index(line, 6)
+            .expect("could not read index when parsing CONECT");
+
+        if line_length > 11 {
+            let index_j = self._read_index(line, 11).unwrap();
+            self._add_bond(frame, line, index_i, index_j);
+        };
+
+        if line_length > 16 {
+            let index_j = self._read_index(line, 16).unwrap();
+            self._add_bond(frame, line, index_i, index_j);
+        };
+
+        if line_length > 21 {
+            let index_j = self._read_index(line, 21).unwrap();
+            self._add_bond(frame, line, index_i, index_j);
+        };
+
+        if line_length > 26 {
+            let index_j = self._read_index(line, 26).unwrap();
+            self._add_bond(frame, line, index_i, index_j);
+        };
 
         Ok(())
     }
@@ -510,7 +564,7 @@ impl FileFormat for PDBFormat {
                 Record::CRYST1 => PDBFormat::parse_cryst1(&mut frame, &line).unwrap(),
                 Record::ATOM => self.parse_atom(&mut frame, &line, false).unwrap(),
                 Record::HETATM => self.parse_atom(&mut frame, &line, true).unwrap(),
-                // Record::CONECT => {}
+                Record::CONECT => self.parse_conect(&mut frame, &line).unwrap(),
                 // Record::MODEL => {}
                 // Record::ENDMDL => {}
                 // Record::HELIX => {}

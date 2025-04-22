@@ -1,34 +1,46 @@
-use crate::atom::Atom;
+use crate::bond::BondOrder;
+use crate::error::CError;
 use crate::property::Properties;
 use crate::unit_cell::UnitCell;
+use crate::{atom::Atom, topology::Topology};
 use std::ops::{Index, IndexMut};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Frame {
-    pub atoms: Vec<Atom>,
     pub unit_cell: UnitCell,
     pub properties: Properties,
+    pub topology: Topology,
 }
 
 impl Frame {
     pub fn new() -> Self {
         Frame {
-            atoms: vec![],
             unit_cell: UnitCell::new(),
             properties: Properties::new(),
+            topology: Topology::default(),
         }
     }
 
     pub fn size(&self) -> usize {
-        self.atoms.len()
+        self.topology.size()
     }
 
     pub fn positions(&self) -> Vec<[f64; 3]> {
-        self.atoms.iter().map(|a| [a.x, a.y, a.z]).collect()
+        self.topology
+            .atoms
+            .iter()
+            .map(|a| [a.x, a.y, a.z])
+            .collect()
     }
 
     pub fn add_atom(&mut self, atom: Atom) {
-        self.atoms.push(atom)
+        self.topology.atoms.push(atom)
+    }
+
+    /// Add a bond in the system, between the atoms at index `i` and
+    /// `j`.
+    pub fn add_bond(&mut self, i: usize, j: usize, bond_order: BondOrder) -> Result<(), CError> {
+        self.topology.add_bond(i, j, bond_order)
     }
 }
 
@@ -36,13 +48,13 @@ impl Index<usize> for Frame {
     type Output = Atom;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.atoms[index]
+        &self.topology.atoms[index]
     }
 }
 
 impl IndexMut<usize> for Frame {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.atoms[index]
+        &mut self.topology.atoms[index]
     }
 }
 

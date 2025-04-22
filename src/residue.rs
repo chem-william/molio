@@ -13,7 +13,7 @@ pub struct FullResidueId {
     pub insertion_code: char,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Residue {
     pub name: String,
     pub id: Option<i64>,

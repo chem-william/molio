@@ -10,7 +10,7 @@ use std::ops::Index;
 ///     |    \   /   \   |
 ///     |      j      m  |
 /// ```
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Dihedral {
     data: [usize; 4],
 }

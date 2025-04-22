@@ -103,11 +103,11 @@ mod tests {
 
         // Read first frame
         let frame0 = trajectory.read_at(0).unwrap();
-        assert_eq!(frame0.atoms.len(), 192);
+        assert_eq!(frame0.size(), 192);
 
         // Read second frame
         let frame1 = trajectory.read_at(1).unwrap();
-        assert_eq!(frame1.atoms.len(), 62);
+        assert_eq!(frame1.size(), 62);
     }
 
     #[test]

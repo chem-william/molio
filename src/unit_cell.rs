@@ -4,8 +4,9 @@ use nalgebra::Matrix3;
 
 type Vec3D = [f64; 3];
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub enum CellShape {
+    #[default]
     Orthorhombic,
     Triclinic,
     Infinite,
@@ -63,7 +64,9 @@ mod utils {
         }
 
         // we support cells with one or two lengths of 0 which results in NaN angles
-        angles.iter().all(|&angle| is_roughly_90(angle) || angle.is_nan())
+        angles
+            .iter()
+            .all(|&angle| is_roughly_90(angle) || angle.is_nan())
     }
 
     /// Check if a cell is infinite (all lengths are zero)
@@ -86,9 +89,10 @@ mod validation {
 
     pub fn check_lengths(lengths: &Vec3D) -> Result<(), CError> {
         if let Some(&length) = lengths.iter().find(|&&x| x < 0.0) {
-            return Err(CError::GenericError(
-                format!("negative length found: {}", length),
-            ));
+            return Err(CError::GenericError(format!(
+                "negative length found: {}",
+                length
+            )));
         }
 
         Ok(())
@@ -104,21 +108,18 @@ mod validation {
     /// - Any angle is 180 degrees or greater
     pub fn check_angles(angles: &Vec3D) -> Result<(), CError> {
         if let Some(&angle) = angles.iter().find(|&&x| x < 0.0) {
-            return Err(CError::GenericError(
-                format!("negative angle found: {}", angle),
-            ));
+            return Err(CError::GenericError(format!(
+                "negative angle found: {}",
+                angle
+            )));
         }
 
         if let Some(&angle) = angles.iter().find(|&&x| utils::is_roughly_zero(x)) {
-            return Err(CError::GenericError(
-                format!("zero angle found: {}", angle),
-            ));
+            return Err(CError::GenericError(format!("zero angle found: {}", angle)));
         }
 
         if let Some(&angle) = angles.iter().find(|&&x| x >= 180.0) {
-            return Err(CError::GenericError(
-                format!("angle too large: {}", angle),
-            ));
+            return Err(CError::GenericError(format!("angle too large: {}", angle)));
         }
 
         Ok(())
@@ -158,7 +159,8 @@ mod matrix {
 
         cell_matrix[(2, 0)] = cos_beta;
         cell_matrix[(2, 1)] = (cos_alpha - cos_beta * cos_gamma) / sin_gamma;
-        cell_matrix[(2, 2)] = (1.0 - cell_matrix[(2, 0)].powi(2) - cell_matrix[(2, 1)].powi(2)).sqrt();
+        cell_matrix[(2, 2)] =
+            (1.0 - cell_matrix[(2, 0)].powi(2) - cell_matrix[(2, 1)].powi(2)).sqrt();
         cell_matrix[(2, 0)] *= lengths[2];
         cell_matrix[(2, 1)] *= lengths[2];
         cell_matrix[(2, 2)] *= lengths[2];
@@ -167,7 +169,7 @@ mod matrix {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct UnitCell {
     pub matrix: Matrix3<f64>,
     pub shape: CellShape,
