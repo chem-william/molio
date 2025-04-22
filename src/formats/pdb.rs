@@ -420,7 +420,7 @@ impl PDBFormat {
             let space_group = &line[55..65].trim();
             // TODO: handle this as a warning (somehow)?
             if space_group != &"P 1" && space_group != &"P1" {
-                println!("ignoring custom spce group ({space_group}), using P1 instead");
+                println!("ignoring custom space group ({space_group}), using P1 instead");
             }
         }
 
