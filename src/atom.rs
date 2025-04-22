@@ -14,6 +14,13 @@ pub struct Atom {
 
 impl Atom {
     pub fn new(x: f64, y: f64, z: f64, symbol: String, name: String) -> Self {
-        Self { x, y, z, symbol, name, properties: Properties::new() }
+        Self {
+            x,
+            y,
+            z,
+            symbol,
+            name,
+            properties: Properties::new(),
+        }
     }
 }

@@ -263,7 +263,7 @@ impl PDBFormat {
         if line.len() >= 78 {
             let atom_type = &line[76..78];
             atom.name = name.trim().to_string();
-            atom.symbol = atom_type.to_string();
+            atom.symbol = atom_type.trim().to_string();
         } else {
             // Read just the atom name and hope for the best
             atom.name = name.to_string();
@@ -429,8 +429,6 @@ impl PDBFormat {
     fn _read_index(&self, line: &str, initial: usize) -> Result<usize, CError> {
         let trimmed_line = &line[initial..initial + 5].trim();
         let mut pdb_atom_id = decode_hybrid36(5, trimmed_line)?;
-        println!("atom offsets: {:?}", self.atom_offsets);
-        println!("pdb atom id: {}", pdb_atom_id);
 
         // Find the lower bound index
         let lower = self
@@ -439,16 +437,11 @@ impl PDBFormat {
             .binary_search(&(pdb_atom_id as usize))
             .unwrap_or_else(|insert_pos| insert_pos)
             - 1;
-        println!("lower: {}", lower);
 
-        println!(
-            "atom offset: {}",
-            self.atom_offsets.borrow().first().copied().unwrap()
-        );
         pdb_atom_id -= lower as i64 - self.atom_offsets.borrow().first().copied().unwrap() as i64;
 
-        println!("pdb_atom_id: {}", pdb_atom_id);
-        println!("line: {}", line);
+        // TODO: is this correct?
+        pdb_atom_id -= 1;
         Ok(usize::try_from(pdb_atom_id).unwrap())
     }
 
@@ -634,7 +627,12 @@ mod tests {
     use assert_approx_eq::assert_approx_eq;
 
     use crate::{
-        formats::pdb::decode_hybrid36, formats::pdb::encode_hybrid36, trajectory::Trajectory,
+        angle::Angle,
+        bond::Bond,
+        dihedral::Dihedral,
+        formats::pdb::{decode_hybrid36, encode_hybrid36},
+        topology::Topology,
+        trajectory::Trajectory,
         unit_cell::CellShape,
     };
 
@@ -692,7 +690,38 @@ mod tests {
     fn read_bonds() {
         let path = Path::new("./src/tests-data/pdb/MOF-5.pdb");
         let mut trajectory = Trajectory::new(path).unwrap();
-        let frame = trajectory.read().unwrap().unwrap();
+        let mut frame = trajectory.read().unwrap().unwrap();
+
+        let topology: &mut Topology = frame.topology_as_mut();
+        assert_eq!(topology.size(), 65);
+
+        assert_eq!(topology[0].symbol, "Zn");
+        assert_eq!(topology[1].symbol, "O");
+
+        assert_eq!(topology[0].name, "ZN");
+        assert_eq!(topology[1].name, "O");
+
+        assert_eq!(topology.bonds().len(), 68);
+
+        assert!(topology.bonds().contains(&Bond::new(9, 38)));
+        assert!(topology.bonds().contains(&Bond::new(58, 62)));
+        assert!(topology.bonds().contains(&Bond::new(37, 24)));
+        assert!(topology.bonds().contains(&Bond::new(27, 31)));
+
+        println!("angles: {:?}", topology.angles());
+        assert!(topology.angles().contains(&Angle::new(20, 21, 23)));
+        assert!(topology.angles().contains(&Angle::new(9, 38, 44)));
+
+        assert!(
+            topology
+                .dihedrals()
+                .contains(&Dihedral::new(64, 62, 58, 53))
+        );
+        assert!(
+            topology
+                .dihedrals()
+                .contains(&Dihedral::new(22, 21, 23, 33))
+        );
     }
 
     macro_rules! recycle_check {

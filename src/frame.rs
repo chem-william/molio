@@ -9,7 +9,7 @@ use std::ops::{Index, IndexMut};
 pub struct Frame {
     pub unit_cell: UnitCell,
     pub properties: Properties,
-    pub topology: Topology,
+    topology: Topology,
 }
 
 impl Frame {
@@ -21,6 +21,20 @@ impl Frame {
         }
     }
 
+    /// Get a const reference to the topology of this frame
+    ///
+    /// It is not possible to get a modifiable reference to the topology,
+    /// because it would then be possible to remove/add atoms without changing
+    /// the actual positions and velocity storage. Instead, all the mutating
+    /// functionalities of the topology are mirrored on the frame (adding and
+    /// removing bonds, adding residues, *etc.*)
+    pub fn topology(&self) -> &Topology {
+        &self.topology
+    }
+
+    pub fn topology_as_mut(&mut self) -> &mut Topology {
+        &mut self.topology
+    }
     pub fn size(&self) -> usize {
         self.topology.size()
     }

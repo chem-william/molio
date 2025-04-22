@@ -43,7 +43,7 @@ pub enum BondOrder {
 /// Ensure a canonical representation of a bond two atoms
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 pub struct Bond {
-    pub data: [usize; 2],
+    data: [usize; 2],
 }
 
 impl Index<usize> for Bond {
@@ -72,7 +72,8 @@ impl Bond {
         if i == j {
             panic!("can not have a bond between an atom and itself");
         }
-        let (a, b) = if i < j { (i, j) } else { (j, i) };
+        let a = std::cmp::min(i, j);
+        let b = std::cmp::max(i, j);
         Bond { data: [a, b] }
     }
 }

@@ -10,9 +10,9 @@ use std::ops::Index;
 ///     |    \   /    |
 ///     |      j      |
 /// ```
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
 pub struct Angle {
-    pub data: [usize; 3],
+    data: [usize; 3],
 }
 
 impl Index<usize> for Angle {
