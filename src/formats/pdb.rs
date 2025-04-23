@@ -63,6 +63,8 @@ impl HelixType {
             2 => Some("right-handed pi helix"),
             3 => Some("right-handed gamma helix"),
             4 => Some("right-handed 3-10 helix"),
+            5 => Some("left-handed alpha helix"),
+            6 => Some("left-handed omega helix"),
             7 => Some("left-handed gamma helix"),
             8 => Some("two 7 ribbon helix"),
             9 => Some("polyproline"),
