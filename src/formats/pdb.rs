@@ -40,6 +40,39 @@ pub enum Record {
     UNKNOWN_,
 }
 
+/// See http://www.wwpdb.org/documentation/file-format-content/format23/sect5.html
+/// for definitions of helix types
+pub enum HelixType {
+    RightHandedAlphaHelix,
+    RightHandedOmegaHelix,
+    RightHandedPiHelix,
+    RightHandedGammaHelix,
+    RightHanded3_10Helix,
+    LeftHandedAlphaHelix,
+    LeftHandedOmegaHelix,
+    LeftHandedGammaHelix,
+    Two7RibbonHelix,
+    Polyproline,
+}
+
+impl HelixType {
+    pub fn nth(n: usize) -> Option<&'static str> {
+        match n {
+            0 => Some("right handed alpha helix"),
+            1 => Some("right handed omega helix"),
+            2 => Some("right handed pi helix"),
+            3 => Some("right handed gamma helix"),
+            4 => Some("right handed 3-10 helix"),
+            5 => Some("left handed alpha helix"),
+            6 => Some("left handed omega helix"),
+            7 => Some("left handed gamma helix"),
+            8 => Some("two 7 ribbon helix"),
+            9 => Some("polyproline"),
+            _ => None,
+        }
+    }
+}
+
 pub fn get_record(line: &str) -> Record {
     // let rec: String = line.chars().take(6).collect();
 
@@ -225,7 +258,10 @@ pub struct PDBFormat {
     /// starting residue of the secondary structure, and values are pairs
     /// containing the ending residue and a string which is a written
     /// description of the secondary structure
-    pub secinfo: BTreeMap<FullResidueId, (FullResidueId, String)>,
+    pub secinfo: RefCell<BTreeMap<FullResidueId, (FullResidueId, String)>>,
+
+    /// Number of models read/written to the file
+    models: RefCell<usize>,
 }
 
 impl PDBFormat {
@@ -357,7 +393,7 @@ impl PDBFormat {
             }
 
             // Are we the start of a secondary information sequence?
-            if let Some(secinfo_for_residue) = self.secinfo.get(&full_residue_id) {
+            if let Some(secinfo_for_residue) = self.secinfo.borrow().get(&full_residue_id) {
                 self.current_secinfo.replace(None);
                 residue.properties.insert(
                     "secondary_structure".to_string(),
@@ -491,12 +527,62 @@ impl PDBFormat {
         Ok(())
     }
 
+    fn parse_helix(&self, line: &str) -> Result<(), CError> {
+        if line.len() < 33 + 5 {
+            println!("warning: HELIX record too short: {line}");
+        };
+
+        let chain_start = line.chars().nth(19).expect("chain start");
+        let chain_end = line.chars().nth(31).expect("chain end");
+        let inscode_start = line.chars().nth(25).expect("inscode start");
+        let inscode_end = line.chars().nth(37).expect("inscode end");
+        let resname_start = line[15..18].trim();
+        let resname_end = line[27..30].trim();
+
+        let resid_start = decode_hybrid36(4, &line[21..25])?;
+        let resid_end = decode_hybrid36(4, &line[33..37])?;
+
+        if chain_start != chain_end {
+            println!("warning: HELIX chain {chain_start} and {chain_end} are not the same");
+        }
+
+        let start = FullResidueId {
+            chain: chain_start,
+            resid: resid_start,
+            resname: resname_start.to_string(),
+            insertion_code: inscode_start,
+        };
+        let end = FullResidueId {
+            chain: chain_end,
+            resid: resid_end,
+            resname: resname_end.to_string(),
+            insertion_code: inscode_end,
+        };
+
+        let helix_type = &line[38..40]
+            .parse::<usize>()
+            .inspect_err(|e| eprintln!("failed to parse helix type: {e}"))
+            .unwrap();
+        if *helix_type <= 10 {
+            self.secinfo.borrow_mut().insert(
+                start,
+                (
+                    end,
+                    HelixType::nth(2).expect("unknown helix type").to_string(),
+                ),
+            );
+        }
+
+        Ok(())
+    }
+
     pub fn new() -> Self {
         PDBFormat {
             residues: RefCell::new(BTreeMap::new()),
             atom_offsets: RefCell::new(Vec::new()),
             current_secinfo: RefCell::new(None),
-            secinfo: BTreeMap::new(),
+            secinfo: RefCell::new(BTreeMap::new()),
+            models: RefCell::new(0),
         }
     }
 
@@ -510,7 +596,8 @@ impl FileFormat for PDBFormat {
         let mut frame = Frame::new();
         let mut line = String::new();
 
-        while reader.read_line(&mut line)? > 0 {
+        let mut got_end = false;
+        while !got_end && reader.read_line(&mut line)? > 0 {
             let record = get_record(&line);
             let name = String::new();
 
@@ -558,9 +645,23 @@ impl FileFormat for PDBFormat {
                 Record::ATOM => self.parse_atom(&mut frame, &line, false).unwrap(),
                 Record::HETATM => self.parse_atom(&mut frame, &line, true).unwrap(),
                 Record::CONECT => self.parse_conect(&mut frame, &line).unwrap(),
-                // Record::MODEL => {}
-                // Record::ENDMDL => {}
-                // Record::HELIX => {}
+                Record::MODEL => *self.models.borrow_mut() += 1,
+                Record::ENDMDL => {
+                    // look one line ahead to see if the next Record is an `END`
+                    let mut line = String::new();
+                    let bytes = reader.read_line(&mut line)?;
+                    if bytes > 0 {
+                        reader.seek_relative(
+                            -(i64::try_from(bytes).expect("failed to convert bytes offset")),
+                        )?;
+                        if get_record(&line) == Record::END {
+                            // If that is the case then wait for the next Record
+                            continue;
+                        }
+                    }
+                    got_end = true;
+                }
+                Record::HELIX => self.parse_helix(&line).unwrap(),
                 // Record::SHEET => {}
                 // Record::TURN => {}
                 // Record::TER => {}
