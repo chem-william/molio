@@ -20,7 +20,7 @@ pub struct Topology {
     connect: Connectivity,
 
     /// List of residues in the system
-    residues: Vec<Residue>,
+    pub residues: Vec<Residue>,
 
     /// Association between atom indices and residues indices
     residue_mapping: HashMap<usize, usize>,
@@ -53,6 +53,26 @@ impl Topology {
 
     pub fn impropers(&mut self) -> Vec<Improper> {
         self.connect.impropers().iter().cloned().collect()
+    }
+
+    pub fn add_residue(&mut self, residue: Residue) -> Result<(), CError> {
+        let contains = residue
+            .into_iter()
+            .any(|r| self.residue_mapping.contains_key(r));
+
+        if contains {
+            return Err(CError::GenericError(format!(
+                "cannot add this residue: atom is already in another residue"
+            )));
+        };
+
+        let res_index = self.residues.len();
+        self.residues.push(residue);
+        for i in self.residues.last().unwrap() {
+            self.residue_mapping.insert(*i, res_index);
+        }
+
+        Ok(())
     }
 
     // TODO: should this check be moved to Connectivity::add_bond?

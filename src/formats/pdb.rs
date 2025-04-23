@@ -335,7 +335,7 @@ impl PDBFormat {
             ..Default::default()
         };
 
-        if self.residues.borrow().len() == 0 {
+        if !self.residues.borrow().contains_key(&full_residue_id) {
             let mut residue = Residue {
                 name: resname,
                 id: Some(resid),
@@ -575,6 +575,51 @@ impl PDBFormat {
         Ok(())
     }
 
+    fn parse_secondary(&self, line: &str, start: usize, end: usize) -> Result<(), CError> {
+        if line.len() < end + 10 {
+            println!("warning: secondary structure record too short: '{line}'");
+        };
+
+        let resname_start = &line[start..start + 3].trim();
+        let resname_end = &line[end..end + 3].trim();
+        let chain_start = &line.chars().nth(start + 4).expect("start of chain");
+        let chain_end = &line.chars().nth(end + 4).expect("end of chain");
+
+        if chain_start != chain_end {
+            return Err(CError::GenericError(format!(
+                "warning: secondary chain {chain_start} and {chain_end} are not the same"
+            )));
+        }
+
+        let resid_start = decode_hybrid36(4, &line[start..start + 4])?;
+        let resid_end = decode_hybrid36(4, &line[end..end + 4])?;
+        let inscode_start = &line
+            .chars()
+            .nth(start + 9)
+            .expect("start of insertion code");
+        let inscode_end = &line.chars().nth(end + 9).expect("end of insertion code");
+
+        let start = FullResidueId {
+            chain: *chain_start,
+            resid: resid_start,
+            resname: resname_start.to_string(),
+            insertion_code: *inscode_start,
+        };
+
+        let end = FullResidueId {
+            chain: *chain_end,
+            resid: resid_end,
+            resname: resname_end.to_string(),
+            insertion_code: *inscode_end,
+        };
+
+        self.secinfo
+            .borrow_mut()
+            .insert(start, (end, "extended".to_string()));
+
+        Ok(())
+    }
+
     pub fn new() -> Self {
         PDBFormat {
             residues: RefCell::new(BTreeMap::new()),
@@ -585,6 +630,19 @@ impl PDBFormat {
         }
     }
 
+    fn chain_ended(&self, frame: &mut Frame) {
+        // println!("residues: {:?}", self.residues);
+        for residue in self.residues.borrow().iter() {
+            frame.add_residue(residue.1.clone());
+        }
+
+        // This is a 'hack' to allow for badly formatted PDB files which restart
+        // the residue ID after a TER residue in cases where they should not.
+        // IE a metal Ion given the chain ID of A and residue ID of 1 even though
+        // this residue already exists.
+        self.residues.borrow_mut().clear();
+    }
+
     const END_RECORD: &str = "END";
     const ENDMDL_RECORD: &str = "ENDMDL";
 }
@@ -592,13 +650,14 @@ impl PDBFormat {
 impl FileFormat for PDBFormat {
     fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         self.residues.borrow_mut().clear();
+        self.atom_offsets.borrow_mut().clear();
+
         let mut frame = Frame::new();
         let mut line = String::new();
 
         let mut got_end = false;
         while !got_end && reader.read_line(&mut line)? > 0 {
             let record = get_record(&line);
-            let name = String::new();
 
             match record {
                 Record::HEADER => {
@@ -658,20 +717,41 @@ impl FileFormat for PDBFormat {
                             continue;
                         }
                     }
+                    // Else we have read a frame
                     got_end = true;
                 }
                 Record::HELIX => self.parse_helix(&line).unwrap(),
-                // Record::SHEET => {}
-                // Record::TURN => {}
-                // Record::TER => {}
-                Record::END => break,
-                // Record::IGNORED_ => {}
-                // Record::UNKNOWN_ => {}
-                _ => {}
+                Record::SHEET => self.parse_secondary(&line, 17, 28).unwrap(),
+                Record::TURN => self.parse_secondary(&line, 15, 26).unwrap(),
+                Record::TER => {
+                    println!("we reach ter?");
+                    if line.len() >= 12 {
+                        let ter_serial =
+                            decode_hybrid36(5, &line[6..11]).expect("TER record not numeric");
+                        if ter_serial != 0 {
+                            // This happens if the TER serial number is blank
+                            self.atom_offsets.borrow_mut().push(
+                                usize::try_from(ter_serial)
+                                    .expect("could not parse ter_serial to usize"),
+                            );
+                        }
+                    }
+                    self.chain_ended(&mut frame);
+                }
+                Record::END => got_end = true,
+                Record::IGNORED_ => {}
+                Record::UNKNOWN_ => {
+                    println!("ignoring unknown record: {}", line);
+                }
             }
             line.clear();
         }
 
+        if !got_end {
+            println!("warning: missing END record in file");
+        }
+
+        self.chain_ended(&mut frame);
         Ok(frame)
     }
 
@@ -808,7 +888,6 @@ mod tests {
         assert!(topology.bonds().contains(&Bond::new(37, 24)));
         assert!(topology.bonds().contains(&Bond::new(27, 31)));
 
-        println!("angles: {:?}", topology.angles());
         assert!(topology.angles().contains(&Angle::new(20, 21, 23)));
         assert!(topology.angles().contains(&Angle::new(9, 38, 44)));
 

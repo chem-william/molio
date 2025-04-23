@@ -13,7 +13,7 @@ pub enum PropertyKind {
     VectorXD,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Property {
     Bool(bool),
     Double(f64),

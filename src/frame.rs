@@ -1,6 +1,7 @@
 use crate::bond::BondOrder;
 use crate::error::CError;
 use crate::property::Properties;
+use crate::residue::Residue;
 use crate::unit_cell::UnitCell;
 use crate::{atom::Atom, topology::Topology};
 use std::ops::{Index, IndexMut};
@@ -49,6 +50,10 @@ impl Frame {
 
     pub fn add_atom(&mut self, atom: Atom) {
         self.topology.atoms.push(atom)
+    }
+
+    pub fn add_residue(&mut self, residue: Residue) {
+        self.topology.add_residue(residue);
     }
 
     /// Add a bond in the system, between the atoms at index `i` and

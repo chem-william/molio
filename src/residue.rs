@@ -1,7 +1,10 @@
 use crate::property::Properties;
-use std::collections::{BTreeSet, btree_set::Iter};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeSet, btree_set::Iter},
+};
 
-#[derive(Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default, PartialEq, Eq, Debug)]
 pub struct FullResidueId {
     /// Chain identifier
     pub chain: char,
@@ -13,7 +16,23 @@ pub struct FullResidueId {
     pub insertion_code: char,
 }
 
-#[derive(Default, Debug)]
+impl Ord for FullResidueId {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.chain
+            .cmp(&other.chain)
+            .then_with(|| self.resid.cmp(&other.resid))
+            .then_with(|| self.insertion_code.cmp(&other.insertion_code))
+            .then_with(|| self.resname.cmp(&other.resname))
+    }
+}
+
+impl PartialOrd for FullResidueId {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[derive(Default, Debug, Clone)]
 pub struct Residue {
     /// Name of the residue
     pub name: String,
@@ -33,7 +52,12 @@ impl Residue {
     pub fn add_atom(&mut self, index: usize) {
         self.atoms.insert(index);
     }
+
+    pub fn size(&self) -> usize {
+        self.atoms.len()
+    }
 }
+
 impl<'a> IntoIterator for &'a Residue {
     type Item = &'a usize;
     type IntoIter = Iter<'a, usize>;
