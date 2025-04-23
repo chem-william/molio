@@ -61,9 +61,9 @@ impl Topology {
             .any(|r| self.residue_mapping.contains_key(r));
 
         if contains {
-            return Err(CError::GenericError(format!(
-                "cannot add this residue: atom is already in another residue"
-            )));
+            return Err(CError::GenericError(
+                "cannot add this residue: atom is already in another residue".to_string(),
+            ));
         };
 
         let res_index = self.residues.len();
@@ -103,5 +103,11 @@ impl Topology {
 
     pub fn bond_order(&self, i: usize, j: usize) -> Result<BondOrder, CError> {
         self.connect.bond_order(i, j)
+    }
+
+    pub fn residue_for_atom(&self, index: usize) -> Option<Residue> {
+        self.residue_mapping
+            .get(&index)
+            .map(|residue_index| self.residues[*residue_index].clone())
     }
 }

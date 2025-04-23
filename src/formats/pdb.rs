@@ -1045,6 +1045,23 @@ mod tests {
         let frame = trajectory.read().unwrap().unwrap();
 
         assert_eq!(frame.topology().residues.len(), 99);
+        let opt_residue = frame.topology().residue_for_atom(1);
+        assert!(opt_residue.is_some());
+        let residue = opt_residue.unwrap();
+
+        assert_eq!(residue.size(), 3);
+        assert!(residue.contains(0));
+        assert!(residue.contains(1));
+        assert!(residue.contains(2));
+        assert!(residue.get("chainid").is_some());
+        assert_eq!(
+            residue
+                .get("chainid")
+                .map(|x| x.to_owned())
+                .unwrap()
+                .expect_string(),
+            "X"
+        );
     }
 
     #[test]

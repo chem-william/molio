@@ -1,8 +1,5 @@
-use crate::property::Properties;
-use std::{
-    cmp::Ordering,
-    collections::{BTreeSet, btree_set::Iter},
-};
+use crate::property::{Properties, Property};
+use std::collections::{BTreeSet, btree_set::Iter};
 
 #[derive(Default, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct FullResidueId {
@@ -39,6 +36,14 @@ impl Residue {
 
     pub fn size(&self) -> usize {
         self.atoms.len()
+    }
+
+    pub fn contains(&self, index: usize) -> bool {
+        self.atoms.contains(&index)
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Property> {
+        self.properties.get(name)
     }
 }
 
