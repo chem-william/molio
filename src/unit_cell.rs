@@ -87,11 +87,16 @@ mod utils {
 mod validation {
     use super::*;
 
+    /// Validate cell angles
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Any length is negative
     pub fn check_lengths(lengths: &Vec3D) -> Result<(), CError> {
         if let Some(&length) = lengths.iter().find(|&&x| x < 0.0) {
             return Err(CError::GenericError(format!(
-                "negative length found: {}",
-                length
+                "negative length found: {length}"
             )));
         }
 
@@ -109,17 +114,16 @@ mod validation {
     pub fn check_angles(angles: &Vec3D) -> Result<(), CError> {
         if let Some(&angle) = angles.iter().find(|&&x| x < 0.0) {
             return Err(CError::GenericError(format!(
-                "negative angle found: {}",
-                angle
+                "negative angle found: {angle}"
             )));
         }
 
         if let Some(&angle) = angles.iter().find(|&&x| utils::is_roughly_zero(x)) {
-            return Err(CError::GenericError(format!("zero angle found: {}", angle)));
+            return Err(CError::GenericError(format!("zero angle found: {angle}")));
         }
 
         if let Some(&angle) = angles.iter().find(|&&x| x >= 180.0) {
-            return Err(CError::GenericError(format!("angle too large: {}", angle)));
+            return Err(CError::GenericError(format!("angle too large: {angle}")));
         }
 
         Ok(())
@@ -127,7 +131,7 @@ mod validation {
 }
 
 mod matrix {
-    use super::*;
+    use super::{CError, Matrix3, Vec3D, utils, validation};
 
     /// Create a cell matrix from lengths and angles
     ///
@@ -190,10 +194,18 @@ impl UnitCell {
         UnitCell::new_from_lengths([0.0, 0.0, 0.0])
     }
 
+    #[must_use]
     pub fn new_from_lengths(lengths: Vec3D) -> Self {
         UnitCell::new_from_lengths_angles(lengths, &mut [90.0, 90.0, 90.0]).unwrap()
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Any length is negative
+    /// - Any angle is negative
+    /// - Any angle is zero
+    /// - Any angle is 180 degrees or greater
     pub fn new_from_lengths_angles(lengths: Vec3D, angles: &mut Vec3D) -> Result<Self, CError> {
         let matrix = matrix::cell_matrix_from_lengths_angles(lengths, angles)?;
         Self::new_from_matrix(matrix)
@@ -203,7 +215,7 @@ impl UnitCell {
     ///
     /// Will return `Err` if the determinant of the input matrix < 0.0
     ///
-    /// Will return `Err` if the input matrix [CellShape::Orthorhombic], but
+    /// Will return `Err` if the input matrix [`CellShape::Orthorhombic`], but
     /// not diagonal
     pub fn new_from_matrix(matrix: Matrix3<f64>) -> Result<Self, CError> {
         if matrix.determinant() < 0.0 {

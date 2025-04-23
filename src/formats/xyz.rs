@@ -59,7 +59,6 @@ impl XYZFormat {
     fn parse_property_list(line: &str) -> Result<PropertiesList, CError> {
         const PREFIX: &str = "species:S:1:pos:R:3:";
 
-        let initial_input = &line;
         let rest = line.strip_prefix(PREFIX).ok_or_else(|| {
             CError::GenericError(
                 "Invalid property list format: missing expected prefix".to_string(),
@@ -222,8 +221,6 @@ impl FileFormat for XYZFormat {
     }
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
-        let mut line_position = 0;
-
         let mut line = String::new();
 
         let bytes = reader.read_line(&mut line)?;
@@ -232,6 +229,7 @@ impl FileFormat for XYZFormat {
         }
         let n_atoms: usize = line.trim().parse().unwrap();
 
+        let mut line_position = 0;
         for i in 0..=n_atoms {
             line.clear();
             let bytes = reader.read_line(&mut line)?;

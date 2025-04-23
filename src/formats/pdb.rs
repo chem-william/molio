@@ -635,7 +635,7 @@ impl PDBFormat {
     fn chain_ended(&self, frame: &mut Frame) {
         // println!("residues: {:?}", self.residues);
         for residue in self.residues.borrow().iter() {
-            frame.add_residue(residue.1.clone());
+            let _ = frame.add_residue(residue.1.clone());
         }
 
         // This is a 'hack' to allow for badly formatted PDB files which restart
@@ -1057,7 +1057,7 @@ mod tests {
         assert_eq!(
             residue
                 .get("chainid")
-                .map(|x| x.to_owned())
+                .map(std::borrow::ToOwned::to_owned)
                 .unwrap()
                 .expect_string(),
             "X"

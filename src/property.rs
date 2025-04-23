@@ -36,7 +36,7 @@ impl Property {
     pub fn expect_bool(&self) -> bool {
         match *self {
             Property::Bool(b) => b,
-            ref other => panic!("expected Bool, found {:?}", other),
+            ref other => panic!("expected Bool, found {other:?}"),
         }
     }
     pub fn as_double(&self) -> Option<f64> {
@@ -49,7 +49,7 @@ impl Property {
     pub fn expect_double(&self) -> f64 {
         match *self {
             Property::Double(d) => d,
-            ref other => panic!("expected Double, found {:?}", other),
+            ref other => panic!("expected Double, found {other:?}"),
         }
     }
     pub fn as_string(&self) -> Option<&str> {
@@ -62,7 +62,7 @@ impl Property {
     pub fn expect_string(&self) -> &str {
         match *self {
             Property::String(ref s) => s,
-            ref other => panic!("expected String, found {:?}", other),
+            ref other => panic!("expected String, found {other:?}"),
         }
     }
     pub fn as_vector3d(&self) -> Option<[f64; 3]> {
@@ -75,7 +75,7 @@ impl Property {
     pub fn expect_vector3d(&self) -> [f64; 3] {
         match *self {
             Property::Vector3D(v) => v,
-            ref other => panic!("expected Vector3D, found {:?}", other),
+            ref other => panic!("expected Vector3D, found {other:?}"),
         }
     }
     pub fn as_matrix3x3(&self) -> Option<[f64; 9]> {
@@ -94,7 +94,7 @@ impl Property {
                 array.copy_from_slice(m.as_slice());
                 array
             }
-            ref other => panic!("expected Matrix3x3, found {:?}", other),
+            ref other => panic!("expected Matrix3x3, found {other:?}"),
         }
     }
 
@@ -162,13 +162,13 @@ impl ValueParser for Vector3DParser {
         }
         let x = parts[0]
             .parse::<f64>()
-            .map_err(|e| CError::GenericError(format!("Failed to parse x component: {}", e)))?;
+            .map_err(|e| CError::GenericError(format!("Failed to parse x component: {e}")))?;
         let y = parts[1]
             .parse::<f64>()
-            .map_err(|e| CError::GenericError(format!("Failed to parse y component: {}", e)))?;
+            .map_err(|e| CError::GenericError(format!("Failed to parse y component: {e}")))?;
         let z = parts[2]
             .parse::<f64>()
-            .map_err(|e| CError::GenericError(format!("Failed to parse z component: {}", e)))?;
+            .map_err(|e| CError::GenericError(format!("Failed to parse z component: {e}")))?;
         Ok(Property::Vector3D([x, y, z]))
     }
 }
@@ -185,7 +185,7 @@ impl ValueParser for Matrix3x3Parser {
         }
         let nums: Result<Vec<f64>, _> = parts.iter().map(|p| p.parse::<f64>()).collect();
         nums.map(|n| Property::Matrix3x3(Matrix3::from_iterator(n)))
-            .map_err(|e| CError::GenericError(format!("Failed to parse matrix components: {}", e)))
+            .map_err(|e| CError::GenericError(format!("Failed to parse matrix components: {e}")))
     }
 }
 
@@ -224,7 +224,7 @@ mod tests {
     fn test_double_property() {
         let prop = Property::Double(f64::consts::PI);
         assert_eq!(prop.as_double(), Some(f64::consts::PI));
-        assert_eq!(prop.expect_double(), f64::consts::PI);
+        assert_approx_eq!(prop.expect_double(), f64::consts::PI);
         assert_eq!(prop.as_bool(), None);
     }
 

@@ -55,3 +55,9 @@ impl<'a> IntoIterator for &'a Residue {
         self.atoms.iter()
     }
 }
+
+impl Residue {
+    fn iter(&self) -> Iter<'_, usize> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+}
