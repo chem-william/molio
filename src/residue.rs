@@ -1,5 +1,5 @@
 use crate::property::Properties;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, btree_set::Iter};
 
 #[derive(Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FullResidueId {
@@ -24,5 +24,13 @@ pub struct Residue {
 impl Residue {
     pub fn add_atom(&mut self, index: usize) {
         self.atoms.insert(index);
+    }
+}
+impl<'a> IntoIterator for &'a Residue {
+    type Item = &'a usize;
+    type IntoIter = Iter<'a, usize>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.atoms.iter()
     }
 }
