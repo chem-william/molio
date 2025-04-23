@@ -561,6 +561,7 @@ impl PDBFormat {
         };
 
         let helix_type = &line[38..40]
+            .trim()
             .parse::<usize>()
             .inspect_err(|e| eprintln!("failed to parse helix type: {e}"))
             .unwrap();
@@ -569,7 +570,9 @@ impl PDBFormat {
                 start,
                 (
                     end,
-                    HelixType::nth(2).expect("unknown helix type").to_string(),
+                    HelixType::nth(helix_type - 1)
+                        .expect("unknown helix type")
+                        .to_string(),
                 ),
             );
         }
