@@ -199,6 +199,12 @@ impl UnitCell {
         Self::new_from_matrix(matrix)
     }
 
+    /// # Errors
+    ///
+    /// Will return `Err` if the determinant of the input matrix < 0.0
+    ///
+    /// Will return `Err` if the input matrix [CellShape::Orthorhombic], but
+    /// not diagonal
     pub fn new_from_matrix(matrix: Matrix3<f64>) -> Result<Self, CError> {
         if matrix.determinant() < 0.0 {
             return Err(CError::GenericError(
@@ -233,6 +239,7 @@ impl UnitCell {
         })
     }
 
+    #[must_use]
     pub fn lengths(&self) -> Vec3D {
         match self.shape {
             CellShape::Infinite => [0.0, 0.0, 0.0],
@@ -245,6 +252,7 @@ impl UnitCell {
         }
     }
 
+    #[must_use]
     pub fn angles(&self) -> Vec3D {
         match self.shape {
             CellShape::Infinite | CellShape::Orthorhombic => [90.0, 90.0, 90.0],
@@ -256,6 +264,7 @@ impl UnitCell {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_approx_eq::assert_approx_eq;
     use nalgebra::Matrix3;
 
     #[test]
@@ -270,9 +279,9 @@ mod tests {
     fn test_unit_cell_from_lengths() {
         let lengths = [10.0, 20.0, 30.0];
         let cell = UnitCell::new_from_lengths(lengths);
-        assert_eq!(cell.matrix[(0, 0)], 10.0);
-        assert_eq!(cell.matrix[(1, 1)], 20.0);
-        assert_eq!(cell.matrix[(2, 2)], 30.0);
+        assert_approx_eq!(cell.matrix[(0, 0)], 10.0);
+        assert_approx_eq!(cell.matrix[(1, 1)], 20.0);
+        assert_approx_eq!(cell.matrix[(2, 2)], 30.0);
         assert_eq!(cell.shape, CellShape::Orthorhombic);
     }
 
@@ -281,9 +290,9 @@ mod tests {
         let lengths = [10.0, 20.0, 30.0];
         let mut angles = [90.0, 90.0, 90.0];
         let cell = UnitCell::new_from_lengths_angles(lengths, &mut angles).unwrap();
-        assert_eq!(cell.matrix[(0, 0)], 10.0);
-        assert_eq!(cell.matrix[(1, 1)], 20.0);
-        assert_eq!(cell.matrix[(2, 2)], 30.0);
+        assert_approx_eq!(cell.matrix[(0, 0)], 10.0);
+        assert_approx_eq!(cell.matrix[(1, 1)], 20.0);
+        assert_approx_eq!(cell.matrix[(2, 2)], 30.0);
         assert_eq!(cell.shape, CellShape::Orthorhombic);
     }
 
@@ -301,13 +310,18 @@ mod tests {
     #[test]
     fn test_unit_cell_lengths() {
         let cell = UnitCell::new_from_lengths([10.0, 20.0, 30.0]);
-        assert_eq!(cell.lengths(), [10.0, 20.0, 30.0]);
+        let expected = [10.0, 20.0, 30.0];
+        for (t, e) in expected.iter().zip(cell.lengths()) {
+            assert_approx_eq!(t, e);
+        }
     }
 
     #[test]
     fn test_unit_cell_angles() {
         let cell = UnitCell::new_from_lengths([10.0, 20.0, 30.0]);
-        assert_eq!(cell.angles(), [90.0, 90.0, 90.0]);
+        for i in 0..3 {
+            assert_approx_eq!(cell.angles()[i], 90.0);
+        }
     }
 
     #[test]
@@ -363,9 +377,9 @@ mod tests {
         let lengths = [10.0, 20.0, 30.0];
         let mut angles = [90.0, 90.0, 90.0];
         let matrix = matrix::cell_matrix_from_lengths_angles(lengths, &mut angles).unwrap();
-        assert_eq!(matrix[(0, 0)], 10.0);
-        assert_eq!(matrix[(1, 1)], 20.0);
-        assert_eq!(matrix[(2, 2)], 30.0);
+        assert_approx_eq!(matrix[(0, 0)], 10.0);
+        assert_approx_eq!(matrix[(1, 1)], 20.0);
+        assert_approx_eq!(matrix[(2, 2)], 30.0);
     }
 
     #[test]

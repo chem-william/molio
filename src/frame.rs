@@ -52,8 +52,8 @@ impl Frame {
         self.topology.atoms.push(atom)
     }
 
-    pub fn add_residue(&mut self, residue: Residue) {
-        self.topology.add_residue(residue);
+    pub fn add_residue(&mut self, residue: Residue) -> Result<(), CError> {
+        self.topology.add_residue(residue)
     }
 
     /// Add a bond in the system, between the atoms at index `i` and

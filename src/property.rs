@@ -206,21 +206,25 @@ pub struct ExtendedProperty {
 
 #[cfg(test)]
 mod tests {
+    use core::f64;
+
+    use assert_approx_eq::assert_approx_eq;
+
     use super::*;
 
     #[test]
     fn test_bool_property() {
         let prop = Property::Bool(true);
         assert_eq!(prop.as_bool(), Some(true));
-        assert_eq!(prop.expect_bool(), true);
+        assert!(prop.expect_bool());
         assert_eq!(prop.as_double(), None);
     }
 
     #[test]
     fn test_double_property() {
-        let prop = Property::Double(3.14);
-        assert_eq!(prop.as_double(), Some(3.14));
-        assert_eq!(prop.expect_double(), 3.14);
+        let prop = Property::Double(f64::consts::PI);
+        assert_eq!(prop.as_double(), Some(f64::consts::PI));
+        assert_eq!(prop.expect_double(), f64::consts::PI);
         assert_eq!(prop.as_bool(), None);
     }
 
@@ -245,14 +249,16 @@ mod tests {
     fn test_matrix3x3_property() {
         let matrix = Matrix3::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
         let prop = Property::Matrix3x3(matrix);
+        let expected = [1.0, 4.0, 7.0, 2.0, 5.0, 8.0, 3.0, 6.0, 9.0];
+
         assert_eq!(
             prop.as_matrix3x3(),
             Some([1.0, 4.0, 7.0, 2.0, 5.0, 8.0, 3.0, 6.0, 9.0])
         );
-        assert_eq!(
-            prop.expect_matrix3x3(),
-            [1.0, 4.0, 7.0, 2.0, 5.0, 8.0, 3.0, 6.0, 9.0]
-        );
+
+        for (v, e) in expected.iter().zip(prop.expect_matrix3x3()) {
+            assert_approx_eq!(v, e);
+        }
         assert_eq!(prop.as_double(), None);
     }
 

@@ -40,7 +40,7 @@ pub enum Record {
     UNKNOWN_,
 }
 
-/// See http://www.wwpdb.org/documentation/file-format-content/format23/sect5.html
+/// See <http://www.wwpdb.org/documentation/file-format-content/format23/sect5.html>
 /// for definitions of helix types
 pub enum HelixType {
     RightHandedAlphaHelix,
@@ -821,7 +821,7 @@ mod tests {
     #[test]
     fn check_nsteps() {
         let path = Path::new("./src/tests-data/pdb/water.pdb");
-        let mut trajectory = Trajectory::new(path).unwrap();
+        let trajectory = Trajectory::new(path).unwrap();
         assert_eq!(trajectory.size, 100);
 
         let path = Path::new("./src/tests-data/pdb/2hkb.pdb");
