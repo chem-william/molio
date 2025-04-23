@@ -1039,6 +1039,15 @@ mod tests {
     }
 
     #[test]
+    fn read_residue_information() {
+        let path = Path::new("./src/tests-data/pdb/water.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+
+        assert_eq!(frame.topology().residues.len(), 99);
+    }
+
+    #[test]
     #[should_panic(expected = "the value '*0000' is not a valid hybrid 36 number")]
     fn decode_bad1() {
         decode_hybrid36(5, "*0000").unwrap();
