@@ -74,8 +74,6 @@ impl HelixType {
 }
 
 pub fn get_record(line: &str) -> Record {
-    // let rec: String = line.chars().take(6).collect();
-
     let rec = if line.len() >= 6 { &line[..6] } else { line };
 
     match rec {
