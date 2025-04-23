@@ -455,7 +455,7 @@ impl PDBFormat {
             let space_group = &line[55..65].trim();
             // TODO: handle this as a warning (somehow)?
             if space_group != &"P 1" && space_group != &"P1" {
-                println!("ignoring custom space group ({space_group}), using P1 instead");
+                println!("warning: ignoring custom space group ({space_group}), using P1 instead");
             }
         }
 
@@ -531,10 +531,10 @@ impl PDBFormat {
             println!("warning: HELIX record too short: {line}");
         };
 
-        let chain_start = line.chars().nth(19).expect("chain start");
-        let chain_end = line.chars().nth(31).expect("chain end");
-        let inscode_start = line.chars().nth(25).expect("inscode start");
-        let inscode_end = line.chars().nth(37).expect("inscode end");
+        let chain_start = line.chars().nth(19).expect("start of chain");
+        let chain_end = line.chars().nth(31).expect("end of chain");
+        let inscode_start = line.chars().nth(25).expect("start of insertion code");
+        let inscode_end = line.chars().nth(37).expect("end of insertion code");
         let resname_start = line[15..18].trim();
         let resname_end = line[27..30].trim();
 
@@ -542,7 +542,9 @@ impl PDBFormat {
         let resid_end = decode_hybrid36(4, &line[33..37])?;
 
         if chain_start != chain_end {
-            println!("warning: HELIX chain {chain_start} and {chain_end} are not the same");
+            return Err(CError::GenericError(format!(
+                "warning: HELIX chain {chain_start} and {chain_end} are not the same"
+            )));
         }
 
         let start = FullResidueId {
