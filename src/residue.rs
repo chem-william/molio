@@ -15,9 +15,17 @@ pub struct FullResidueId {
 
 #[derive(Default, Debug)]
 pub struct Residue {
+    /// Name of the residue
     pub name: String,
+
+    /// Index of the residue in the initial topology file
     pub id: Option<i64>,
+
+    /// Indexes of the atoms in this residue. These indexes refers to the
+    /// associated topology.
     pub atoms: BTreeSet<usize>,
+
+    /// Additional properties of this residue
     pub properties: Properties,
 }
 
