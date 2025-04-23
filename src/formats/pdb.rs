@@ -1062,6 +1062,15 @@ mod tests {
                 .expect_string(),
             "X"
         );
+
+        let path = Path::new("./src/tests-data/pdb/MOF-5.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+
+        assert_eq!(frame.topology().residues.len(), 1);
+        let residue = frame.topology().residues[0].clone();
+        assert_eq!(residue.size(), frame.size());
+        assert_eq!(residue.name, "LIG");
     }
 
     #[test]
