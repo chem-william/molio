@@ -156,52 +156,53 @@ pub(crate) fn decode_hybrid36(width: usize, line: &str) -> Result<i64, CError> {
             "length of '{line}' is greater than the width '{width}'. this is a bug"
         )));
     }
+    let trimmed_line = line.trim();
 
-    let f = line.chars().next();
+    let f = trimmed_line.chars().next();
     if let Some(f) = f {
         if f == ' ' {
             // Space-prefixed numbers are not encoded => return 0
             return Ok(0);
         } else if f == '-' || f.is_ascii_digit() {
             // Try to parse as a number
-            return line.parse::<i64>().map_err(|_e| {
+            return trimmed_line.parse::<i64>().map_err(|_e| {
                 CError::GenericError(format!("expected negative number. got '{f}'"))
             });
         }
     }
 
-    if line.is_empty() {
+    if trimmed_line.is_empty() {
         return Ok(0);
     }
 
     if DIGITS_UPPER.contains(f.unwrap()) {
-        let is_valid = line
+        let is_valid = trimmed_line
             .chars()
             .all(|c| c.is_ascii_digit() || c.is_ascii_uppercase());
 
         if !is_valid {
             return Err(CError::GenericError(format!(
                 "the value '{}' is not a valid hybrid 36 number",
-                line
+                trimmed_line
             )));
         }
 
-        return Ok(decode_pure(line) - 10 * pow_int(36, width - 1) + pow_int(10, width));
+        return Ok(decode_pure(trimmed_line) - 10 * pow_int(36, width - 1) + pow_int(10, width));
     }
 
     if DIGITS_LOWER.contains(f.unwrap()) {
-        let is_valid = line
+        let is_valid = trimmed_line
             .chars()
             .all(|c| c.is_ascii_digit() || c.is_ascii_lowercase());
 
         if !is_valid {
             return Err(CError::GenericError(format!(
                 "the value '{}' is not a valid hybrid 36 number",
-                line
+                trimmed_line
             )));
         }
 
-        return Ok(decode_pure(line) + 16 * pow_int(36, width - 1) + pow_int(10, width));
+        return Ok(decode_pure(trimmed_line) + 16 * pow_int(36, width - 1) + pow_int(10, width));
     }
 
     Err(CError::GenericError(format!(
