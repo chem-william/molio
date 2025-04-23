@@ -1,7 +1,7 @@
 use std::ops::Index;
 
 /// Stores the type of bond
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BondOrder {
     /// Bond order is unknown or unspecified
     Unknown,

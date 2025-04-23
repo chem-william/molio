@@ -1,7 +1,7 @@
 use crate::property::{Properties, Property};
 use std::collections::{BTreeSet, btree_set::Iter};
 
-#[derive(Default, PartialEq, Eq, Debug, PartialOrd, Ord)]
+#[derive(Default, PartialEq, Eq, Debug, PartialOrd, Ord, Clone)]
 pub struct FullResidueId {
     /// Chain identifier
     pub chain: char,

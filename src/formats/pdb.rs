@@ -58,14 +58,12 @@ pub enum HelixType {
 impl HelixType {
     pub fn nth(n: usize) -> Option<&'static str> {
         match n {
-            0 => Some("right handed alpha helix"),
-            1 => Some("right handed omega helix"),
-            2 => Some("right handed pi helix"),
-            3 => Some("right handed gamma helix"),
-            4 => Some("right handed 3-10 helix"),
-            5 => Some("left handed alpha helix"),
-            6 => Some("left handed omega helix"),
-            7 => Some("left handed gamma helix"),
+            0 => Some("right-handed alpha helix"),
+            1 => Some("right-handed omega helix"),
+            2 => Some("right-handed pi helix"),
+            3 => Some("right-handed gamma helix"),
+            4 => Some("right-handed 3-10 helix"),
+            7 => Some("left-handed gamma helix"),
             8 => Some("two 7 ribbon helix"),
             9 => Some("polyproline"),
             _ => None,
@@ -332,7 +330,7 @@ impl PDBFormat {
             chain: *chain,
             resid,
             resname: resname.to_string(),
-            ..Default::default()
+            insertion_code,
         };
 
         if !self.residues.borrow().contains_key(&full_residue_id) {
@@ -380,20 +378,28 @@ impl PDBFormat {
             }
 
             // Are we within a secondary information sequence?
-            if let Some(secinfo) = self.current_secinfo.borrow().as_ref() {
-                residue.properties.insert(
-                    "secondary_structure".to_string(),
-                    Property::String(secinfo.1.clone()),
-                );
+            // we add an extra scope so that the borrow of `self.current_secinfo` is dropped
+            // before we access it further down
+            {
+                let current_secinfo_borrow = self.current_secinfo.borrow();
+                if let Some((end_residue_id, description)) = current_secinfo_borrow.as_ref() {
+                    residue.properties.insert(
+                        "secondary_structure".to_string(),
+                        Property::String(description.clone()),
+                    );
 
-                if secinfo.0 == full_residue_id {
-                    self.current_secinfo.replace(None);
+                    if *end_residue_id == full_residue_id {
+                        // we drop the current borrow to allow the mutable borrow
+                        drop(current_secinfo_borrow);
+                        *self.current_secinfo.borrow_mut() = None;
+                    }
                 }
             }
 
-            // Are we the start of a secondary information sequence?
+            // Are we at the start of a secondary information sequence?
+            // second borrow of `self.secinfo` happens here
             if let Some(secinfo_for_residue) = self.secinfo.borrow().get(&full_residue_id) {
-                self.current_secinfo.replace(None);
+                *self.current_secinfo.borrow_mut() = Some((*secinfo_for_residue).clone());
                 residue.properties.insert(
                     "secondary_structure".to_string(),
                     Property::String(secinfo_for_residue.1.clone()),
@@ -565,6 +571,7 @@ impl PDBFormat {
             .parse::<usize>()
             .inspect_err(|e| eprintln!("failed to parse helix type: {e}"))
             .unwrap();
+
         if *helix_type <= 10 {
             self.secinfo.borrow_mut().insert(
                 start,
@@ -636,7 +643,6 @@ impl PDBFormat {
     }
 
     fn chain_ended(&self, frame: &mut Frame) {
-        // println!("residues: {:?}", self.residues);
         for residue in self.residues.borrow().iter() {
             let _ = frame.add_residue(residue.1.clone());
         }
@@ -729,7 +735,6 @@ impl FileFormat for PDBFormat {
                 Record::SHEET => self.parse_secondary(&line, 17, 28).unwrap(),
                 Record::TURN => self.parse_secondary(&line, 15, 26).unwrap(),
                 Record::TER => {
-                    println!("we reach ter?");
                     if line.len() >= 12 {
                         let ter_serial =
                             decode_hybrid36(5, &line[6..11]).expect("TER record not numeric");
@@ -813,13 +818,15 @@ mod tests {
 
     use crate::{
         angle::Angle,
-        bond::Bond,
+        bond::{Bond, BondOrder},
         dihedral::Dihedral,
         formats::pdb::{decode_hybrid36, encode_hybrid36},
         topology::Topology,
         trajectory::Trajectory,
         unit_cell::CellShape,
     };
+
+    use std::borrow::ToOwned;
 
     #[test]
     fn check_nsteps() {
@@ -1060,7 +1067,7 @@ mod tests {
         assert_eq!(
             residue
                 .get("chainid")
-                .map(std::borrow::ToOwned::to_owned)
+                .map(ToOwned::to_owned)
                 .unwrap()
                 .expect_string(),
             "X"
@@ -1074,6 +1081,44 @@ mod tests {
         let residue = frame.topology().residues[0].clone();
         assert_eq!(residue.size(), frame.size());
         assert_eq!(residue.name, "LIG");
+    }
+
+    #[test]
+    fn read_atom_hetatm_information() {
+        let path = Path::new("./src/tests-data/pdb/hemo.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+        let residues = frame.topology().residues.clone();
+
+        assert!(!residues[0].get("is_standard_pdb").unwrap().expect_bool());
+
+        for res in &residues[1..] {
+            assert!(res.get("is_standard_pdb").unwrap().expect_bool());
+        }
+        assert_eq!(frame[74].symbol, "C");
+    }
+
+    #[test]
+    fn handle_multiple_ter_records() {
+        let path = Path::new("./src/tests-data/pdb/4hhb.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+
+        assert_eq!(frame[4556].name, "ND");
+        assert_eq!(frame[4557].name, "FE");
+        assert_eq!(
+            frame.topology().bond_order(4556, 4557).unwrap(),
+            BondOrder::Unknown
+        );
+
+        let topology = frame.topology();
+        assert_eq!(
+            topology.residues[5]
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed alpha helix"
+        );
     }
 
     #[test]
