@@ -1,7 +1,11 @@
-use nalgebra::Matrix3;
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+
+use nalgebra::Matrix3;
 
 use crate::error::CError;
+
+const EPSILON: f64 = 1e-12;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum PropertyKind {
@@ -23,7 +27,102 @@ pub enum Property {
     VectorXD(Vec<f64>),
 }
 
-pub type Properties = HashMap<String, Property>;
+impl Default for Property {
+    fn default() -> Self {
+        Property::Bool(false)
+    }
+}
+
+/// Returns `true` if `a` and `b` are both finite and within `epsilon` of each other.
+/// Any `NaN` or infinite value always compares as `false`.
+fn almost_eq(a: f64, b: f64, epsilon: f64) -> bool {
+    // Reject NaN outright
+    if a.is_nan() || b.is_nan() {
+        return false;
+    }
+    // Reject infinities outright
+    if a.is_infinite() || b.is_infinite() {
+        return false;
+    }
+    // Both are finite: compare absolute difference
+    (a - b).abs() <= epsilon
+}
+
+impl PartialEq for Property {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Property::Bool(a), Property::Bool(b)) => a == b,
+
+            (Property::Double(a), Property::Double(b)) => almost_eq(*a, *b, EPSILON),
+
+            (Property::String(a), Property::String(b)) => a == b,
+
+            (Property::Vector3D(a), Property::Vector3D(b)) => a
+                .iter()
+                .zip(b.iter())
+                .all(|(x, y)| almost_eq(*x, *y, EPSILON)),
+
+            // nalgebra’s Matrix3<f64>: compare each entry’s bits
+            (Property::Matrix3x3(a), Property::Matrix3x3(b)) => {
+                for i in 0..3 {
+                    for j in 0..3 {
+                        if !almost_eq(a[(i, j)], b[(i, j)], EPSILON) {
+                            return false;
+                        }
+                    }
+                }
+                true
+            }
+
+            // variable‐length vector of f64: same pattern
+            (Property::VectorXD(a), Property::VectorXD(b)) => {
+                if a.len() != b.len() {
+                    return false;
+                }
+                a.iter()
+                    .zip(b.iter())
+                    .all(|(x, y)| almost_eq(*x, *y, EPSILON))
+            }
+
+            // different variants are never equal
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Property {}
+
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct Properties(HashMap<String, Property>);
+
+impl Properties {
+    pub fn new() -> Self {
+        Properties(HashMap::new())
+    }
+}
+
+impl Deref for Properties {
+    type Target = HashMap<String, Property>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Properties {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl IntoIterator for Properties {
+    type Item = (String, Property);
+    type IntoIter = <HashMap<String, Property> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
 
 impl Property {
     pub fn as_bool(&self) -> Option<bool> {

@@ -110,4 +110,21 @@ impl Topology {
             .get(&index)
             .map(|residue_index| self.residues[*residue_index].clone())
     }
+
+    pub fn are_linked(&self, first: &Residue, second: &Residue) -> bool {
+        if first == second {
+            return true;
+        }
+
+        let bonds = self.connect.bonds.clone();
+        for &bond_i in first {
+            for &bond_j in second {
+                let check_bond = Bond::new(bond_i, bond_j);
+                if bonds.contains(&check_bond) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }

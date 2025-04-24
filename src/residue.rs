@@ -19,7 +19,7 @@ pub struct FullResidueId {
     pub resname: String,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct Residue {
     /// Name of the residue
     pub name: String,
@@ -59,11 +59,5 @@ impl<'a> IntoIterator for &'a Residue {
 
     fn into_iter(self) -> Self::IntoIter {
         self.atoms.iter()
-    }
-}
-
-impl Residue {
-    fn iter(&self) -> Iter<'_, usize> {
-        <&Self as IntoIterator>::into_iter(self)
     }
 }

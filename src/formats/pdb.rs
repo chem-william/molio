@@ -7,10 +7,12 @@ use crate::property::Property;
 use crate::residue::{FullResidueId, Residue};
 use crate::unit_cell::UnitCell;
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
 use std::path::Path;
+
+use super::pdb_connectivity::{self, find};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Record {
@@ -659,6 +661,145 @@ impl PDBFormat {
 
     const END_RECORD: &str = "END";
     const ENDMDL_RECORD: &str = "ENDMDL";
+
+    fn link_standard_residue_bonds(&self, frame: &mut Frame) {
+        let mut link_previous_peptide = false;
+        let mut link_previous_nucleic = false;
+        let mut previous_residue_id = 0;
+        let mut previous_carboxylic_id = 0;
+
+        let residues = frame.topology().residues.clone();
+
+        for residue in residues {
+            let residue_table = find(&residue.name);
+            if residue_table.is_none() {
+                continue;
+            }
+
+            let mut atom_name_to_index = HashMap::<String, usize>::new();
+            for &atom in &residue {
+                atom_name_to_index.insert(frame[atom].name.to_string(), atom);
+            }
+
+            let amide_nitrogen = atom_name_to_index.get("N");
+            let amide_carbon = atom_name_to_index.get("C");
+
+            // Check if the residue has an ID
+            let resid = match residue.id {
+                Some(id) => id,
+                None => {
+                    eprintln!("warning: got a residue without id, this should not happen");
+                    return;
+                }
+            };
+
+            // If conditions are met, add a bond
+            if link_previous_peptide {
+                if let Some(&n_index) = amide_nitrogen {
+                    if resid == previous_residue_id + 1 {
+                        link_previous_peptide = false;
+                        frame
+                            .add_bond(previous_carboxylic_id, n_index, BondOrder::Unknown)
+                            .expect("unable to add bond when linking residues");
+                    }
+                }
+            }
+
+            if let Some(&ac_index) = amide_carbon {
+                link_previous_peptide = true;
+                previous_carboxylic_id = ac_index;
+                previous_residue_id = resid;
+            }
+
+            let three_prime_oxygen = atom_name_to_index.get("O3'");
+            let five_prime_phosphorus = atom_name_to_index.get("P");
+            if link_previous_nucleic {
+                if let Some(&_) = five_prime_phosphorus {
+                    if resid == previous_residue_id + 1 {
+                        link_previous_nucleic = false;
+                        frame
+                            .add_bond(
+                                previous_carboxylic_id,
+                                *three_prime_oxygen.unwrap(),
+                                BondOrder::Unknown,
+                            )
+                            .expect("unable to add bond when linking residues");
+                    }
+                }
+            }
+
+            if let Some(&o_index) = three_prime_oxygen {
+                link_previous_nucleic = true;
+                previous_carboxylic_id = o_index;
+                previous_residue_id = resid;
+            }
+
+            // A special case missed by the standards committee????
+            if atom_name_to_index.contains_key("HO5'") {
+                frame
+                    .add_bond(
+                        *atom_name_to_index.get("HO5'").unwrap(),
+                        *atom_name_to_index.get("O5'").unwrap(),
+                        BondOrder::Unknown,
+                    )
+                    .expect("failed to add bond to frame in special case");
+            }
+
+            // link = (InternedName, InternedName)
+            //
+            // residue_table = ResidueConnectMap => std::unordered_multimap<InternedName, InternedName>
+            for link in residue_table.unwrap() {
+                let first_atom = atom_name_to_index.get(pdb_connectivity::INTERNER[link.0]);
+                let second_atom = atom_name_to_index.get(pdb_connectivity::INTERNER[link.1]);
+
+                if first_atom.is_none() {
+                    let first_name = pdb_connectivity::INTERNER[link.0];
+                    let first_char = first_name
+                        .chars()
+                        .nth(0)
+                        .expect("first_name did not contain any characters");
+                    if first_char != 'H'
+                        && first_name != "OXT"
+                        && first_char != 'P'
+                        && first_name.chars().take(2).collect::<String>() != "OP"
+                    {
+                        eprintln!(
+                            "warning: could not find standard atom '{first_name}' in residue '{}' (resid {resid})",
+                            residue.name
+                        );
+                    }
+                    continue;
+                }
+
+                if second_atom.is_none() {
+                    let second_name = pdb_connectivity::INTERNER[link.1];
+                    let first_char = second_name
+                        .chars()
+                        .nth(0)
+                        .expect("second_name did not contain any characters");
+                    if first_char != 'H'
+                        && second_name != "OXT"
+                        && first_char != 'P'
+                        && second_name.chars().take(2).collect::<String>() != "OP"
+                    {
+                        eprintln!(
+                            "warning: could not find standard atom '{second_name}' in residue '{}' (resid {resid})",
+                            residue.name
+                        );
+                    }
+                    continue;
+                }
+
+                frame
+                    .add_bond(
+                        *first_atom.unwrap(),
+                        *second_atom.unwrap(),
+                        BondOrder::Unknown,
+                    )
+                    .expect("unable to add bond to frame");
+            }
+        }
+    }
 }
 
 impl FileFormat for PDBFormat {
@@ -765,6 +906,7 @@ impl FileFormat for PDBFormat {
         }
 
         self.chain_ended(&mut frame);
+        self.link_standard_residue_bonds(&mut frame);
         Ok(frame)
     }
 
@@ -1277,6 +1419,21 @@ mod tests {
                 .expect_string(),
             "L"
         );
+    }
+
+    #[test]
+    fn read_protein_residues() {
+        let path = Path::new("./src/tests-data/pdb/hemo.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+
+        let topology = frame.topology();
+
+        assert!(!topology.are_linked(&topology.residues[2], &topology.residues[3]));
+        assert!(topology.are_linked(&topology.residues[3], &topology.residues[3]));
+        assert!(topology.are_linked(&topology.residues[3], &topology.residues[4]));
+        assert!(!topology.are_linked(&topology.residues[3], &topology.residues[5]));
+        assert_eq!(topology.bonds().len(), 482);
     }
 
     #[test]
