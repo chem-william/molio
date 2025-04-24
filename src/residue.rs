@@ -1,16 +1,22 @@
 use crate::property::{Properties, Property};
 use std::collections::{BTreeSet, btree_set::Iter};
 
-#[derive(Default, PartialEq, Eq, Debug, PartialOrd, Ord, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+// the specific order of the struct matters in the following when deriving `[Ord]`
+// if resname is not compared last, tests will fail
 pub struct FullResidueId {
     /// Chain identifier
     pub chain: char,
+
     /// Residue id
     pub resid: i64,
-    /// Residue name
-    pub resname: String,
+
     /// Insertion code of the residue
     pub insertion_code: char,
+
+    /// Residue name
+    // This needs to come after `insertion_code`
+    pub resname: String,
 }
 
 #[derive(Default, Debug, Clone)]

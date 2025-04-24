@@ -56,20 +56,20 @@ impl Topology {
     }
 
     pub fn add_residue(&mut self, residue: Residue) -> Result<(), CError> {
-        let contains = residue
-            .into_iter()
-            .any(|r| self.residue_mapping.contains_key(r));
-
-        if contains {
-            return Err(CError::GenericError(
-                "cannot add this residue: atom is already in another residue".to_string(),
-            ));
-        };
+        for &atom_id in &residue {
+            if self.residue_mapping.contains_key(&atom_id) {
+                return Err(CError::GenericError(format!(
+                    "cannot add this residue: atom {atom_id} is already in another residue"
+                )));
+            }
+        }
 
         let res_index = self.residues.len();
         self.residues.push(residue);
-        for i in self.residues.last().unwrap() {
-            self.residue_mapping.insert(*i, res_index);
+
+        // Update the mapping
+        for &atom_id in &self.residues[res_index] {
+            self.residue_mapping.insert(atom_id, res_index);
         }
 
         Ok(())

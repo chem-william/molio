@@ -390,6 +390,7 @@ impl PDBFormat {
                         Property::String(description.clone()),
                     );
 
+                    // Are we at the end of a secondary information sequence?
                     if *end_residue_id == full_residue_id {
                         // we drop the current borrow to allow the mutable borrow
                         drop(current_secinfo_borrow);
@@ -1121,6 +1122,71 @@ mod tests {
                 .expect_string(),
             "right-handed alpha helix"
         );
+    }
+
+    #[test]
+    fn secondary_structure_with_insertion_code_test() {
+        let path = Path::new("./src/tests-data/pdb/1bcu.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+
+        // check that residues have been inserted correctly
+        let topology = frame.topology();
+        assert_eq!(topology.residue_for_atom(0).unwrap().name, "ALA");
+        assert_eq!(
+            topology
+                .residue_for_atom(0)
+                .unwrap()
+                .get("insertion_code")
+                .unwrap()
+                .expect_string(),
+            "B"
+        );
+        assert_eq!(
+            topology
+                .residue_for_atom(5)
+                .unwrap()
+                .get("insertion_code")
+                .unwrap()
+                .expect_string(),
+            "A"
+        );
+        assert!(
+            topology
+                .residue_for_atom(13)
+                .unwrap()
+                .get("insertion_code")
+                .is_none(),
+        );
+
+        // // Check secondary structure, no insertion code
+        assert_eq!(
+            topology.residues[9]
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed 3-10 helix"
+        );
+        assert_eq!(
+            topology.residues[10]
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed 3-10 helix"
+        );
+        assert_eq!(
+            topology.residues[11]
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed 3-10 helix"
+        );
+        assert!(topology.residues[12].get("secondary_structure").is_none());
+        assert!(topology.residues[13].get("secondary_structure").is_none());
+        assert!(topology.residues[14].get("secondary_structure").is_none());
+        assert!(topology.residues[15].get("secondary_structure").is_none());
+        assert!(topology.residues[16].get("secondary_structure").is_none());
+        assert!(topology.residues[17].get("secondary_structure").is_none());
     }
 
     #[test]
