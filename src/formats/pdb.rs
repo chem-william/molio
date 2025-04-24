@@ -1187,6 +1187,22 @@ mod tests {
         assert!(topology.residues[15].get("secondary_structure").is_none());
         assert!(topology.residues[16].get("secondary_structure").is_none());
         assert!(topology.residues[17].get("secondary_structure").is_none());
+
+        // First residue in a long list of residues with the same secondary structure
+        let ins_check = topology.residues[18].clone();
+        assert_eq!(
+            ins_check
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed alpha helix"
+        );
+        assert_eq!(
+            ins_check.get("insertion_code").unwrap().expect_string(),
+            "C"
+        );
+        assert_eq!(ins_check.id.unwrap(), 14);
+        assert_eq!(ins_check.get("chainid").unwrap().expect_string(), "L");
     }
 
     #[test]
