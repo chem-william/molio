@@ -276,7 +276,7 @@ impl PDBFormat {
         }
 
         if self.atom_offsets.borrow().is_empty() {
-            let initial_offset = decode_hybrid36(5, line[6..11].trim()).unwrap();
+            let initial_offset = decode_hybrid36(5, &line[6..11]).unwrap();
 
             if initial_offset <= 0 {
                 println!(
