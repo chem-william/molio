@@ -1260,6 +1260,23 @@ mod tests {
                 .expect_string(),
             "G"
         );
+
+        assert!(topology.residues[23].get("secondary_structure").is_none());
+        assert_eq!(
+            topology.residues[23]
+                .get("insertion_code")
+                .unwrap()
+                .expect_string(),
+            "H"
+        );
+        assert_eq!(topology.residues[23].id.unwrap(), 14);
+        assert_eq!(
+            topology.residues[23]
+                .get("chainid")
+                .unwrap()
+                .expect_string(),
+            "L"
+        );
     }
 
     #[test]
