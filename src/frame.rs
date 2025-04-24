@@ -79,6 +79,8 @@ impl IndexMut<usize> for Frame {
 
 #[cfg(test)]
 mod tests {
+    use assert_approx_eq::assert_approx_eq;
+
     use super::*;
 
     #[test]
@@ -107,12 +109,12 @@ mod tests {
         // Test read access
         assert_eq!(frame[0].symbol, "H");
         assert_eq!(frame[1].symbol, "O");
-        assert_eq!(frame[0].x, 1.0);
-        assert_eq!(frame[1].x, 4.0);
+        assert_approx_eq!(frame[0].x, 1.0);
+        assert_approx_eq!(frame[1].x, 4.0);
 
         // Test write access
         frame[0].x = 10.0;
-        assert_eq!(frame[0].x, 10.0);
+        assert_approx_eq!(frame[0].x, 10.0);
     }
 
     #[test]

@@ -4,6 +4,7 @@ use crate::error::CError;
 use crate::format::FileFormat;
 use crate::frame::Frame;
 use crate::property::Property;
+use crate::property::PropertyKind;
 use crate::residue::{FullResidueId, Residue};
 use crate::unit_cell::UnitCell;
 use std::cell::RefCell;
@@ -312,9 +313,9 @@ impl PDBFormat {
                 .insert("altloc".to_string(), Property::String(altloc.to_string()));
         }
 
-        let x = Property::parse_value(&line[30..38], crate::property::PropertyKind::Double)?;
-        let y = Property::parse_value(&line[38..46], crate::property::PropertyKind::Double)?;
-        let z = Property::parse_value(&line[46..54], crate::property::PropertyKind::Double)?;
+        let x = Property::parse_value(&line[30..38], &PropertyKind::Double)?;
+        let y = Property::parse_value(&line[38..46], &PropertyKind::Double)?;
+        let z = Property::parse_value(&line[46..54], &PropertyKind::Double)?;
         atom.x = x.expect_double();
         atom.y = y.expect_double();
         atom.z = z.expect_double();
@@ -745,9 +746,6 @@ impl PDBFormat {
                     .expect("failed to add bond to frame in special case");
             }
 
-            // link = (InternedName, InternedName)
-            //
-            // residue_table = ResidueConnectMap => std::unordered_multimap<InternedName, InternedName>
             for link in residue_table.unwrap() {
                 let first_atom = atom_name_to_index.get(pdb_connectivity::INTERNER[link.0]);
                 let second_atom = atom_name_to_index.get(pdb_connectivity::INTERNER[link.1]);

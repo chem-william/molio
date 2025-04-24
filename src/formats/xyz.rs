@@ -43,12 +43,12 @@ impl XYZFormat {
                     let y = tokens.next().ok_or(CError::MissingToken)?;
                     let z = tokens.next().ok_or(CError::MissingToken)?;
                     let value = format!("{} {} {}", x, y, z);
-                    let property = Property::parse_value(&value, kind.clone())?;
+                    let property = Property::parse_value(&value, &kind)?;
                     atom.properties.insert(name.clone(), property);
                 }
                 _ => {
                     let value = tokens.next().ok_or(CError::MissingToken)?;
-                    let property = Property::parse_value(value, kind.clone())?;
+                    let property = Property::parse_value(value, &kind)?;
                     atom.properties.insert(name.clone(), property);
                 }
             }
@@ -122,20 +122,20 @@ impl XYZFormat {
         // Try parsing as bool first
         let lowercased = value.to_lowercase();
         if ["t", "true", "f", "false"].contains(&lowercased.as_str()) {
-            return Property::parse_value(&lowercased, PropertyKind::Bool)
+            return Property::parse_value(&lowercased, &PropertyKind::Bool)
                 .unwrap_or_else(|_| Property::String(value.to_string()));
         }
 
         // Try parsing as vector/matrix
         let parts: Vec<&str> = value.split_whitespace().collect();
         match parts.len() {
-            1 => Property::parse_value(value, PropertyKind::Double)
+            1 => Property::parse_value(value, &PropertyKind::Double)
                 .unwrap_or_else(|_| Property::String(value.to_string())),
-            3 => Property::parse_value(value, PropertyKind::Vector3D)
+            3 => Property::parse_value(value, &PropertyKind::Vector3D)
                 .unwrap_or_else(|_| Property::String(value.to_string())),
-            9 => Property::parse_value(value, PropertyKind::Matrix3x3)
+            9 => Property::parse_value(value, &PropertyKind::Matrix3x3)
                 .unwrap_or_else(|_| Property::String(value.to_string())),
-            _ => Property::parse_value(value, PropertyKind::VectorXD)
+            _ => Property::parse_value(value, &PropertyKind::VectorXD)
                 .unwrap_or_else(|_| Property::String(value.to_string())),
         }
     }
@@ -299,8 +299,8 @@ mod tests {
         assert_eq!(frame.unit_cell, unit_cell);
 
         // Frame level properties
-        assert_eq!(frame.properties["ENERGY"].expect_double(), -2069.84934116);
-        assert_eq!(frame.properties["Natoms"].expect_double(), 192.0);
+        assert_approx_eq!(frame.properties["ENERGY"].expect_double(), -2069.84934116);
+        assert_approx_eq!(frame.properties["Natoms"].expect_double(), 192.0);
         assert_eq!(frame.properties["NAME"].expect_string(), "COBHUW");
         let virial = frame.properties["virial"].expect_matrix3x3();
         let true_virial = [
@@ -364,7 +364,7 @@ mod tests {
         assert!(!frame[6].properties["bool"].expect_bool());
         assert!(!frame[7].properties["bool"].expect_bool());
 
-        assert_eq!(frame[0].properties["int"].expect_double(), 33.0);
+        assert_approx_eq!(frame[0].properties["int"].expect_double(), 33.0);
         assert_eq!(frame[0].properties["strings_0"].expect_string(), "bar");
         assert_eq!(frame[0].properties["strings_1"].expect_string(), "\"test\"");
     }

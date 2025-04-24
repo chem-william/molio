@@ -40,19 +40,19 @@ impl Topology {
     }
 
     pub fn bonds(&self) -> Vec<Bond> {
-        self.connect.bonds.iter().cloned().collect()
+        self.connect.bonds.iter().copied().collect()
     }
 
     pub fn angles(&mut self) -> Vec<Angle> {
-        self.connect.angles().iter().cloned().collect()
+        self.connect.angles().iter().copied().collect()
     }
 
     pub fn dihedrals(&mut self) -> Vec<Dihedral> {
-        self.connect.dihedrals().iter().cloned().collect()
+        self.connect.dihedrals().iter().copied().collect()
     }
 
     pub fn impropers(&mut self) -> Vec<Improper> {
-        self.connect.impropers().iter().cloned().collect()
+        self.connect.impropers().iter().copied().collect()
     }
 
     pub fn add_residue(&mut self, residue: Residue) -> Result<(), CError> {

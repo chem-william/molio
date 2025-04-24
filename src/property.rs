@@ -125,6 +125,7 @@ impl IntoIterator for Properties {
 }
 
 impl Property {
+    #[must_use]
     pub fn as_bool(&self) -> Option<bool> {
         if let Property::Bool(b) = *self {
             Some(b)
@@ -132,6 +133,7 @@ impl Property {
             None
         }
     }
+
     pub fn expect_bool(&self) -> bool {
         match *self {
             Property::Bool(b) => b,
@@ -197,7 +199,7 @@ impl Property {
         }
     }
 
-    pub fn parse_value(value: &str, kind: PropertyKind) -> Result<Property, CError> {
+    pub fn parse_value(value: &str, kind: &PropertyKind) -> Result<Property, CError> {
         match kind {
             PropertyKind::String => StringParser::parse(value),
             PropertyKind::Bool => BoolParser::parse(value),
@@ -232,8 +234,7 @@ impl ValueParser for BoolParser {
             "t" | "true" => Ok(Property::Bool(true)),
             "f" | "false" => Ok(Property::Bool(false)),
             _ => Err(CError::GenericError(format!(
-                "Invalid boolean value: {}",
-                value
+                "Invalid boolean value: {value}"
             ))),
         }
     }
@@ -245,7 +246,7 @@ impl ValueParser for DoubleParser {
             .trim()
             .parse::<f64>()
             .map(Property::Double)
-            .map_err(|e| CError::GenericError(format!("Failed to parse number: {}", e)))
+            .map_err(|e| CError::GenericError(format!("Failed to parse number: {e}")))
     }
 }
 
@@ -254,9 +255,8 @@ impl ValueParser for Vector3DParser {
         let parts: Vec<&str> = value.split_whitespace().collect();
         if parts.len() != 3 {
             return Err(CError::GenericError(format!(
-                "Vector3D requires exactly 3 components, got {}: {:?}",
-                parts.len(),
-                parts
+                "Vector3D requires exactly 3 components, got {}: {parts:?}",
+                parts.len()
             )));
         }
         let x = parts[0]
@@ -277,9 +277,8 @@ impl ValueParser for Matrix3x3Parser {
         let parts: Vec<&str> = value.split_whitespace().collect();
         if parts.len() != 9 {
             return Err(CError::GenericError(format!(
-                "Matrix3x3 requires exactly 9 components, got {}: {:?}",
-                parts.len(),
-                parts
+                "Matrix3x3 requires exactly 9 components, got {}: {parts:?}",
+                parts.len()
             )));
         }
         let nums: Result<Vec<f64>, _> = parts.iter().map(|p| p.parse::<f64>()).collect();
@@ -293,7 +292,7 @@ impl ValueParser for VectorXDParser {
         let parts: Vec<&str> = value.split_whitespace().collect();
         let nums: Result<Vec<f64>, _> = parts.iter().map(|p| p.parse::<f64>()).collect();
         nums.map(Property::VectorXD)
-            .map_err(|e| CError::GenericError(format!("Failed to parse vector components: {}", e)))
+            .map_err(|e| CError::GenericError(format!("Failed to parse vector components: {e}")))
     }
 }
 
