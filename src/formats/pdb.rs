@@ -1203,6 +1203,63 @@ mod tests {
         );
         assert_eq!(ins_check.id.unwrap(), 14);
         assert_eq!(ins_check.get("chainid").unwrap().expect_string(), "L");
+
+        assert_eq!(
+            topology.residues[19]
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed alpha helix"
+        );
+        assert_eq!(
+            topology.residues[19]
+                .get("insertion_code")
+                .unwrap()
+                .expect_string(),
+            "D"
+        );
+        assert_eq!(
+            topology.residues[20]
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed alpha helix"
+        );
+        assert_eq!(
+            topology.residues[20]
+                .get("insertion_code")
+                .unwrap()
+                .expect_string(),
+            "E"
+        );
+        assert_eq!(
+            topology.residues[21]
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed alpha helix"
+        );
+        assert_eq!(
+            topology.residues[21]
+                .get("insertion_code")
+                .unwrap()
+                .expect_string(),
+            "F"
+        );
+        assert_eq!(
+            topology.residues[22]
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed alpha helix"
+        );
+        assert_eq!(
+            topology.residues[22]
+                .get("insertion_code")
+                .unwrap()
+                .expect_string(),
+            "G"
+        );
     }
 
     #[test]
