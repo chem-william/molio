@@ -102,14 +102,15 @@ impl Connectivity {
 
     pub fn bond_order(&self, i: usize, j: usize) -> Result<BondOrder, CError> {
         let bond = Bond::new(i, j);
-        let pos = self.bonds.iter().position(|b| *b == bond);
-
-        match pos {
-            Some(found_pos) => Ok(self.bond_orders[found_pos]),
-            None => Err(CError::GenericError(format!(
-                "out of bounds atomic index. No bond between {i} and {j} exists"
-            ))),
-        }
+        self.bonds
+            .iter()
+            .position(|b| *b == bond)
+            .map(|pos| self.bond_orders[pos])
+            .ok_or_else(|| {
+                CError::GenericError(format!(
+                    "out of bounds atomic index. No bond between {i} and {j} exists"
+                ))
+            })
     }
 
     fn recalculate(&mut self) {
