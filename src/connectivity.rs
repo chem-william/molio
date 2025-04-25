@@ -1,4 +1,4 @@
-use smallvec::{Array, SmallVec};
+use smallvec::SmallVec;
 use std::collections::BTreeSet;
 
 use crate::{
