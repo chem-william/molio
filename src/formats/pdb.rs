@@ -682,7 +682,11 @@ impl<'a> PDBFormat<'a> {
         let mut previous_residue_id = 0;
         let mut previous_carboxylic_id = 0;
 
-        let residues = frame.topology().residues.clone();
+        let residues = &frame.topology().residues;
+
+        // Collect all the bonds we need to add first
+        // We need at least `residues.len()` bonds to add + fudge factor
+        let mut bonds_to_add = Vec::with_capacity(residues.len() * 3);
 
         for residue in residues {
             let residue_table = find(&residue.name);
@@ -691,7 +695,7 @@ impl<'a> PDBFormat<'a> {
             }
 
             let mut atom_name_to_index = HashMap::<String, usize>::new();
-            for &atom in &residue {
+            for &atom in residue {
                 atom_name_to_index.insert(frame[atom].name.to_string(), atom);
             }
 
@@ -707,14 +711,11 @@ impl<'a> PDBFormat<'a> {
                 }
             };
 
-            // If conditions are met, add a bond
             if link_previous_peptide {
                 if let Some(&n_index) = amide_nitrogen {
                     if resid == previous_residue_id + 1 {
                         link_previous_peptide = false;
-                        frame
-                            .add_bond(previous_carboxylic_id, n_index, BondOrder::Unknown)
-                            .expect("unable to add bond when linking residues");
+                        bonds_to_add.push((previous_carboxylic_id, n_index));
                     }
                 }
             }
@@ -731,13 +732,9 @@ impl<'a> PDBFormat<'a> {
                 if let Some(&_) = five_prime_phosphorus {
                     if resid == previous_residue_id + 1 {
                         link_previous_nucleic = false;
-                        frame
-                            .add_bond(
-                                previous_carboxylic_id,
-                                *three_prime_oxygen.unwrap(),
-                                BondOrder::Unknown,
-                            )
-                            .expect("unable to add bond when linking residues");
+                        if let Some(&o_index) = three_prime_oxygen {
+                            bonds_to_add.push((previous_carboxylic_id, o_index));
+                        }
                     }
                 }
             }
@@ -748,15 +745,14 @@ impl<'a> PDBFormat<'a> {
                 previous_residue_id = resid;
             }
 
-            // A special case missed by the standards committee????
+            // A special case missed by the standards committee??
             if atom_name_to_index.contains_key("HO5'") {
-                frame
-                    .add_bond(
-                        *atom_name_to_index.get("HO5'").unwrap(),
-                        *atom_name_to_index.get("O5'").unwrap(),
-                        BondOrder::Unknown,
-                    )
-                    .expect("failed to add bond to frame in special case");
+                if let (Some(&ho5), Some(&o5)) = (
+                    atom_name_to_index.get("HO5'"),
+                    atom_name_to_index.get("O5'"),
+                ) {
+                    bonds_to_add.push((ho5, o5));
+                }
             }
 
             for link in residue_table.unwrap() {
@@ -803,14 +799,16 @@ impl<'a> PDBFormat<'a> {
                     continue;
                 }
 
-                frame
-                    .add_bond(
-                        *first_atom.unwrap(),
-                        *second_atom.unwrap(),
-                        BondOrder::Unknown,
-                    )
-                    .expect("unable to add bond to frame");
+                if let (Some(&first), Some(&second)) = (first_atom, second_atom) {
+                    bonds_to_add.push((first, second));
+                }
             }
+        }
+        // Now add all the bonds at once
+        for (i, j) in bonds_to_add {
+            frame
+                .add_bond(i, j, BondOrder::Unknown)
+                .expect("unable to add bond to frame");
         }
     }
 }
