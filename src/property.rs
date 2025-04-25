@@ -62,7 +62,7 @@ impl PartialEq for Property {
                 .zip(b.iter())
                 .all(|(x, y)| almost_eq(*x, *y, EPSILON)),
 
-            // nalgebra’s Matrix3<f64>: compare each entry’s bits
+            // nalgebra’s Matrix3<f64>: compare each entry
             (Property::Matrix3x3(a), Property::Matrix3x3(b)) => {
                 for i in 0..3 {
                     for j in 0..3 {
@@ -74,7 +74,7 @@ impl PartialEq for Property {
                 true
             }
 
-            // variable‐length vector of f64: same pattern
+            // variable-length vector of f64: same pattern
             (Property::VectorXD(a), Property::VectorXD(b)) => {
                 if a.len() != b.len() {
                     return false;
@@ -388,5 +388,236 @@ mod tests {
     fn test_expect_matrix3x3_panic() {
         let prop = Property::Double(1.0);
         prop.expect_matrix3x3();
+    }
+
+    #[test]
+    fn test_property_equality() {
+        // Test basic equality
+        assert_eq!(Property::Bool(true), Property::Bool(true));
+        assert_eq!(
+            Property::String("test".to_string()),
+            Property::String("test".to_string())
+        );
+        assert_eq!(Property::Double(1.0), Property::Double(1.0));
+        assert_eq!(
+            Property::Vector3D([1.0, 2.0, 3.0]),
+            Property::Vector3D([1.0, 2.0, 3.0])
+        );
+
+        // Test floating-point approximate equality
+        assert_eq!(Property::Double(1.0), Property::Double(1.0 + EPSILON / 2.0));
+        assert_ne!(Property::Double(1.0), Property::Double(1.0 + EPSILON * 2.0));
+
+        // Test different types are not equal
+        assert_ne!(Property::Bool(true), Property::String("true".to_string()));
+        assert_ne!(Property::Double(1.0), Property::Bool(true));
+
+        // Test NaN and infinity handling
+        assert_ne!(Property::Double(f64::NAN), Property::Double(f64::NAN));
+        assert_ne!(
+            Property::Double(f64::INFINITY),
+            Property::Double(f64::INFINITY)
+        );
+        assert_ne!(
+            Property::Double(f64::NEG_INFINITY),
+            Property::Double(f64::NEG_INFINITY)
+        );
+    }
+
+    #[test]
+    fn test_vector_xd_property() {
+        let vec = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let prop = Property::VectorXD(vec.clone());
+
+        match &prop {
+            Property::VectorXD(v) => assert_eq!(v, &vec),
+            _ => panic!("Expected VectorXD property"),
+        }
+
+        assert_ne!(
+            Property::VectorXD(vec.clone()),
+            Property::VectorXD(vec![1.0, 2.0, 3.0])
+        );
+    }
+
+    #[test]
+    fn test_properties_container() {
+        let mut properties = Properties::new();
+
+        // Test insertion
+        properties.insert("bool_prop".to_string(), Property::Bool(true));
+        properties.insert("double_prop".to_string(), Property::Double(3.140));
+        properties.insert(
+            "string_prop".to_string(),
+            Property::String("hello".to_string()),
+        );
+
+        // Test retrieval
+        assert_eq!(properties.get("bool_prop").unwrap().as_bool(), Some(true));
+        assert_approx_eq!(
+            properties.get("double_prop").unwrap().expect_double(),
+            3.140
+        );
+        assert_eq!(
+            properties.get("string_prop").unwrap().expect_string(),
+            "hello"
+        );
+
+        // Test non-existent key
+        assert!(properties.get("nonexistent").is_none());
+
+        // Test update
+        properties.insert("bool_prop".to_string(), Property::Bool(false));
+        assert_eq!(properties.get("bool_prop").unwrap().as_bool(), Some(false));
+
+        // Test removal
+        properties.remove("string_prop");
+        assert!(properties.get("string_prop").is_none());
+
+        // Test iteration
+        let keys: Vec<_> = properties.keys().cloned().collect();
+        assert_eq!(keys.len(), 2);
+        assert!(keys.contains(&"bool_prop".to_string()));
+        assert!(keys.contains(&"double_prop".to_string()));
+    }
+
+    #[test]
+    fn test_parse_bool() {
+        assert_eq!(BoolParser::parse("true").unwrap(), Property::Bool(true));
+        assert_eq!(BoolParser::parse("True").unwrap(), Property::Bool(true));
+        assert_eq!(BoolParser::parse("t").unwrap(), Property::Bool(true));
+        assert_eq!(BoolParser::parse("T").unwrap(), Property::Bool(true));
+
+        assert_eq!(BoolParser::parse("false").unwrap(), Property::Bool(false));
+        assert_eq!(BoolParser::parse("False").unwrap(), Property::Bool(false));
+        assert_eq!(BoolParser::parse("f").unwrap(), Property::Bool(false));
+        assert_eq!(BoolParser::parse("F").unwrap(), Property::Bool(false));
+
+        assert!(BoolParser::parse("invalid").is_err());
+    }
+
+    #[test]
+    fn test_parse_double() {
+        assert_approx_eq!(DoubleParser::parse("3.140").unwrap().expect_double(), 3.140);
+        assert_approx_eq!(DoubleParser::parse("-1.5").unwrap().expect_double(), -1.5);
+        assert_approx_eq!(DoubleParser::parse("0").unwrap().expect_double(), 0.0);
+        assert_approx_eq!(
+            DoubleParser::parse("1e6").unwrap().expect_double(),
+            1000000.0
+        );
+
+        assert!(DoubleParser::parse("not_a_number").is_err());
+    }
+
+    #[test]
+    fn test_parse_vector3d() {
+        let result = Vector3DParser::parse("1.0 2.0 3.0").unwrap();
+        assert_eq!(result.as_vector3d().unwrap(), [1.0, 2.0, 3.0]);
+
+        // Not enough components
+        assert!(Vector3DParser::parse("1.0 2.0").is_err());
+
+        // Too many components
+        assert!(Vector3DParser::parse("1.0 2.0 3.0 4.0").is_err());
+
+        // Invalid components
+        assert!(Vector3DParser::parse("1.0 invalid 3.0").is_err());
+    }
+
+    #[test]
+    fn test_parse_matrix3x3() {
+        let result = Matrix3x3Parser::parse("1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0").unwrap();
+        let matrix = result.as_matrix3x3().unwrap();
+
+        assert_approx_eq!(matrix[0], 1.0);
+        assert_approx_eq!(matrix[1], 2.0);
+        assert_approx_eq!(matrix[2], 3.0);
+        assert_approx_eq!(matrix[3], 4.0);
+        assert_approx_eq!(matrix[4], 5.0);
+        assert_approx_eq!(matrix[5], 6.0);
+        assert_approx_eq!(matrix[6], 7.0);
+        assert_approx_eq!(matrix[7], 8.0);
+        assert_approx_eq!(matrix[8], 9.0);
+
+        // Not enough components
+        assert!(Matrix3x3Parser::parse("1.0 2.0 3.0 4.0").is_err());
+
+        // Too many components
+        assert!(Matrix3x3Parser::parse("1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0").is_err());
+
+        // Invalid components
+        assert!(Matrix3x3Parser::parse("1.0 2.0 3.0 4.0 invalid 6.0 7.0 8.0 9.0").is_err());
+    }
+
+    #[test]
+    fn test_parse_vectorxd() {
+        let result = VectorXDParser::parse("1.0 2.0 3.0 4.0 5.0").unwrap();
+
+        match result {
+            Property::VectorXD(vec) => {
+                assert_eq!(vec.len(), 5);
+                assert_approx_eq!(vec[0], 1.0);
+                assert_approx_eq!(vec[1], 2.0);
+                assert_approx_eq!(vec[2], 3.0);
+                assert_approx_eq!(vec[3], 4.0);
+                assert_approx_eq!(vec[4], 5.0);
+            }
+            _ => panic!("Expected VectorXD property"),
+        }
+
+        // Empty input should give empty vector
+        let empty_result = VectorXDParser::parse("").unwrap();
+        match empty_result {
+            Property::VectorXD(vec) => assert_eq!(vec.len(), 0),
+            _ => panic!("Expected VectorXD property"),
+        }
+
+        // Invalid components
+        assert!(VectorXDParser::parse("1.0 2.0 invalid 4.0").is_err());
+    }
+
+    #[test]
+    fn test_parse_value() {
+        // Test general parse_value method
+        assert_eq!(
+            Property::parse_value("true", &PropertyKind::Bool).unwrap(),
+            Property::Bool(true)
+        );
+
+        assert_approx_eq!(
+            Property::parse_value("3.140", &PropertyKind::Double)
+                .unwrap()
+                .expect_double(),
+            3.140
+        );
+
+        assert_eq!(
+            Property::parse_value("hello", &PropertyKind::String)
+                .unwrap()
+                .expect_string(),
+            "hello"
+        );
+
+        let vector = Property::parse_value("1.0 2.0 3.0", &PropertyKind::Vector3D).unwrap();
+        assert_eq!(vector.as_vector3d().unwrap(), [1.0, 2.0, 3.0]);
+    }
+
+    #[test]
+    fn test_matrix_direct_comparison() {
+        let matrix1 = Matrix3::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+        let matrix2 = Matrix3::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+
+        let prop1 = Property::Matrix3x3(matrix1);
+        let prop2 = Property::Matrix3x3(matrix2);
+
+        // Test that the properties are equal
+        assert_eq!(prop1, prop2);
+
+        // Create a slightly different matrix
+        let matrix3 = Matrix3::new(1.0, 2.0, 3.0, 4.0, 5.1, 6.0, 7.0, 8.0, 9.0);
+        let prop3 = Property::Matrix3x3(matrix3);
+
+        // Should not be equal
+        assert_ne!(prop1, prop3);
     }
 }
