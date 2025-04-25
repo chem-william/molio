@@ -245,7 +245,7 @@ pub(crate) fn encode_hybrid36(width: usize, value: i64) -> String {
 
 pub struct PDBFormat<'a> {
     /// Residue information in the current step
-    pub residues: RefCell<BTreeMap<FullResidueId, Residue>>,
+    pub residues: RefCell<Vec<(FullResidueId, Residue)>>,
 
     /// List of all atom offsets. This maybe pushed in read_ATOM or if a TER
     /// record is found. It is reset every time a frame is read.
@@ -338,7 +338,20 @@ impl<'a> PDBFormat<'a> {
             insertion_code,
         };
 
-        if !self.residues.borrow().contains_key(&full_residue_id) {
+        let mut residues = self.residues.borrow_mut();
+
+        // Find all matching residues
+        let matching_positions: Vec<usize> = residues
+            .iter()
+            .enumerate()
+            .filter(|(_, (id, _))| *id == full_residue_id)
+            .map(|(pos, _)| pos)
+            .collect();
+
+        if !matching_positions.is_empty() {
+            // Add atom to the first matching residue
+            residues[matching_positions[0]].1.add_atom(atom_id);
+        } else {
             let mut residue = Residue {
                 name: resname,
                 id: Some(resid),
@@ -412,14 +425,32 @@ impl<'a> PDBFormat<'a> {
                 );
             }
 
-            self.residues.borrow_mut().insert(full_residue_id, residue);
-        } else {
-            // Just add this atom to the residue
-            self.residues
-                .borrow_mut()
-                .get_mut(&full_residue_id)
-                .unwrap()
-                .add_atom(atom_id);
+            // Find the first spot where either
+            // 1) the existing resid is greater than ours → we should come before it, or
+            // 2) we hit our same resid → then we'll want to append after the last equal entry.
+            let insert_pos = match residues
+                .iter()
+                .position(|(id, _)| id.resid >= full_residue_id.resid)
+            {
+                Some(pos) if residues[pos].0.resid == full_residue_id.resid => {
+                    // we found an existing block of equal IDs; extend to its end
+                    residues
+                        .iter()
+                        .rposition(|(id, _)| id.resid == full_residue_id.resid)
+                        .unwrap()
+                        + 1
+                }
+                Some(pos) => {
+                    // the first resid ≥ ours but not equal → insert here
+                    pos
+                }
+                None => {
+                    // all existing resids are smaller → push to the end
+                    residues.len()
+                }
+            };
+
+            residues.insert(insert_pos, (full_residue_id, residue));
         }
 
         Ok(())
@@ -623,7 +654,7 @@ impl<'a> PDBFormat<'a> {
 
     pub fn new() -> Self {
         PDBFormat {
-            residues: RefCell::new(BTreeMap::new()),
+            residues: RefCell::new(Vec::new()),
             atom_offsets: RefCell::new(Vec::new()),
             current_secinfo: RefCell::new(None),
             secinfo: RefCell::new(BTreeMap::new()),
@@ -632,15 +663,14 @@ impl<'a> PDBFormat<'a> {
     }
 
     fn chain_ended(&self, frame: &mut Frame) {
-        for residue in self.residues.borrow().iter() {
-            let _ = frame.add_residue(residue.1.clone());
-        }
-
-        // This is a 'hack' to allow for badly formatted PDB files which restart
+        // We drain as a 'hack' to allow for badly formatted PDB files which restart
         // the residue ID after a TER residue in cases where they should not.
         // IE a metal Ion given the chain ID of A and residue ID of 1 even though
         // this residue already exists.
-        self.residues.borrow_mut().clear();
+        let mut residues = self.residues.borrow_mut();
+        for (_, residue) in residues.drain(..) {
+            let _ = frame.add_residue(residue);
+        }
     }
 
     const END_RECORD: &'a str = "END";
