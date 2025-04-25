@@ -286,7 +286,7 @@ impl PDBFormat {
 
             let unwrapped = initial_offset.unwrap();
             if unwrapped <= 0 {
-                println!("warning: '{unwrapped}' is too small, assuming id is '1'",);
+                eprintln!("warning: '{unwrapped}' is too small, assuming id is '1'",);
                 self.atom_offsets.borrow_mut().push(0);
             } else {
                 self.atom_offsets.borrow_mut().push(
@@ -467,7 +467,7 @@ impl PDBFormat {
             let space_group = &line[55..65].trim();
             // TODO: handle this as a warning (somehow)?
             if space_group != &"P 1" && space_group != &"P1" {
-                println!("warning: ignoring custom space group ({space_group}), using P1 instead");
+                eprintln!("warning: ignoring custom space group ({space_group}), using P1 instead");
             }
         }
 
@@ -493,7 +493,7 @@ impl PDBFormat {
 
     fn _add_bond(&self, frame: &mut Frame, line: &str, i: usize, j: usize) {
         if i >= frame.size() || j >= frame.size() {
-            println!(
+            eprintln!(
                 "warning: PDB reader: ignoring CONECT ('{}') with atomic indexes bigger than frame size ({})",
                 line.trim(),
                 frame.size()
@@ -539,7 +539,7 @@ impl PDBFormat {
 
     fn parse_helix(&self, line: &str) -> Result<(), CError> {
         if line.len() < 33 + 5 {
-            println!("warning: HELIX record too short: {line}");
+            eprintln!("warning: HELIX record too short: {line}");
         };
 
         let chain_start = line.chars().nth(19).expect("start of chain");
@@ -594,7 +594,7 @@ impl PDBFormat {
 
     fn parse_secondary(&self, line: &str, start: usize, end: usize) -> Result<(), CError> {
         if line.len() < end + 10 {
-            println!("warning: secondary structure record too short: '{line}'");
+            eprintln!("warning: secondary structure record too short: '{line}'");
         };
 
         let resname_start = &line[start..start + 3].trim();
@@ -892,14 +892,14 @@ impl FileFormat for PDBFormat {
                 Record::END => got_end = true,
                 Record::IGNORED_ => {}
                 Record::UNKNOWN_ => {
-                    println!("ignoring unknown record: {}", line);
+                    eprintln!("ignoring unknown record: {}", line);
                 }
             }
             line.clear();
         }
 
         if !got_end {
-            println!("warning: missing END record in file");
+            eprintln!("warning: missing END record in file");
         }
 
         self.chain_ended(&mut frame);
@@ -935,7 +935,7 @@ impl FileFormat for PDBFormat {
     }
 
     fn write(&self, path: &Path, frame: &Frame) -> Result<(), CError> {
-        println!(
+        eprintln!(
             "Writing {:?} as PDB format with {} atoms",
             path,
             frame.size()
