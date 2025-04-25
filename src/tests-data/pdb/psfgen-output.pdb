@@ -1,0 +1,28 @@
+REMARK original generated coordinate pdb file
+ATOM      1  N   ALA A   1      -9.229 -14.861  -5.481  1.00  0.00      PROT N
+ATOM      2  HT1 ALA A   1     -10.048 -15.427  -5.569  0.00  0.00      PROT
+ATOM      3  HT2 ALA A   1      -9.488 -13.913  -5.295  0.00  0.00      PROT
+ATOM      4  HT3 ALA A   1      -8.652 -15.208  -4.741  0.00  0.00      PROT
+ATOM      5  CA  ALA A   1      -8.483 -14.912  -6.726  1.00  0.00      PROT C
+ATOM      6  HA  ALA A   1      -8.185 -15.947  -6.894  1.00  0.00      PROT H
+ATOM      7  CB  ALA A   1      -9.383 -14.465  -7.880  1.00  0.00      PROT C
+ATOM      8  HB1 ALA A   1     -10.428 -14.602  -7.600  1.00  0.00      PROT H
+ATOM      9  HB2 ALA A   1      -9.200 -13.413  -8.098  1.00  0.00      PROT H
+ATOM     10  HB3 ALA A   1      -9.164 -15.063  -8.765  1.00  0.00      PROT H
+ATOM     11  C   ALA A   1      -7.227 -14.047  -6.599  1.00  0.00      PROT C
+ATOM     12  O   ALA A   1      -7.083 -13.048  -7.303  1.00  0.00      PROT O
+ATOM     13  N   GLY A   2       5.512 -12.329  -3.475  1.00  0.00      PROT N
+ATOM     14  HN  GLY A   2       5.140 -12.278  -4.401  0.00  0.00      PROT
+ATOM     15  CA  GLY A   2       6.437 -13.422  -3.229  1.00  0.00      PROT C
+ATOM     16  HA1 GLY A   2       7.311 -13.011  -2.742  0.00  0.00      PROT
+ATOM     17  HA2 GLY A   2       6.707 -13.894  -4.174  1.00  0.00      PROT H
+ATOM     18  C   GLY A   2       5.818 -14.462  -2.292  1.00  0.00      PROT C
+ATOM     19  O   GLY A   2       5.770 -15.646  -2.619  1.00  0.00      PROT O
+ATOM     20  N   GLY A   1      -5.359   2.056   5.693  1.00  0.00      PROT N
+ATOM     21  HN  GLY A   1      -5.252   1.254   5.107  0.00  0.00      PROT
+ATOM     22  CA  GLY A   1      -4.584   3.223   5.308  1.00  0.00      PROT C
+ATOM     23  HA1 GLY A   1      -4.112   3.005   4.360  0.00  0.00      PROT
+ATOM     24  HA2 GLY A   1      -3.835   3.435   6.071  1.00  0.00      PROT H
+ATOM     25  C   GLY A   1      -5.486   4.444   5.119  1.00  0.00      PROT C
+ATOM     26  O   GLY A   1      -5.156   5.540   5.568  1.00  0.00      PROT O
+END

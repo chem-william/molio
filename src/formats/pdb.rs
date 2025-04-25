@@ -1486,6 +1486,65 @@ mod tests {
     }
 
     #[test]
+    fn multiple_residues_with_the_same_id() {
+        let path = Path::new("./src/tests-data/pdb/psfgen-output.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+
+        let topology = frame.topology();
+
+        assert_eq!(topology.residues.len(), 3);
+        assert_eq!(topology.residues[0].name, "ALA");
+        assert_eq!(topology.residues[0].id.unwrap(), 1);
+        assert_eq!(
+            topology.residues[0].get("segname").unwrap().expect_string(),
+            "PROT"
+        );
+
+        assert_eq!(topology.residues[1].name, "GLY");
+        assert_eq!(topology.residues[1].id.unwrap(), 1);
+        assert_eq!(
+            topology.residues[1].get("segname").unwrap().expect_string(),
+            "PROT"
+        );
+
+        assert_eq!(topology.residues[2].name, "GLY");
+        assert_eq!(topology.residues[2].id.unwrap(), 2);
+        assert_eq!(
+            topology.residues[2].get("segname").unwrap().expect_string(),
+            "PROT"
+        );
+    }
+
+    // TODO: fix this test - requires implementing compressed reading
+    // #[test]
+    // fn test_left_handed_helix() {
+    //     let path = Path::new("./src/tests-data/pdb/insertion-code.pdb");
+    //     let mut trajectory = Trajectory::new(path).unwrap();
+    //     let frame = trajectory.read().unwrap().unwrap();
+
+    //     let topology = frame.topology();
+
+    //     assert_eq!(
+    //         topology
+    //             .residues[226]
+    //             .get("secondary_structure")
+    //             .unwrap()
+    //             .expect_string(),
+    //         "left-handed alpha helix"
+    //     );
+
+    //     assert_eq!(
+    //         topology
+    //             .residues[138]
+    //             .get("secondary_structure")
+    //             .unwrap()
+    //             .expect_string(),
+    //         "right-handed alpha helix"
+    //     );
+    // }
+
+    #[test]
     #[should_panic(expected = "the value '*0000' is not a valid hybrid 36 number")]
     fn decode_bad1() {
         decode_hybrid36(5, "*0000").unwrap();
