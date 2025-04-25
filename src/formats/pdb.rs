@@ -297,7 +297,7 @@ impl<'a> PDBFormat<'a> {
         }
 
         let mut atom = Atom::default();
-        let name = &line[12..16];
+        let name = &line[12..16].trim();
         if line.len() >= 78 {
             let atom_type = &line[76..78];
             atom.name = name.trim().to_string();
