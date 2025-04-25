@@ -1448,6 +1448,44 @@ mod tests {
     }
 
     #[test]
+    fn read_atomic_insertion_codes() {
+        let path = Path::new("./src/tests-data/pdb/insertion-code.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+
+        let topology = frame.topology();
+
+        assert_eq!(
+            topology
+                .residue_for_atom(0)
+                .unwrap()
+                .get("insertion_code")
+                .unwrap()
+                .expect_string(),
+            "a"
+        );
+        assert_eq!(
+            topology
+                .residue_for_atom(1)
+                .unwrap()
+                .get("insertion_code")
+                .unwrap()
+                .expect_string(),
+            "c"
+        );
+        assert_eq!(
+            topology
+                .residue_for_atom(2)
+                .unwrap()
+                .get("insertion_code")
+                .unwrap()
+                .expect_string(),
+            "x"
+        );
+        assert!(frame[3].properties.get("insertion_code").is_none());
+    }
+
+    #[test]
     #[should_panic(expected = "the value '*0000' is not a valid hybrid 36 number")]
     fn decode_bad1() {
         decode_hybrid36(5, "*0000").unwrap();
