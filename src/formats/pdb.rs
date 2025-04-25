@@ -924,6 +924,7 @@ impl FileFormat for PDBFormat<'_> {
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
         let mut line = String::new();
+        let position = reader.stream_position()?;
 
         while reader.read_line(&mut line)? > 0 {
             if line.starts_with(Self::ENDMDL_RECORD) {
@@ -940,13 +941,17 @@ impl FileFormat for PDBFormat<'_> {
             }
 
             if line.starts_with(Self::END_RECORD) {
-                return Ok(Some(reader.stream_position()?));
+                return Ok(Some(position));
             }
 
             line.clear();
         }
 
-        Ok(None)
+        if position == 0 {
+            Ok(Some(position))
+        } else {
+            Ok(None)
+        }
     }
 
     fn write(&self, path: &Path, frame: &Frame) -> Result<(), CError> {
@@ -1547,6 +1552,21 @@ mod tests {
             frame.topology().bond_order(19, 13).unwrap(),
             BondOrder::Unknown
         );
+    }
+
+    #[test]
+    fn atom_id_starts_at_0() {
+        let path = Path::new("./src/tests-data/pdb/atom-id-0.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 1);
+
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 2);
+
+        assert_eq!(frame[0].name, "C1");
+        assert_eq!(frame[1].name, "C2");
+        assert_eq!(frame[0].symbol, "C");
+        assert_eq!(frame[0].symbol, "C");
     }
 
     // TODO: fix this test - requires implementing compressed reading

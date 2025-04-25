@@ -266,6 +266,10 @@ mod tests {
 
     #[test]
     fn check_nsteps() {
+        let path = Path::new("./src/tests-data/xyz/single_struct.xyz");
+        let trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 1);
+
         let path = Path::new("./src/tests-data/xyz/trajectory.xyz");
         let trajectory = Trajectory::new(path).unwrap();
         assert_eq!(trajectory.size, 2);
