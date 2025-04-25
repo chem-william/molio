@@ -279,18 +279,18 @@ impl PDBFormat {
         }
 
         if self.atom_offsets.borrow().is_empty() {
-            let initial_offset = decode_hybrid36(5, &line[6..11]).unwrap();
+            let initial_offset = decode_hybrid36(5, &line[6..11]);
+            if initial_offset.is_err() {
+                eprintln!("initial offset was err");
+            }
 
-            if initial_offset <= 0 {
-                println!(
-                    "warning: '{}' is too small, assuming id is '1'",
-                    initial_offset
-                );
+            let unwrapped = initial_offset.unwrap();
+            if unwrapped <= 0 {
+                println!("warning: '{unwrapped}' is too small, assuming id is '1'",);
                 self.atom_offsets.borrow_mut().push(0);
             } else {
                 self.atom_offsets.borrow_mut().push(
-                    usize::try_from(initial_offset)
-                        .expect("decode_hybrid36 returned a negative number")
+                    usize::try_from(unwrapped).expect("decode_hybrid36 returned a negative number")
                         - 1,
                 );
             };
@@ -474,8 +474,8 @@ impl PDBFormat {
         Ok(())
     }
     fn _read_index(&self, line: &str, initial: usize) -> Result<usize, CError> {
-        let trimmed_line = &line[initial..initial + 5].trim();
-        let mut pdb_atom_id = decode_hybrid36(5, trimmed_line)?;
+        debug_assert!(line.len() >= 5); // otherwise the indexing fails
+        let mut pdb_atom_id = decode_hybrid36(5, &line[initial..initial + 5])?;
 
         // Find the lower bound index
         let lower = self
@@ -484,12 +484,11 @@ impl PDBFormat {
             .binary_search(&(pdb_atom_id as usize))
             .unwrap_or_else(|insert_pos| insert_pos)
             - 1;
-
-        pdb_atom_id -= lower as i64 - self.atom_offsets.borrow().first().copied().unwrap() as i64;
+        pdb_atom_id -= lower as i64;
 
         // TODO: is this correct?
         pdb_atom_id -= 1;
-        Ok(usize::try_from(pdb_atom_id).unwrap())
+        Ok(usize::try_from(pdb_atom_id).unwrap() - self.atom_offsets.borrow().first().unwrap())
     }
 
     fn _add_bond(&self, frame: &mut Frame, line: &str, i: usize, j: usize) {
@@ -1513,6 +1512,25 @@ mod tests {
         assert_eq!(
             topology.residues[2].get("segname").unwrap().expect_string(),
             "PROT"
+        );
+    }
+
+    #[test]
+    fn odd_pdb_numbering() {
+        let path = Path::new("./src/tests-data/pdb/odd-start.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+
+        assert_eq!(frame.size(), 20);
+        assert_eq!(frame[0].name, "C1");
+        assert_eq!(frame[19].name, "C18");
+        assert_eq!(
+            frame.topology().bond_order(0, 1).unwrap(),
+            BondOrder::Unknown
+        );
+        assert_eq!(
+            frame.topology().bond_order(19, 13).unwrap(),
+            BondOrder::Unknown
         );
     }
 
