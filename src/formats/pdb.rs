@@ -243,7 +243,7 @@ pub(crate) fn encode_hybrid36(width: usize, value: i64) -> String {
     "*".repeat(width)
 }
 
-pub struct PDBFormat {
+pub struct PDBFormat<'a> {
     /// Residue information in the current step
     pub residues: RefCell<BTreeMap<FullResidueId, Residue>>,
 
@@ -254,19 +254,19 @@ pub struct PDBFormat {
     /// This will be None when no secondary structure information should be
     /// read. Else it is set to the final residue of a secondary structure and
     /// the text description which should be set.
-    pub current_secinfo: RefCell<Option<(FullResidueId, String)>>,
+    pub current_secinfo: RefCell<Option<(FullResidueId, &'a str)>>,
 
     /// Store secondary structure information. Keys are the
     /// starting residue of the secondary structure, and values are pairs
     /// containing the ending residue and a string which is a written
     /// description of the secondary structure
-    pub secinfo: RefCell<BTreeMap<FullResidueId, (FullResidueId, String)>>,
+    pub secinfo: RefCell<BTreeMap<FullResidueId, (FullResidueId, &'a str)>>,
 
     /// Number of models read/written to the file
     models: RefCell<usize>,
 }
 
-impl PDBFormat {
+impl<'a> PDBFormat<'a> {
     fn parse_atom(&self, frame: &mut Frame, line: &str, is_hetatm: bool) -> Result<(), CError> {
         debug_assert!(line[..6] == *"ATOM  " || line[..6] == *"HETATM");
 
@@ -390,7 +390,7 @@ impl PDBFormat {
                 if let Some((end_residue_id, description)) = current_secinfo_borrow.as_ref() {
                     residue.properties.insert(
                         "secondary_structure".to_string(),
-                        Property::String(description.clone()),
+                        Property::String(description.to_string()),
                     );
 
                     // Are we at the end of a secondary information sequence?
@@ -405,10 +405,10 @@ impl PDBFormat {
             // Are we at the start of a secondary information sequence?
             // second borrow of `self.secinfo` happens here
             if let Some(secinfo_for_residue) = self.secinfo.borrow().get(&full_residue_id) {
-                *self.current_secinfo.borrow_mut() = Some((*secinfo_for_residue).clone());
+                *self.current_secinfo.borrow_mut() = Some(secinfo_for_residue.clone());
                 residue.properties.insert(
                     "secondary_structure".to_string(),
-                    Property::String(secinfo_for_residue.1.clone()),
+                    Property::String(secinfo_for_residue.1.to_string()),
                 );
             }
 
@@ -570,9 +570,7 @@ impl PDBFormat {
                 start,
                 (
                     end,
-                    HelixType::nth(helix_type - 1)
-                        .expect("unknown helix type")
-                        .to_string(),
+                    HelixType::nth(helix_type - 1).expect("unknown helix type"),
                 ),
             );
         }
@@ -618,9 +616,7 @@ impl PDBFormat {
             insertion_code: *inscode_end,
         };
 
-        self.secinfo
-            .borrow_mut()
-            .insert(start, (end, "extended".to_string()));
+        self.secinfo.borrow_mut().insert(start, (end, "extended"));
 
         Ok(())
     }
@@ -647,8 +643,8 @@ impl PDBFormat {
         self.residues.borrow_mut().clear();
     }
 
-    const END_RECORD: &str = "END";
-    const ENDMDL_RECORD: &str = "ENDMDL";
+    const END_RECORD: &'a str = "END";
+    const ENDMDL_RECORD: &'a str = "ENDMDL";
 
     fn link_standard_residue_bonds(&self, frame: &mut Frame) {
         let mut link_previous_peptide = false;
@@ -739,14 +735,15 @@ impl PDBFormat {
 
                 if first_atom.is_none() {
                     let first_name = pdb_connectivity::INTERNER[link.0];
-                    let first_char = first_name
-                        .chars()
-                        .nth(0)
-                        .expect("first_name did not contain any characters");
-                    if first_char != 'H'
+                    let mut chars = first_name.chars();
+                    let first_char = chars.next();
+                    let second_char = chars.next();
+
+                    if first_char != Some('H')
                         && first_name != "OXT"
-                        && first_char != 'P'
-                        && first_name.chars().take(2).collect::<String>() != "OP"
+                        && first_char != Some('P')
+                        && first_char != Some('O')
+                        && second_char != Some('P')
                     {
                         eprintln!(
                             "warning: could not find standard atom '{first_name}' in residue '{}' (resid {resid})",
@@ -758,14 +755,15 @@ impl PDBFormat {
 
                 if second_atom.is_none() {
                     let second_name = pdb_connectivity::INTERNER[link.1];
-                    let first_char = second_name
-                        .chars()
-                        .nth(0)
-                        .expect("second_name did not contain any characters");
-                    if first_char != 'H'
+                    let mut chars = second_name.chars();
+                    let first_char = chars.next();
+                    let second_char = chars.next();
+
+                    if first_char != Some('H')
                         && second_name != "OXT"
-                        && first_char != 'P'
-                        && second_name.chars().take(2).collect::<String>() != "OP"
+                        && first_char != Some('P')
+                        && first_char != Some('O')
+                        && second_char != Some('P')
                     {
                         eprintln!(
                             "warning: could not find standard atom '{second_name}' in residue '{}' (resid {resid})",
@@ -787,7 +785,7 @@ impl PDBFormat {
     }
 }
 
-impl FileFormat for PDBFormat {
+impl FileFormat for PDBFormat<'_> {
     fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         self.residues.borrow_mut().clear();
         self.atom_offsets.borrow_mut().clear();

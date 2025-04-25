@@ -12,12 +12,12 @@ pub enum TextFormat {
     Guess,
 }
 
-pub enum Format {
+pub enum Format<'a> {
     XYZ(XYZFormat),
-    PDB(PDBFormat),
+    PDB(PDBFormat<'a>),
 }
 
-impl Format {
+impl Format<'_> {
     pub fn new(path: &Path) -> Result<Self, CError> {
         let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
 
@@ -44,7 +44,7 @@ pub trait FileFormat {
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError>;
 }
 
-impl FileFormat for Format {
+impl FileFormat for Format<'_> {
     fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         match self {
             Format::XYZ(format) => format.read_next(reader),

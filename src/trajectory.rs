@@ -12,7 +12,7 @@ pub struct Trajectory<'a> {
     pub size: usize,
 
     path: &'a Path,
-    strategy: Format,
+    strategy: Format<'a>,
     reader: BufReader<File>,
     frame_positions: Vec<u64>,
 }
