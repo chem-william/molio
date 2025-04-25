@@ -484,10 +484,12 @@ impl<'a> PDBFormat<'a> {
         frame.unit_cell = unit_cell;
 
         if line.len() >= 55 {
-            let space_group = &line[55..65].trim();
+            let space_group_slice = &line[55..std::cmp::min(line.len(), 65)].trim();
             // TODO: handle this as a warning (somehow)?
-            if space_group != &"P 1" && space_group != &"P1" {
-                eprintln!("warning: ignoring custom space group ({space_group}), using P1 instead");
+            if space_group_slice != &"P 1" && space_group_slice != &"P1" {
+                eprintln!(
+                    "warning: ignoring custom space group ({space_group_slice}), using P1 instead"
+                );
             }
         }
 
@@ -1593,6 +1595,16 @@ mod tests {
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 2223);
+    }
+
+    #[test]
+    fn file_generated_by_crystal_maker() {
+        let path = Path::new("./src/tests-data/pdb/crystal-maker.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 1);
+
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 8);
     }
 
     // TODO: fix this test - requires implementing compressed reading
