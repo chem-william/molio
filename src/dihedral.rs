@@ -52,3 +52,57 @@ impl Dihedral {
         Dihedral { data }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dihedral_creation() {
+        let dihedral = Dihedral::new(2, 1, 3, 4);
+        // Check canonical ordering
+        assert_eq!(dihedral[0], 2);
+        assert_eq!(dihedral[1], 1);
+        assert_eq!(dihedral[2], 3);
+        assert_eq!(dihedral[3], 4);
+
+        // Test with reverse order - should flip the atoms since max(4, 3) > max(1, 2)
+        let dihedral_reversed = Dihedral::new(4, 3, 1, 2);
+        assert_eq!(dihedral_reversed[0], 2);
+        assert_eq!(dihedral_reversed[1], 1);
+        assert_eq!(dihedral_reversed[2], 3);
+        assert_eq!(dihedral_reversed[3], 4);
+    }
+
+    #[test]
+    fn test_dihedral_equality() {
+        // These should be equal due to canonical representation
+        let dihedral1 = Dihedral::new(1, 2, 3, 4);
+        let dihedral2 = Dihedral::new(4, 3, 2, 1);
+
+        assert_eq!(dihedral1, dihedral2);
+
+        // Different dihedral
+        let dihedral3 = Dihedral::new(1, 2, 3, 5);
+        assert_ne!(dihedral1, dihedral3);
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot have an atom linked to itself in a dihedral angle")]
+    fn test_dihedral_with_linked_duplicate_i_j() {
+        Dihedral::new(1, 1, 3, 4);
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot have an atom twice in a dihedral angle")]
+    fn test_dihedral_with_distant_duplicate_i_k() {
+        Dihedral::new(1, 2, 1, 4);
+    }
+
+    #[test]
+    #[should_panic(expected = "can not access atom n° 4 in dihedral")]
+    fn test_dihedral_index_out_of_bounds() {
+        let dihedral = Dihedral::new(1, 2, 3, 4);
+        let _ = dihedral[4]; // This should panic
+    }
+}

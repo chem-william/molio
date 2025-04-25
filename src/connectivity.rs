@@ -175,3 +175,166 @@ impl Connectivity {
         self.up_to_date = true;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_bond() {
+        let mut connectivity = Connectivity::default();
+        // Add a bond
+        connectivity.add_bond(1, 2, BondOrder::Single);
+
+        // Check that the bond was added
+        assert_eq!(connectivity.bonds.len(), 1);
+        assert!(connectivity.bonds.contains(&Bond::new(1, 2)));
+
+        // Check bond order
+        assert_eq!(connectivity.bond_order(1, 2).unwrap(), BondOrder::Single);
+
+        // Adding the same bond again should not increase count
+        connectivity.add_bond(1, 2, BondOrder::Double);
+        assert_eq!(connectivity.bonds.len(), 1);
+
+        // Check that the bond order was not updated
+        assert_eq!(connectivity.bond_order(1, 2).unwrap(), BondOrder::Single);
+
+        // Adding the same bond in reverse order should not increase count
+        connectivity.add_bond(2, 1, BondOrder::Single);
+        assert_eq!(connectivity.bonds.len(), 1);
+
+        // Check the bond order was updated
+        assert_eq!(connectivity.bond_order(1, 2).unwrap(), BondOrder::Single);
+    }
+
+    #[test]
+    fn test_remove_bond() {
+        let mut connectivity = Connectivity::default();
+        connectivity.add_bond(1, 2, BondOrder::Single);
+        connectivity.add_bond(2, 3, BondOrder::Double);
+        connectivity.add_bond(3, 4, BondOrder::Triple);
+
+        assert_eq!(connectivity.bonds.len(), 3);
+
+        // Remove a bond
+        connectivity.remove_bond(1, 2);
+        assert_eq!(connectivity.bonds.len(), 2);
+        assert!(!connectivity.bonds.contains(&Bond::new(1, 2)));
+
+        // Removing a non-existent bond should do nothing
+        connectivity.remove_bond(1, 2);
+        assert_eq!(connectivity.bonds.len(), 2);
+
+        // Check that bond orders array has same length as bonds set
+        assert_eq!(connectivity.bond_orders.len(), connectivity.bonds.len());
+    }
+
+    #[test]
+    fn test_bond_order() {
+        let mut connectivity = Connectivity::default();
+        connectivity.add_bond(1, 2, BondOrder::Single);
+        connectivity.add_bond(2, 3, BondOrder::Double);
+        connectivity.add_bond(3, 4, BondOrder::Triple);
+
+        // Check bond orders
+        assert_eq!(connectivity.bond_order(1, 2).unwrap(), BondOrder::Single);
+        assert_eq!(connectivity.bond_order(2, 3).unwrap(), BondOrder::Double);
+        assert_eq!(connectivity.bond_order(3, 4).unwrap(), BondOrder::Triple);
+
+        // Check bond orders with reversed indices
+        assert_eq!(connectivity.bond_order(2, 1).unwrap(), BondOrder::Single);
+        assert_eq!(connectivity.bond_order(3, 2).unwrap(), BondOrder::Double);
+        assert_eq!(connectivity.bond_order(4, 3).unwrap(), BondOrder::Triple);
+
+        // Bond order for non-existent bond should return error
+        assert!(connectivity.bond_order(1, 3).is_err());
+    }
+
+    #[test]
+    fn test_angles_generation() {
+        let mut connectivity = Connectivity::default();
+
+        // Create a simple chain: 1-2-3
+        connectivity.add_bond(1, 2, BondOrder::Single);
+        connectivity.add_bond(2, 3, BondOrder::Single);
+
+        let angles = connectivity.angles();
+        assert_eq!(angles.len(), 1);
+        assert!(angles.contains(&Angle::new(1, 2, 3)));
+
+        // Add another atom to create a branch: 1-2-3
+        //                                         |
+        //                                         4
+        connectivity.add_bond(2, 4, BondOrder::Single);
+
+        // Force recalculation by getting angles again
+        let angles = connectivity.angles();
+        assert_eq!(angles.len(), 3);
+        assert!(angles.contains(&Angle::new(1, 2, 3)));
+        assert!(angles.contains(&Angle::new(1, 2, 4)));
+        assert!(angles.contains(&Angle::new(3, 2, 4)));
+    }
+
+    #[test]
+    fn test_dihedrals_generation() {
+        let mut connectivity = Connectivity::default();
+
+        // Create a simple chain: 1-2-3-4
+        connectivity.add_bond(1, 2, BondOrder::Single);
+        connectivity.add_bond(2, 3, BondOrder::Single);
+        connectivity.add_bond(3, 4, BondOrder::Single);
+
+        let dihedrals = connectivity.dihedrals();
+        assert_eq!(dihedrals.len(), 1);
+        assert!(dihedrals.contains(&Dihedral::new(1, 2, 3, 4)));
+
+        // Add another atom to create a branch: 1-2-3-4
+        //                                          |
+        //                                          5
+        connectivity.add_bond(3, 5, BondOrder::Single);
+
+        // Force recalculation
+        let dihedrals = connectivity.dihedrals().clone();
+        let impropers = connectivity.impropers().clone();
+        assert_eq!(dihedrals.len(), 2);
+        assert_eq!(impropers.len(), 1);
+        assert!(dihedrals.contains(&Dihedral::new(1, 2, 3, 4)));
+        assert!(dihedrals.contains(&Dihedral::new(1, 2, 3, 5)));
+        assert!(impropers.contains(&Improper::new(2, 3, 4, 5)));
+    }
+
+    #[test]
+    fn test_impropers_generation() {
+        let mut connectivity = Connectivity::default();
+
+        // Create a structure with potential improper:
+        //       1
+        //       |
+        //   4---2---3
+        connectivity.add_bond(1, 2, BondOrder::Single);
+        connectivity.add_bond(2, 3, BondOrder::Single);
+        connectivity.add_bond(2, 4, BondOrder::Single);
+
+        let impropers = connectivity.impropers();
+        assert_eq!(impropers.len(), 1);
+        assert!(impropers.contains(&Improper::new(1, 2, 3, 4)));
+
+        // Add another branch
+        //       1
+        //       |
+        //   4---2---3
+        //       |
+        //       5
+        connectivity.add_bond(2, 5, BondOrder::Single);
+
+        // Force recalculation
+        let impropers = connectivity.impropers();
+        assert_eq!(impropers.len(), 4);
+        // All possible combinations with 2 as the central atom
+        assert!(impropers.contains(&Improper::new(1, 2, 3, 4)));
+        assert!(impropers.contains(&Improper::new(1, 2, 3, 5)));
+        assert!(impropers.contains(&Improper::new(1, 2, 4, 5)));
+        assert!(impropers.contains(&Improper::new(3, 2, 4, 5)));
+    }
+}
