@@ -1569,6 +1569,19 @@ mod tests {
         assert_eq!(frame[0].symbol, "C");
     }
 
+    #[test]
+    fn multiple_end_records() {
+        let path = Path::new("./src/tests-data/pdb/end-endmdl.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 2);
+
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 4);
+
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 7);
+    }
+
     // TODO: fix this test - requires implementing compressed reading
     // #[test]
     // fn test_left_handed_helix() {
