@@ -1696,6 +1696,13 @@ mod tests {
         assert!(no_ss_residue.get("secondary_structure").is_none());
     }
 
+    #[test]
+    fn file_by_ase() {
+        let path = Path::new("./src/tests-data/pdb/ase.pdb");
+        let trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 156)
+    }
+
     // TODO: fix this test - requires implementing compressed reading
     // #[test]
     // fn test_left_handed_helix() {
