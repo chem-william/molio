@@ -1582,6 +1582,19 @@ mod tests {
         assert_eq!(frame.size(), 7);
     }
 
+    #[test]
+    fn multiple_model_without_end() {
+        let path = Path::new("./src/tests-data/pdb/model.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 2);
+
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 2223);
+
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 2223);
+    }
+
     // TODO: fix this test - requires implementing compressed reading
     // #[test]
     // fn test_left_handed_helix() {
