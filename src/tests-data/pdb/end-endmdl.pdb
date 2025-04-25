@@ -1,0 +1,31 @@
+REMARK This is a weird file, containing both ENDMDL and END record, and
+REMARK containing more than one END record
+MODEL    1
+CRYST1   22.000   22.000   22.000  90.00  90.00  90.00 P 1           1
+ATOM      1 A    XXX X   1       1.000   2.000   3.000  1.00  0.00           A
+HETATM    2 B    XXX X   2       1.000   2.000   3.000  1.00  0.00           B
+ATOM      3 C    XXX X   3       1.000   2.000   3.000  1.00  0.00           C
+HETATM    4 D    XXX X   4       1.000   2.000   3.000  1.00  0.00           D
+CONECT    1    2
+CONECT    2    1
+ENDMDL
+END
+MODEL    1
+CRYST1   22.000   22.000   22.000  90.00  90.00  90.00 P 1           1
+ATOM      1 A    XXX X   4       4.000   5.000   6.000  1.00  0.00           A
+HETATM    2 B    foo X   3       4.000   5.000   6.000  1.00  0.00           B
+ATOM      3 C    foo X   3       4.000   5.000   6.000  1.00  0.00           C
+HETATM    4 D    bar X  -1       4.000   5.000   6.000  1.00  0.00           D
+HETATM    5 E    XXX X   5       4.000   5.000   6.000  1.00  0.00           E
+HETATM    6 F    XXX X   6       4.000   5.000   6.000  1.00  0.00           F
+HETATM    7 G    XXX X   7       4.000   5.000   6.000  1.00  0.00           G
+CONECT    1    2    7
+CONECT    2    1    7
+CONECT    3    7
+CONECT    4    7
+CONECT    5    6    7
+CONECT    6    5    7
+CONECT    7    1    2    3    4
+CONECT    7    5    6
+ENDMDL
+END
