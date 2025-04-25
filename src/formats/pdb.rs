@@ -1435,6 +1435,19 @@ mod tests {
     }
 
     #[test]
+    fn read_nucleic_residues() {
+        let path = Path::new("./src/tests-data/pdb/2hkb.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+
+        let topology = frame.topology();
+
+        assert!(topology.are_linked(&topology.residues[3], &topology.residues[4]));
+        assert!(!topology.are_linked(&topology.residues[3], &topology.residues[5]));
+        assert_eq!(topology.bonds().len(), 815);
+    }
+
+    #[test]
     #[should_panic(expected = "the value '*0000' is not a valid hybrid 36 number")]
     fn decode_bad1() {
         decode_hybrid36(5, "*0000").unwrap();
