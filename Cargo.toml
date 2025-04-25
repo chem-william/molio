@@ -8,6 +8,7 @@ thiserror = "2"
 nalgebra = "0.33"
 assert_approx_eq = "1.1.0"
 phf = { version = "0.11", features = ["macros"]}
+fast-float = "0.2"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"]}

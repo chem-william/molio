@@ -23,7 +23,7 @@ impl XYZFormat {
 
         matrix.iter_mut().zip(lattice.split_whitespace()).for_each(
             |(matrix_entry, lattice_item)| {
-                *matrix_entry = lattice_item.parse::<f64>().expect("expected float");
+                *matrix_entry = fast_float::parse(lattice_item).expect("expected float");
             },
         );
 
@@ -43,12 +43,12 @@ impl XYZFormat {
                     let y = tokens.next().ok_or(CError::MissingToken)?;
                     let z = tokens.next().ok_or(CError::MissingToken)?;
                     let value = format!("{} {} {}", x, y, z);
-                    let property = Property::parse_value(&value, &kind)?;
+                    let property = Property::parse_value(&value, kind)?;
                     atom.properties.insert(name.clone(), property);
                 }
                 _ => {
                     let value = tokens.next().ok_or(CError::MissingToken)?;
-                    let property = Property::parse_value(value, &kind)?;
+                    let property = Property::parse_value(value, kind)?;
                     atom.properties.insert(name.clone(), property);
                 }
             }

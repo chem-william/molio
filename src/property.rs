@@ -242,9 +242,7 @@ impl ValueParser for BoolParser {
 
 impl ValueParser for DoubleParser {
     fn parse(value: &str) -> Result<Property, CError> {
-        value
-            .trim()
-            .parse::<f64>()
+        fast_float::parse(value)
             .map(Property::Double)
             .map_err(|e| CError::GenericError(format!("Failed to parse number: {e}")))
     }
@@ -259,14 +257,11 @@ impl ValueParser for Vector3DParser {
                 parts.len()
             )));
         }
-        let x = parts[0]
-            .parse::<f64>()
+        let x = fast_float::parse(parts[0])
             .map_err(|e| CError::GenericError(format!("Failed to parse x component: {e}")))?;
-        let y = parts[1]
-            .parse::<f64>()
+        let y = fast_float::parse(parts[1])
             .map_err(|e| CError::GenericError(format!("Failed to parse y component: {e}")))?;
-        let z = parts[2]
-            .parse::<f64>()
+        let z = fast_float::parse(parts[2])
             .map_err(|e| CError::GenericError(format!("Failed to parse z component: {e}")))?;
         Ok(Property::Vector3D([x, y, z]))
     }
@@ -281,7 +276,7 @@ impl ValueParser for Matrix3x3Parser {
                 parts.len()
             )));
         }
-        let nums: Result<Vec<f64>, _> = parts.iter().map(|p| p.parse::<f64>()).collect();
+        let nums: Result<Vec<f64>, _> = parts.iter().map(fast_float::parse).collect();
         nums.map(|n| Property::Matrix3x3(Matrix3::from_iterator(n)))
             .map_err(|e| CError::GenericError(format!("Failed to parse matrix components: {e}")))
     }
@@ -290,7 +285,7 @@ impl ValueParser for Matrix3x3Parser {
 impl ValueParser for VectorXDParser {
     fn parse(value: &str) -> Result<Property, CError> {
         let parts: Vec<&str> = value.split_whitespace().collect();
-        let nums: Result<Vec<f64>, _> = parts.iter().map(|p| p.parse::<f64>()).collect();
+        let nums: Result<Vec<f64>, _> = parts.iter().map(fast_float::parse).collect();
         nums.map(Property::VectorXD)
             .map_err(|e| CError::GenericError(format!("Failed to parse vector components: {e}")))
     }

@@ -168,7 +168,7 @@ pub(crate) fn decode_hybrid36(width: usize, line: &str) -> Result<i64, CError> {
             return Ok(0);
         } else if f == '-' || f.is_ascii_digit() {
             // Try to parse as a number
-            return trimmed_line.parse::<i64>().map_err(|_e| {
+            return trimmed_line.parse().map_err(|_e| {
                 CError::GenericError(format!("expected negative number. got '{f}'"))
             });
         }
@@ -313,9 +313,9 @@ impl PDBFormat {
                 .insert("altloc".to_string(), Property::String(altloc.to_string()));
         }
 
-        let x = Property::parse_value(&line[30..38], &PropertyKind::Double)?;
-        let y = Property::parse_value(&line[38..46], &PropertyKind::Double)?;
-        let z = Property::parse_value(&line[46..54], &PropertyKind::Double)?;
+        let x = Property::parse_value(line[30..38].trim(), &PropertyKind::Double)?;
+        let y = Property::parse_value(line[38..46].trim(), &PropertyKind::Double)?;
+        let z = Property::parse_value(line[46..54].trim(), &PropertyKind::Double)?;
         atom.x = x.expect_double();
         atom.y = y.expect_double();
         atom.z = z.expect_double();
@@ -435,29 +435,17 @@ impl PDBFormat {
             });
         }
 
-        let a = line[6..15]
-            .trim()
-            .parse::<f64>()
+        let a = fast_float::parse(line[6..15].trim())
             .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let b = line[15..24]
-            .trim()
-            .parse::<f64>()
+        let b = fast_float::parse(line[15..24].trim())
             .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let c = line[24..33]
-            .trim()
-            .parse::<f64>()
+        let c = fast_float::parse(line[24..33].trim())
             .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let alpha = line[33..40]
-            .trim()
-            .parse::<f64>()
+        let alpha = fast_float::parse(line[33..40].trim())
             .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let beta = line[40..47]
-            .trim()
-            .parse::<f64>()
+        let beta = fast_float::parse(line[40..47].trim())
             .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let gamma = line[47..54]
-            .trim()
-            .parse::<f64>()
+        let gamma = fast_float::parse(line[47..54].trim())
             .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
 
         let unit_cell = UnitCell::new_from_lengths_angles([a, b, c], &mut [alpha, beta, gamma])?;
