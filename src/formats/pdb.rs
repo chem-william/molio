@@ -1638,6 +1638,64 @@ mod tests {
         assert_approx_eq!(frame.positions()[5][2], 5.320);
     }
 
+    #[test]
+    fn bug_in_1htq() {
+        // https://github.com/chemfiles/chemfiles/issues/328
+        // some secondary structure residues are not in the expected order
+        let path = Path::new("./src/tests-data/pdb/1htq.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+        let topology = frame.topology();
+        // The residue IDs are out of order, but still read correctly
+        let first_residue = topology.residue_for_atom(2316).unwrap();
+        assert_eq!(first_residue.id.unwrap(), 503);
+        assert_eq!(
+            first_residue
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed 3-10 helix"
+        );
+
+        // The 'second' residue
+        let second_residue = topology.residue_for_atom(2320).unwrap();
+        assert_eq!(second_residue.id.unwrap(), 287);
+        assert_eq!(
+            second_residue
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed 3-10 helix"
+        );
+
+        // The 'third' residue
+        let third_residue = topology.residue_for_atom(2332).unwrap();
+        assert_eq!(third_residue.id.unwrap(), 288);
+        assert_eq!(
+            third_residue
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed 3-10 helix"
+        );
+
+        // The 'last' residue
+        let final_residue = topology.residue_for_atom(2337).unwrap();
+        assert_eq!(final_residue.id.unwrap(), 289);
+        assert_eq!(
+            final_residue
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed 3-10 helix"
+        );
+
+        // No secondary structure after the chain
+        let no_ss_residue = topology.residue_for_atom(2341).unwrap();
+        assert_eq!(no_ss_residue.id.unwrap(), 290);
+        assert!(no_ss_residue.get("secondary_structure").is_none());
+    }
+
     // TODO: fix this test - requires implementing compressed reading
     // #[test]
     // fn test_left_handed_helix() {
