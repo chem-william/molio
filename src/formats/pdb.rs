@@ -300,7 +300,7 @@ impl<'a> PDBFormat<'a> {
         let name = &line[12..16].trim();
         if line.len() >= 78 {
             let atom_type = &line[76..78];
-            atom.name = name.trim().to_string();
+            atom.name = name.to_string();
             atom.symbol = atom_type.trim().to_string();
         } else {
             // Read just the atom name and hope for the best
@@ -334,7 +334,7 @@ impl<'a> PDBFormat<'a> {
         let full_residue_id = FullResidueId {
             chain: *chain,
             resid,
-            resname: resname.to_string(),
+            resname: resname.clone(),
             insertion_code,
         };
 
