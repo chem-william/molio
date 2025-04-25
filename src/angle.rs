@@ -42,3 +42,49 @@ impl Angle {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_angle_creation() {
+        let angle = Angle::new(5, 1, 8);
+        // Check canonical ordering (first and last atoms are sorted)
+        assert_eq!(angle[0], 5); // min of i,k
+        assert_eq!(angle[1], 1); // central atom j
+        assert_eq!(angle[2], 8); // max of i,k
+
+        // Test with reverse order of outer atoms
+        let angle_reversed = Angle::new(8, 1, 5);
+        assert_eq!(angle_reversed[0], 5); // min of i,k
+        assert_eq!(angle_reversed[1], 1); // central atom j
+        assert_eq!(angle_reversed[2], 8); // max of i,k
+    }
+
+    #[test]
+    fn test_angle_equality() {
+        // These should be equal due to canonical representation
+        let angle1 = Angle::new(5, 1, 8);
+        let angle2 = Angle::new(8, 1, 5);
+
+        assert_eq!(angle1, angle2);
+
+        // Different angle
+        let angle3 = Angle::new(5, 2, 8);
+        assert_ne!(angle1, angle3);
+    }
+
+    #[test]
+    #[should_panic(expected = "can not have the same atom twice in an angle")]
+    fn test_angle_with_duplicate_atoms_i_j() {
+        Angle::new(1, 1, 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "can not access atom n° 3 in angle")]
+    fn test_angle_index_out_of_bounds() {
+        let angle = Angle::new(5, 1, 8);
+        let _ = angle[3]; // This should panic
+    }
+}
