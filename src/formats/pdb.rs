@@ -341,16 +341,17 @@ impl<'a> PDBFormat<'a> {
         let mut residues = self.residues.borrow_mut();
 
         // Find all matching residues
-        let matching_positions: Vec<usize> = residues
+        let mut matching_positions = residues
             .iter()
             .enumerate()
             .filter(|(_, (id, _))| *id == full_residue_id)
             .map(|(pos, _)| pos)
-            .collect();
+            .peekable();
 
-        if !matching_positions.is_empty() {
+        if matching_positions.peek().is_some() {
+            let val = matching_positions.next().unwrap();
             // Add atom to the first matching residue
-            residues[matching_positions[0]].1.add_atom(atom_id);
+            residues[val].1.add_atom(atom_id);
         } else {
             let mut residue = Residue {
                 name: resname,
