@@ -1697,6 +1697,74 @@ mod tests {
     }
 
     #[test]
+    fn bug_in_1avg() {
+        // https://github.com/chemfiles/chemfiles/issues/342
+        // some secondary structure residues are not in the expected order
+        let path = Path::new("./src/tests-data/pdb/1avg.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+        let topology = frame.topology();
+
+        let pre_residue = topology.residue_for_atom(75).unwrap();
+        assert_eq!(pre_residue.id.unwrap(), 1);
+        assert_eq!(
+            pre_residue.get("insertion_code").unwrap().expect_string(),
+            "D"
+        );
+        assert!(pre_residue.get("secondary_structure").is_none());
+
+        let first_residue = topology.residue_for_atom(79).unwrap();
+        assert_eq!(first_residue.id.unwrap(), 1);
+        assert_eq!(
+            first_residue.get("insertion_code").unwrap().expect_string(),
+            "C"
+        );
+        assert_eq!(
+            first_residue
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed 3-10 helix"
+        );
+
+        let second_residue = topology.residue_for_atom(88).unwrap();
+        assert_eq!(second_residue.id.unwrap(), 1);
+        assert_eq!(
+            second_residue
+                .get("insertion_code")
+                .unwrap()
+                .expect_string(),
+            "B"
+        );
+        assert_eq!(
+            second_residue
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed 3-10 helix"
+        );
+
+        let third_residue = topology.residue_for_atom(93).unwrap();
+        assert_eq!(third_residue.id.unwrap(), 1);
+        assert_eq!(
+            third_residue.get("insertion_code").unwrap().expect_string(),
+            "A"
+        );
+        assert_eq!(
+            third_residue
+                .get("secondary_structure")
+                .unwrap()
+                .expect_string(),
+            "right-handed 3-10 helix"
+        );
+
+        let fourth_residue = topology.residue_for_atom(101).unwrap();
+        assert_eq!(fourth_residue.id.unwrap(), 1);
+        assert!(fourth_residue.get("insertion_code").is_none());
+        assert!(fourth_residue.get("secondary_structure").is_none());
+    }
+
+    #[test]
     fn file_by_ase() {
         let path = Path::new("./src/tests-data/pdb/ase.pdb");
         let trajectory = Trajectory::new(path).unwrap();
