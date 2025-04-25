@@ -305,6 +305,7 @@ impl<'a> PDBFormat<'a> {
         } else {
             // Read just the atom name and hope for the best
             atom.name = name.to_string();
+            atom.symbol = name.to_string();
         }
 
         let altloc = &line[16..17];
@@ -1605,6 +1606,36 @@ mod tests {
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 8);
+    }
+
+    #[test]
+    fn short_cryst1_record() {
+        let path = Path::new("./src/tests-data/pdb/short-cryst1.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        assert_eq!(trajectory.size, 1);
+
+        let frame = trajectory.read().unwrap().unwrap();
+    }
+
+    #[test]
+    fn short_atom_record() {
+        let path = Path::new("./src/tests-data/pdb/short-atom.pdb");
+        let mut trajectory = Trajectory::new(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 9);
+
+        assert_eq!(frame[0].name, "O");
+        assert_eq!(frame[5].name, "H");
+        assert_eq!(frame[0].symbol, "O");
+        assert_eq!(frame[5].symbol, "H");
+
+        assert_approx_eq!(frame.positions()[0][0], 0.417);
+        assert_approx_eq!(frame.positions()[0][1], 8.303);
+        assert_approx_eq!(frame.positions()[0][2], 11.737);
+
+        assert_approx_eq!(frame.positions()[5][0], 8.922);
+        assert_approx_eq!(frame.positions()[5][1], 9.426);
+        assert_approx_eq!(frame.positions()[5][2], 5.320);
     }
 
     // TODO: fix this test - requires implementing compressed reading
