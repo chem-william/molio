@@ -484,9 +484,9 @@ impl<'a> PDBFormat<'a> {
         frame.unit_cell = unit_cell;
 
         if line.len() >= 55 {
-            let space_group_slice = &line[55..std::cmp::min(line.len(), 65)].trim();
+            let space_group_slice = &line[55..std::cmp::min(line.len(), 65)];
             // TODO: handle this as a warning (somehow)?
-            if space_group_slice != &"P 1" && space_group_slice != &"P1" {
+            if !space_group_slice.contains("P 1") && !space_group_slice.contains("P1") {
                 eprintln!(
                     "warning: ignoring custom space group ({space_group_slice}), using P1 instead"
                 );
