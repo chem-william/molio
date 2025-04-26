@@ -289,7 +289,7 @@ impl XYZFormat {
                 .matrix
                 .map(|m| if m.abs() < 1e-12 { 0.0 } else { m });
             result.push_str(&format!(
-                " Lattice=\"{:e} {:e} {:e} {:e} {:e} {:e} {:e} {:e} {:e}\"",
+                " Lattice=\"{:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?}\"",
                 m[(0, 0)],
                 m[(0, 1)],
                 m[(0, 2)],
@@ -309,10 +309,9 @@ impl XYZFormat {
         for item in sorted_properties {
             if XYZFormat::should_be_quoted(item.0) {
                 // quote the string
-                let mut chars = item.0.chars();
-                if !chars.any(|c| c == '"') {
+                if !item.0.contains("\"") {
                     result.push_str(&format!(" \"{}\"=", item.0));
-                } else if !chars.any(|c| c == '\'') {
+                } else if !item.0.contains("'") {
                     result.push_str(&format!(" '{}'=", item.0));
                 } else {
                     eprintln!(
@@ -327,11 +326,11 @@ impl XYZFormat {
 
             match item.1.kind() {
                 PropertyKind::String => result.push_str(&format!("\"{}\"", item.1.expect_string())),
-                PropertyKind::Bool => result.push_str(&format!("{}", item.1.expect_bool())),
-                PropertyKind::Double => result.push_str(&format!("{:e}", item.1.expect_double())),
+                PropertyKind::Bool => result.push_str(if item.1.expect_bool() { "T" } else { "F" }),
+                PropertyKind::Double => result.push_str(&format!("{:?}", item.1.expect_double())),
                 PropertyKind::Vector3D => {
                     let v = item.1.expect_vector3d();
-                    result.push_str(&format!("\"{:e} {:e} {:e}\"", v[0], v[1], v[2]));
+                    result.push_str(&format!("\"{:?} {:?} {:?}\"", v[0], v[1], v[2]));
                 }
                 _ => todo!(),
             }
@@ -441,7 +440,7 @@ impl FileFormat for XYZFormat {
                 if *property.1 == PropertyKind::String {
                     write!(writer, " {}", val.expect_string())?;
                 } else if *property.1 == PropertyKind::Bool {
-                    if val.as_bool().is_some() {
+                    if val.expect_bool() {
                         write!(writer, " T")?;
                     } else {
                         write!(writer, " F")?;
@@ -688,18 +687,18 @@ mod tests {
         // let tmpfile = named_tmpfile.tempfile().unwrap();
         const EXPECTED_CONTENT: &str = r#"4
 Properties=species:S:1:pos:R:3:bool:L:1:double:R:1:string:S:1:vector:R:3 name="Test"
-A 1 2 3 T 10 atom_0 10 20 30
-B 1 2 3 F 11 atom_1 11 21 31
-C 1 2 3 T 12 atom_2 12 22 32
-D 1 2 3 T 13 atom_2 13 23 33
+A 1.0 2.0 3.0 T 10.0 atom_0 10.0 20.0 30.0
+B 1.0 2.0 3.0 F 11.0 atom_1 11.0 21.0 31.0
+C 1.0 2.0 3.0 T 12.0 atom_2 12.0 22.0 32.0
+D 1.0 2.0 3.0 T 13.0 atom_2 13.0 23.0 33.0
 6
-Properties=species:S:1:pos:R:3 Lattice="12 0 0 0 13 0 0 0 14" direction="1 0 2" is_open=F name="Test" 'quotes"'=T "quotes'"=T speed=33.4 "with space"=T
-A 1 2 3
-B 1 2 3
-C 1 2 3
-D 1 2 3
-E 4 5 6
-F 4 5 6
+Properties=species:S:1:pos:R:3 Lattice="12.0 0.0 0.0 0.0 13.0 0.0 0.0 0.0 14.0" direction="1.0 0.0 2.0" is_open=F name="Test" 'quotes"'=T "quotes'"=T speed=33.4 "with space"=T
+A 1.0 2.0 3.0
+B 1.0 2.0 3.0
+C 1.0 2.0 3.0
+D 1.0 2.0 3.0
+E 4.0 5.0 6.0
+F 4.0 5.0 6.0
 "#;
 
         // Write the expected content into the temp file
@@ -800,31 +799,40 @@ F 4 5 6
 
         trajectory.write(&frame).unwrap();
 
+        frame.unit_cell = UnitCell::new_from_lengths([12.0, 13.0, 14.0]);
+        frame
+            .properties
+            .insert("is_open".to_string(), Property::Bool(false));
+        frame
+            .properties
+            .insert("speed".to_string(), Property::Double(33.4));
+        frame
+            .properties
+            .insert("direction".to_string(), Property::Vector3D([1.0, 0.0, 2.0]));
+        frame
+            .properties
+            .insert("with space".to_string(), Property::Bool(true));
+        frame
+            .properties
+            .insert("quotes'".to_string(), Property::Bool(true));
+        frame
+            .properties
+            .insert("quotes\"".to_string(), Property::Bool(true));
+
+        // properties with two types of quotes are skipped
+        frame
+            .properties
+            .insert("all_quotes'\"".to_string(), Property::Bool(true));
+
+        let atom = Atom::new("E".to_string());
+        frame.add_atom(atom, [4.0, 5.0, 6.0]);
+
+        let atom = Atom::new("F".to_string());
+        frame.add_atom(atom, [4.0, 5.0, 6.0]);
+
+        trajectory.write(&frame).unwrap();
+
         let contents = std::fs::read_to_string(named_tmpfile.path()).unwrap();
-        dbg!("{}", contents);
+        assert_eq!(contents, EXPECTED_CONTENT);
     }
-
-    //     auto file = Trajectory(tmpfile, 'w');
-    //     file.write(frame);
-
-    //     frame.set_cell(UnitCell({12, 13, 14}));
-    //     frame.set("is_open", false);
-    //     frame.set("speed", 33.4);
-    //     frame.set("direction", Vector3D(1, 0, 2));
-    //     frame.set("with space", true);
-    //     frame.set("quotes'", true);
-    //     frame.set("quotes\"", true);
-
-    //     // properties with two type of quotes are skipped
-    //     frame.set("all_quotes'\"", true);
-
-    //     frame.add_atom(Atom("E"), {4, 5, 6});
-    //     frame.add_atom(Atom("F"), {4, 5, 6});
-
-    //     file.write(frame);
-    //     file.close();
-
-    //     auto content = read_text_file(tmpfile);
-    //     CHECK(content == EXPECTED_CONTENT);
-    // }
 }

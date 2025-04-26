@@ -2,7 +2,7 @@ use crate::bond::BondOrder;
 use crate::error::CError;
 use crate::property::Properties;
 use crate::residue::Residue;
-use crate::unit_cell::UnitCell;
+use crate::unit_cell::{self, UnitCell};
 use crate::{atom::Atom, topology::Topology};
 use std::collections::hash_set::Iter;
 use std::ops::{Deref, Index, IndexMut};
