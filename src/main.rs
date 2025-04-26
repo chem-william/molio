@@ -8,7 +8,7 @@ fn main() {
     // let path = Path::new("./src/tests-data/pdb/water.pdb");
     // let path = Path::new("./water.pdb");
     for _ in 0..32 {
-        let mut trajectory = Trajectory::new(path, molio::trajectory::FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let mut dummy = 0;
         while let Some(next_frame) = trajectory.read().unwrap() {
             dummy += next_frame.size();

@@ -471,11 +471,7 @@ mod tests {
     use std::path::Path;
 
     use crate::{
-        atom::Atom,
-        frame::Frame,
-        property::Property,
-        trajectory::{FileMode, Trajectory},
-        unit_cell::UnitCell,
+        atom::Atom, frame::Frame, property::Property, trajectory::Trajectory, unit_cell::UnitCell,
     };
     use assert_approx_eq::assert_approx_eq;
     use tempfile::Builder;
@@ -483,29 +479,29 @@ mod tests {
     #[test]
     fn check_nsteps() {
         let path = Path::new("./src/tests-data/xyz/single_struct.xyz");
-        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 1);
 
         let path = Path::new("./src/tests-data/xyz/trajectory.xyz");
-        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 2);
 
         let path = Path::new("./src/tests-data/xyz/helium.xyz");
-        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 397);
 
         let path = Path::new("./src/tests-data/xyz/topology.xyz");
-        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 1);
     }
 
     #[test]
     fn extended_xyz() {
         let path = Path::new("./src/tests-data/xyz/extended.xyz");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 3);
 
-        let frame = trajectory.read_at(0).unwrap();
+        let frame = trajectory.read_at(0).unwrap().unwrap();
         assert_eq!(frame.size(), 192);
 
         // Reading the unit cell
@@ -592,7 +588,7 @@ mod tests {
     #[test]
     fn read_whole_file() {
         let path = Path::new("./src/tests-data/xyz/helium.xyz");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 397);
 
         let mut frame = Frame::new();
@@ -611,7 +607,7 @@ mod tests {
     #[test]
     fn various_files_formatting() {
         let path = Path::new("./src/tests-data/xyz/spaces.xyz");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 1);
         let frame = trajectory.read().unwrap().unwrap();
         let positions = frame.positions();
@@ -624,7 +620,7 @@ mod tests {
     macro_rules! assert_read_at_fails {
         ($index:expr) => {
             let path = Path::new(BAD_EXTENDED);
-            let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+            let mut trajectory = Trajectory::open(&path).unwrap();
             trajectory.read_at($index).unwrap();
         };
     }
@@ -702,7 +698,7 @@ F 4.0 5.0 6.0
 "#;
 
         // Write the expected content into the temp file
-        let mut trajectory = Trajectory::new(named_tmpfile.path(), FileMode::Write).unwrap();
+        let mut trajectory = Trajectory::create(named_tmpfile.path()).unwrap();
         let mut frame = Frame::new();
         frame
             .properties
