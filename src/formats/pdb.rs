@@ -314,13 +314,10 @@ impl<'a> PDBFormat<'a> {
                 .insert("altloc".to_string(), Property::String(altloc.to_string()));
         }
 
-        let x = Property::parse_value(line[30..38].trim(), &PropertyKind::Double)?;
-        let y = Property::parse_value(line[38..46].trim(), &PropertyKind::Double)?;
-        let z = Property::parse_value(line[46..54].trim(), &PropertyKind::Double)?;
-        atom.x = x.expect_double();
-        atom.y = y.expect_double();
-        atom.z = z.expect_double();
-        frame.add_atom(atom);
+        let x = Property::parse_value(line[30..38].trim(), &PropertyKind::Double)?.expect_double();
+        let y = Property::parse_value(line[38..46].trim(), &PropertyKind::Double)?.expect_double();
+        let z = Property::parse_value(line[46..54].trim(), &PropertyKind::Double)?.expect_double();
+        frame.add_atom(atom, [x, y, z]);
 
         let atom_id = frame.size() - 1;
         let insertion_code = line.chars().nth(26).unwrap();

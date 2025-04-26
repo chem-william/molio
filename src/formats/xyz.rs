@@ -344,16 +344,13 @@ impl FileFormat for XYZFormat {
             let z: f64 = tokens.next().ok_or(CError::MissingToken)?.parse()?;
 
             let mut atom = Atom {
-                x,
-                y,
-                z,
                 symbol,
                 name: "".to_string(),
                 properties: Properties::new(),
             };
             XYZFormat::read_atomic_properties(&properties, &mut tokens, &mut atom)?;
 
-            frame.add_atom(atom);
+            frame.add_atom(atom, [x, y, z]);
         }
 
         Ok(frame)
