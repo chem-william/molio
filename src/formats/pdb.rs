@@ -296,17 +296,17 @@ impl<'a> PDBFormat<'a> {
             };
         }
 
-        let mut atom = Atom::default();
         let name = &line[12..16].trim();
-        if line.len() >= 78 {
+        let mut atom = if line.len() >= 78 {
             let atom_type = &line[76..78];
-            atom.name = name.to_string();
-            atom.symbol = atom_type.trim().to_string();
+            let name = name.to_string();
+            let symbol = atom_type.trim().to_string();
+            Atom::with_symbol(name, symbol)
         } else {
             // Read just the atom name and hope for the best
-            atom.name = name.to_string();
-            atom.symbol = name.to_string();
-        }
+            let name = name.to_string();
+            Atom::new(name)
+        };
 
         let altloc = &line[16..17];
         if altloc != " " {
