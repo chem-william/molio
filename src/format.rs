@@ -27,7 +27,7 @@ impl Format<'_> {
             _ => Err(CError::GenericError("unknown file format".to_string())),
         }
     }
-    pub fn new_from_format(fmt: TextFormat, path: &Path) -> Result<Self, CError> {
+    pub fn new_from_format(fmt: &TextFormat, path: &Path) -> Result<Self, CError> {
         match fmt {
             TextFormat::XYZ => Ok(Format::XYZ(XYZFormat)),
             TextFormat::PDB => Ok(Format::PDB(PDBFormat::new())),

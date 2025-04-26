@@ -143,6 +143,7 @@ impl<'a> IntoIterator for &'a mut Properties {
 }
 
 impl Property {
+    #[must_use]
     pub fn kind(&self) -> PropertyKind {
         match self {
             Property::Bool(_) => PropertyKind::Bool,
@@ -153,7 +154,7 @@ impl Property {
             Property::VectorXD(_) => PropertyKind::VectorXD,
         }
     }
-    #[must_use]
+
     pub fn as_bool(&self) -> Option<bool> {
         if let Property::Bool(b) = *self {
             Some(b)
@@ -168,6 +169,7 @@ impl Property {
             ref other => panic!("expected Bool, found {other:?}"),
         }
     }
+
     pub fn as_double(&self) -> Option<f64> {
         if let Property::Double(x) = *self {
             Some(x)
@@ -175,12 +177,14 @@ impl Property {
             None
         }
     }
+
     pub fn expect_double(&self) -> f64 {
         match *self {
             Property::Double(d) => d,
             ref other => panic!("expected Double, found {other:?}"),
         }
     }
+
     pub fn as_string(&self) -> Option<&str> {
         if let Property::String(ref s) = *self {
             Some(s)
@@ -188,12 +192,14 @@ impl Property {
             None
         }
     }
+
     pub fn expect_string(&self) -> &str {
         match *self {
             Property::String(ref s) => s,
             ref other => panic!("expected String, found {other:?}"),
         }
     }
+
     pub fn as_vector3d(&self) -> Option<[f64; 3]> {
         if let Property::Vector3D(v) = *self {
             Some(v)
@@ -201,12 +207,14 @@ impl Property {
             None
         }
     }
+
     pub fn expect_vector3d(&self) -> [f64; 3] {
         match *self {
             Property::Vector3D(v) => v,
             ref other => panic!("expected Vector3D, found {other:?}"),
         }
     }
+
     pub fn as_matrix3x3(&self) -> Option<[f64; 9]> {
         if let Property::Matrix3x3(m) = *self {
             let mut array = [0.0; 9];
@@ -216,6 +224,7 @@ impl Property {
             None
         }
     }
+
     pub fn expect_matrix3x3(&self) -> [f64; 9] {
         match *self {
             Property::Matrix3x3(m) => {
@@ -531,7 +540,7 @@ mod tests {
         assert_approx_eq!(DoubleParser::parse("0").unwrap().expect_double(), 0.0);
         assert_approx_eq!(
             DoubleParser::parse("1e6").unwrap().expect_double(),
-            1000000.0
+            1_000_000.0
         );
 
         assert!(DoubleParser::parse("not_a_number").is_err());
@@ -657,7 +666,7 @@ mod tests {
 
         // Test direct iteration over properties
         let mut prop_count = 0;
-        for (key, prop) in properties.iter() {
+        for (key, prop) in &properties {
             prop_count += 1;
             match key.as_str() {
                 "bool_prop" => assert_eq!(prop.as_bool(), Some(true)),

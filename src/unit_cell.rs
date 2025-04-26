@@ -13,7 +13,8 @@ pub enum CellShape {
 }
 
 mod utils {
-    use super::*;
+    use super::Vec3D;
+    use nalgebra::Matrix3;
 
     /// Check if a value is approximately zero (within 1e-5)
     pub fn is_roughly_zero(x: f64) -> bool {
@@ -85,7 +86,7 @@ mod utils {
 }
 
 mod validation {
-    use super::*;
+    use super::{CError, Vec3D, utils};
 
     /// Validate cell angles
     ///
@@ -190,6 +191,7 @@ impl PartialEq for UnitCell {
 }
 
 impl UnitCell {
+    #[must_use]
     pub fn new() -> Self {
         UnitCell::new_from_lengths([0.0, 0.0, 0.0])
     }
@@ -444,17 +446,17 @@ mod tests {
     #[test]
     fn from_lengths_angles() {
         let expected = UnitCell::new_from_lengths_angles(
-            [8.43116035, 14.50510613, 15.60911468],
-            &mut [73.31699212, 85.70200582, 89.37501529],
+            [8.431_160_35, 14.505_106_13, 15.609_114_68],
+            &mut [73.316_992_12, 85.702_005_82, 89.375_015_29],
         )
         .unwrap();
         let mut true_cell = UnitCell::new();
-        true_cell.matrix[(0, 0)] = 8.43116035;
-        true_cell.matrix[(1, 0)] = 0.158219155128;
-        true_cell.matrix[(1, 1)] = 14.5042431863;
-        true_cell.matrix[(2, 0)] = 1.16980663624;
-        true_cell.matrix[(2, 1)] = 4.4685149855;
-        true_cell.matrix[(2, 2)] = 14.9100096405;
+        true_cell.matrix[(0, 0)] = 8.431_160_35;
+        true_cell.matrix[(1, 0)] = 0.158_219_155_128;
+        true_cell.matrix[(1, 1)] = 14.504_243_186_3;
+        true_cell.matrix[(2, 0)] = 1.169_806_636_24;
+        true_cell.matrix[(2, 1)] = 4.468_514_985_5;
+        true_cell.matrix[(2, 2)] = 14.910_009_640_5;
         let diff = expected.matrix - true_cell.matrix;
         assert!((diff).iter().all(|&x| x.abs() < 1e-6), "diff: {diff}");
     }

@@ -55,7 +55,7 @@ impl Trajectory {
 
     /// Opens a trajectory file for reading with an explicit format
     pub fn open_with_format(path: &Path, fmt: TextFormat) -> Result<TrajectoryReader, CError> {
-        let strategy = Format::new_from_format(fmt, path)?;
+        let strategy = Format::new_from_format(&fmt, path)?;
         let file = File::open(path).map_err(CError::IoError)?;
         let mut reader = BufReader::new(file);
 
@@ -77,7 +77,7 @@ impl Trajectory {
 
     /// Creates a new trajectory file for writing with an explicit format
     pub fn create_with_format(path: &Path, fmt: TextFormat) -> Result<TrajectoryWriter, CError> {
-        let strategy = Format::new_from_format(fmt, path)?;
+        let strategy = Format::new_from_format(&fmt, path)?;
         let file = File::create(path).map_err(CError::IoError)?;
         let writer = BufWriter::new(file);
 
@@ -126,7 +126,7 @@ impl TrajectoryReader<'_> {
     fn scan_all(reader: &mut BufReader<File>, strategy: &Format) -> Vec<u64> {
         let mut frame_positions = vec![0];
         while let Some(pos) = strategy.forward(reader).unwrap() {
-            frame_positions.push(pos)
+            frame_positions.push(pos);
         }
         reader.rewind().unwrap();
         frame_positions

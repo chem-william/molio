@@ -35,6 +35,7 @@ impl Index<usize> for Topology {
 }
 
 impl Topology {
+    #[must_use]
     pub fn size(&self) -> usize {
         self.atoms.len()
     }
@@ -105,12 +106,14 @@ impl Topology {
         self.connect.bond_order(i, j)
     }
 
+    #[must_use]
     pub fn residue_for_atom(&self, index: usize) -> Option<Residue> {
         self.residue_mapping
             .get(&index)
             .map(|residue_index| self.residues[*residue_index].clone())
     }
 
+    #[must_use]
     pub fn are_linked(&self, first: &Residue, second: &Residue) -> bool {
         if first == second {
             return true;

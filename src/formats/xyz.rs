@@ -34,23 +34,21 @@ impl XYZFormat {
         atom: &mut Atom,
     ) -> Result<(), CError> {
         for (name, kind) in properties {
-            match kind {
-                PropertyKind::Vector3D => {
-                    // For Vector3D, collect all three components first
-                    let x = tokens.next().ok_or(CError::MissingToken)?;
-                    let y = tokens.next().ok_or(CError::MissingToken)?;
-                    let z = tokens.next().ok_or(CError::MissingToken)?;
-                    let value = format!("{} {} {}", x, y, z);
-                    let property = Property::parse_value(&value, kind)?;
-                    atom.properties.insert(name.clone(), property);
-                }
-                _ => {
-                    let value = tokens.next().ok_or(CError::MissingToken)?;
-                    let property = Property::parse_value(value, kind)?;
-                    atom.properties.insert(name.clone(), property);
-                }
+            if kind == &PropertyKind::Vector3D {
+                // For Vector3D, collect all three components first
+                let x = tokens.next().ok_or(CError::MissingToken)?;
+                let y = tokens.next().ok_or(CError::MissingToken)?;
+                let z = tokens.next().ok_or(CError::MissingToken)?;
+                let value = format!("{x} {y} {z}");
+                let property = Property::parse_value(&value, kind)?;
+                atom.properties.insert(name.clone(), property);
+            } else {
+                let value = tokens.next().ok_or(CError::MissingToken)?;
+                let property = Property::parse_value(value, kind)?;
+                atom.properties.insert(name.clone(), property);
             }
         }
+
         Ok(())
     }
 
@@ -81,20 +79,18 @@ impl XYZFormat {
                 "L" => PropertyKind::Bool,
                 unknown => {
                     return Err(CError::GenericError(format!(
-                        "Unknown property type: {}",
-                        unknown
+                        "Unknown property type: {unknown}"
                     )));
                 }
             };
 
             let count = chunk[2].parse::<usize>().map_err(|e| {
-                CError::GenericError(format!("Invalid property count '{}': {}", chunk[2], e))
+                CError::GenericError(format!("Invalid property count '{}': {e}", chunk[2]))
             })?;
 
             if count == 0 {
                 return Err(CError::GenericError(format!(
-                    "Invalid count of 0 for property '{}'",
-                    name
+                    "Invalid count of 0 for property '{name}'"
                 )));
             }
 
@@ -184,7 +180,7 @@ impl XYZFormat {
             .any(|c| c.is_ascii_whitespace() || c == '=' || c == '\'' || c == '"')
     }
 
-    fn get_atom_properties(&self, frame: &Frame) -> PropertiesList {
+    fn get_atom_properties(frame: &Frame) -> PropertiesList {
         if frame.size() == 0 {
             return PropertiesList::new();
         };
@@ -198,8 +194,7 @@ impl XYZFormat {
             for (name, property) in &first_atom.properties {
                 if !XYZFormat::is_valid_property_name(name) {
                     eprintln!(
-                        "warning: '{}' is not a valid property name for extended XYZ. it will not be saved",
-                        name
+                        "warning: '{name}' is not a valid property name for extended XYZ. it will not be saved"
                     );
                     partially_defined_already_warned.insert(name.clone());
                     continue;
@@ -208,8 +203,7 @@ impl XYZFormat {
                 if let Some(string_prop) = property.as_string() {
                     if XYZFormat::should_be_quoted(string_prop) {
                         eprint!(
-                            "warning: string value for property '{}' on atom 0 cannot be saved as an atomic property",
-                            name
+                            "warning: string value for property '{name}' on atom 0 cannot be saved as an atomic property"
                         );
                         continue;
                     }
@@ -226,16 +220,14 @@ impl XYZFormat {
                     None => {
                         // Property missing on this atom
                         eprintln!(
-                            "warning: property '{}' is only defined for a subset of atoms. it will not be saved",
-                            prop_name
+                            "warning: property '{prop_name}' is only defined for a subset of atoms. it will not be saved"
                         );
                         false // Remove this property
                     }
                     Some(prop) if prop.kind() != *prop_kind => {
                         // Property has different type on this atom
                         eprintln!(
-                            "warning: property '{}' is defined with different types on different atoms. it will not be saved",
-                            prop_name
+                            "warning: property '{prop_name}' is defined with different types on different atoms. it will not be saved",
                         );
                         partially_defined_already_warned.insert(prop_name.clone());
                         false // Remove this property
@@ -250,8 +242,7 @@ impl XYZFormat {
                     && !partially_defined_already_warned.contains(prop_name)
                 {
                     eprintln!(
-                        "warning: property '{}' is only defined for a subset of atoms. it will not be saved",
-                        prop_name
+                        "warning: property '{prop_name}' is only defined for a subset of atoms. it will not be saved",
                     );
                     partially_defined_already_warned.insert(prop_name.clone());
                 }
@@ -309,9 +300,9 @@ impl XYZFormat {
         for item in sorted_properties {
             if XYZFormat::should_be_quoted(item.0) {
                 // quote the string
-                if !item.0.contains("\"") {
+                if !item.0.contains('\"') {
                     result.push_str(&format!(" \"{}\"=", item.0));
-                } else if !item.0.contains("'") {
+                } else if !item.0.contains('\'') {
                     result.push_str(&format!(" '{}'=", item.0));
                 } else {
                     eprintln!(
@@ -339,7 +330,7 @@ impl XYZFormat {
                         v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]
                     ));
                 }
-                _ => todo!(),
+                PropertyKind::VectorXD => todo!(),
             }
         }
 
@@ -375,7 +366,7 @@ impl FileFormat for XYZFormat {
 
             let mut atom = Atom {
                 symbol,
-                name: "".to_string(),
+                name: String::new(),
                 properties: Properties::new(),
             };
             XYZFormat::read_atomic_properties(&properties, &mut tokens, &mut atom)?;
@@ -424,7 +415,7 @@ impl FileFormat for XYZFormat {
 
     fn write_next(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
         let positions = frame.positions();
-        let properties = self.get_atom_properties(frame);
+        let properties = XYZFormat::get_atom_properties(frame);
 
         writeln!(writer, "{}", frame.size())?;
         writeln!(
@@ -487,26 +478,26 @@ mod tests {
     #[test]
     fn check_nsteps() {
         let path = Path::new("./src/tests-data/xyz/single_struct.xyz");
-        let trajectory = Trajectory::open(&path).unwrap();
+        let trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 1);
 
         let path = Path::new("./src/tests-data/xyz/trajectory.xyz");
-        let trajectory = Trajectory::open(&path).unwrap();
+        let trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 2);
 
         let path = Path::new("./src/tests-data/xyz/helium.xyz");
-        let trajectory = Trajectory::open(&path).unwrap();
+        let trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 397);
 
         let path = Path::new("./src/tests-data/xyz/topology.xyz");
-        let trajectory = Trajectory::open(&path).unwrap();
+        let trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 1);
     }
 
     #[test]
     fn extended_xyz() {
         let path = Path::new("./src/tests-data/xyz/extended.xyz");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 3);
 
         let frame = trajectory.read_at(0).unwrap().unwrap();
@@ -514,36 +505,39 @@ mod tests {
 
         // Reading the unit cell
         let mut unit_cell = UnitCell::new();
-        unit_cell.matrix[(0, 0)] = 8.43116035;
-        unit_cell.matrix[(0, 1)] = 0.158219155128;
-        unit_cell.matrix[(1, 1)] = 14.5042431863;
-        unit_cell.matrix[(0, 2)] = 1.16980663624;
-        unit_cell.matrix[(1, 2)] = 4.4685149855;
-        unit_cell.matrix[(2, 2)] = 14.9100096405;
+        unit_cell.matrix[(0, 0)] = 8.431_160_35;
+        unit_cell.matrix[(0, 1)] = 0.158_219_155_128;
+        unit_cell.matrix[(1, 1)] = 14.504_243_186_3;
+        unit_cell.matrix[(0, 2)] = 1.169_806_636_24;
+        unit_cell.matrix[(1, 2)] = 4.468_514_985_5;
+        unit_cell.matrix[(2, 2)] = 14.910_009_640_5;
         assert_eq!(frame.unit_cell, unit_cell);
 
         // Frame level properties
-        assert_approx_eq!(frame.properties["ENERGY"].expect_double(), -2069.84934116);
+        assert_approx_eq!(
+            frame.properties["ENERGY"].expect_double(),
+            -2_069.849_341_16
+        );
         assert_approx_eq!(frame.properties["Natoms"].expect_double(), 192.0);
         assert_eq!(frame.properties["NAME"].expect_string(), "COBHUW");
         let virial = frame.properties["virial"].expect_matrix3x3();
         let true_virial = [
-            222.64807906606316,
-            21.561432674983322,
-            57.08570699995725,
-            21.561432674983322,
-            247.82551996948678,
-            -13.553549356442273,
-            57.08570699995725,
-            -13.553549356442273,
-            156.87636103904026,
+            222.648_079_066_063_16,
+            21.561_432_674_983_322,
+            57.085_706_999_957_25,
+            21.561_432_674_983_322,
+            247.825_519_969_486_78,
+            -13.553_549_356_442_273,
+            57.085_706_999_957_25,
+            -13.553_549_356_442_273,
+            156.876_361_039_040_26,
         ];
         for i in 0..9 {
             assert_approx_eq!(virial[i], true_virial[i], 1e-12);
         }
         let stress = frame.properties["stress"].expect_matrix3x3();
         let true_stress = [
-            -0.0002564107895985581,
+            -0.000_256_410_789_598_558_1,
             0.0,
             0.0,
             0.0,
@@ -551,7 +545,7 @@ mod tests {
             0.0,
             0.0,
             0.0,
-            -0.00026623200192425463,
+            -0.000_266_232_001_924_254_63,
         ];
         for i in 0..9 {
             assert_approx_eq!(stress[i], true_stress[i], 1e-12);
@@ -560,9 +554,9 @@ mod tests {
 
         // Atom level properties
         let positions = frame.positions()[0];
-        assert_approx_eq!(positions[0], 2.33827271799, 1e-9);
-        assert_approx_eq!(positions[1], 4.55315540425, 1e-9);
-        assert_approx_eq!(positions[2], 11.5841360926, 1e-9);
+        assert_approx_eq!(positions[0], 2.338_272_717_99, 1e-9);
+        assert_approx_eq!(positions[1], 4.553_155_404_25, 1e-9);
+        assert_approx_eq!(positions[2], 11.584_136_092_6, 1e-9);
         assert_approx_eq!(frame[0].properties["CS_0"].expect_double(), 24.10);
         assert_approx_eq!(frame[0].properties["CS_1"].expect_double(), 31.34);
         assert_approx_eq!(frame[51].properties["CS_0"].expect_double(), -73.98);
@@ -596,7 +590,7 @@ mod tests {
     #[test]
     fn read_whole_file() {
         let path = Path::new("./src/tests-data/xyz/helium.xyz");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 397);
 
         let mut frame = Frame::new();
@@ -604,25 +598,25 @@ mod tests {
             frame = next_frame;
         }
         let positions = frame.positions();
-        assert_approx_eq!(positions[0][0], -1.186037, 1e-12);
-        assert_approx_eq!(positions[0][1], 11.439334, 1e-12);
-        assert_approx_eq!(positions[0][2], 0.529939, 1e-12);
+        assert_approx_eq!(positions[0][0], -1.186_037, 1e-12);
+        assert_approx_eq!(positions[0][1], 11.439_334, 1e-12);
+        assert_approx_eq!(positions[0][2], 0.529_939, 1e-12);
 
-        assert_approx_eq!(positions[124][0], 5.208778, 1e-12);
-        assert_approx_eq!(positions[124][1], 12.707273, 1e-12);
-        assert_approx_eq!(positions[124][2], 10.940157, 1e-12);
+        assert_approx_eq!(positions[124][0], 5.208_778, 1e-12);
+        assert_approx_eq!(positions[124][1], 12.707_273, 1e-12);
+        assert_approx_eq!(positions[124][2], 10.940_157, 1e-12);
     }
     #[test]
     fn various_files_formatting() {
         let path = Path::new("./src/tests-data/xyz/spaces.xyz");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 1);
         let frame = trajectory.read().unwrap().unwrap();
         let positions = frame.positions();
 
-        assert_approx_eq!(positions[10][0], 0.8336);
-        assert_approx_eq!(positions[10][1], 0.3006);
-        assert_approx_eq!(positions[10][2], 0.4968);
+        assert_approx_eq!(positions[10][0], 0.833_6);
+        assert_approx_eq!(positions[10][1], 0.300_6);
+        assert_approx_eq!(positions[10][2], 0.496_8);
     }
 
     macro_rules! assert_read_at_fails {
@@ -681,15 +675,7 @@ mod tests {
         assert_read_at_fails!(8);
     }
 
-    #[test]
-    fn test_xyz_file_contents() {
-        let named_tmpfile = Builder::new()
-            .prefix("temporary-xyz")
-            .suffix(".xyz")
-            .tempfile()
-            .unwrap();
-        // let tmpfile = named_tmpfile.tempfile().unwrap();
-        const EXPECTED_CONTENT: &str = r#"4
+    const EXPECTED_CONTENT: &str = r#"4
 Properties=species:S:1:pos:R:3:bool:L:1:double:R:1:string:S:1:vector:R:3 name="Test" stress="0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0"
 A 1.0 2.0 3.0 T 10.0 atom_0 10.0 20.0 30.0
 B 1.0 2.0 3.0 F 11.0 atom_1 11.0 21.0 31.0
@@ -704,6 +690,13 @@ D 1.0 2.0 3.0
 E 4.0 5.0 6.0
 F 4.0 5.0 6.0
 "#;
+    #[test]
+    fn test_xyz_file_contents() {
+        let named_tmpfile = Builder::new()
+            .prefix("temporary-xyz")
+            .suffix(".xyz")
+            .tempfile()
+            .unwrap();
 
         // Write the expected content into the temp file
         let mut trajectory = Trajectory::create(named_tmpfile.path()).unwrap();

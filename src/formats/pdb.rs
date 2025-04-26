@@ -144,7 +144,7 @@ fn digit_to_value(c: char) -> i32 {
         '0'..='9' => (c as u8 - b'0') as i32,
         'A'..='Z' => (c as u8 - b'A') as i32 + 10,
         'a'..='z' => (c as u8 - b'a') as i32 + 10,
-        _ => panic!("Invalid character: {}", c),
+        _ => panic!("Invalid character: {c}"),
     }
 }
 
@@ -185,8 +185,7 @@ pub(crate) fn decode_hybrid36(width: usize, line: &str) -> Result<i64, CError> {
 
         if !is_valid {
             return Err(CError::GenericError(format!(
-                "the value '{}' is not a valid hybrid 36 number",
-                trimmed_line
+                "the value '{trimmed_line}' is not a valid hybrid 36 number"
             )));
         }
 
@@ -200,8 +199,7 @@ pub(crate) fn decode_hybrid36(width: usize, line: &str) -> Result<i64, CError> {
 
         if !is_valid {
             return Err(CError::GenericError(format!(
-                "the value '{}' is not a valid hybrid 36 number",
-                trimmed_line
+                "the value '{trimmed_line}' is not a valid hybrid 36 number"
             )));
         }
 
@@ -493,7 +491,7 @@ impl<'a> PDBFormat<'a> {
 
         Ok(())
     }
-    fn _read_index(&self, line: &str, initial: usize) -> Result<usize, CError> {
+    fn read_index(&self, line: &str, initial: usize) -> Result<usize, CError> {
         debug_assert!(line.len() >= 5); // otherwise the indexing fails
         let mut pdb_atom_id = decode_hybrid36(5, &line[initial..initial + 5])?;
 
@@ -511,7 +509,7 @@ impl<'a> PDBFormat<'a> {
         Ok(usize::try_from(pdb_atom_id).unwrap() - self.atom_offsets.borrow().first().unwrap())
     }
 
-    fn _add_bond(&self, frame: &mut Frame, line: &str, i: usize, j: usize) {
+    fn add_bond(&self, frame: &mut Frame, line: &str, i: usize, j: usize) {
         if i >= frame.size() || j >= frame.size() {
             eprintln!(
                 "warning: PDB reader: ignoring CONECT ('{}') with atomic indexes bigger than frame size ({})",
@@ -525,36 +523,34 @@ impl<'a> PDBFormat<'a> {
             .expect("could not add bond on frame when parsing CONECT");
     }
 
-    fn parse_conect(&self, frame: &mut Frame, line: &str) -> Result<(), CError> {
+    fn parse_conect(&self, frame: &mut Frame, line: &str) {
         debug_assert_eq!(&line[..6], "CONECT");
 
         let line_length = line.trim().len();
 
         let index_i = self
-            ._read_index(line, 6)
+            .read_index(line, 6)
             .expect("could not read index when parsing CONECT");
 
         if line_length > 11 {
-            let index_j = self._read_index(line, 11).unwrap();
-            self._add_bond(frame, line, index_i, index_j);
+            let index_j = self.read_index(line, 11).unwrap();
+            self.add_bond(frame, line, index_i, index_j);
         };
 
         if line_length > 16 {
-            let index_j = self._read_index(line, 16).unwrap();
-            self._add_bond(frame, line, index_i, index_j);
+            let index_j = self.read_index(line, 16).unwrap();
+            self.add_bond(frame, line, index_i, index_j);
         };
 
         if line_length > 21 {
-            let index_j = self._read_index(line, 21).unwrap();
-            self._add_bond(frame, line, index_i, index_j);
+            let index_j = self.read_index(line, 21).unwrap();
+            self.add_bond(frame, line, index_i, index_j);
         };
 
         if line_length > 26 {
-            let index_j = self._read_index(line, 26).unwrap();
-            self._add_bond(frame, line, index_i, index_j);
+            let index_j = self.read_index(line, 26).unwrap();
+            self.add_bond(frame, line, index_i, index_j);
         };
-
-        Ok(())
     }
 
     fn parse_helix(&self, line: &str) -> Result<(), CError> {
@@ -637,14 +633,14 @@ impl<'a> PDBFormat<'a> {
         let start = FullResidueId {
             chain: *chain_start,
             resid: resid_start,
-            resname: resname_start.to_string(),
+            resname: (*resname_start).to_string(),
             insertion_code: *inscode_start,
         };
 
         let end = FullResidueId {
             chain: *chain_end,
             resid: resid_end,
-            resname: resname_end.to_string(),
+            resname: (*resname_end).to_string(),
             insertion_code: *inscode_end,
         };
 
@@ -677,7 +673,7 @@ impl<'a> PDBFormat<'a> {
     const END_RECORD: &'a str = "END";
     const ENDMDL_RECORD: &'a str = "ENDMDL";
 
-    fn link_standard_residue_bonds(&self, frame: &mut Frame) {
+    fn link_standard_residue_bonds(frame: &mut Frame) {
         let mut link_previous_peptide = false;
         let mut link_previous_nucleic = false;
         let mut previous_residue_id = 0;
@@ -704,12 +700,9 @@ impl<'a> PDBFormat<'a> {
             let amide_carbon = atom_name_to_index.get("C");
 
             // Check if the residue has an ID
-            let resid = match residue.id {
-                Some(id) => id,
-                None => {
-                    eprintln!("warning: got a residue without id, this should not happen");
-                    return;
-                }
+            let Some(resid) = residue.id else {
+                eprintln!("warning: got a residue without id, this should not happen");
+                return;
             };
 
             if link_previous_peptide {
@@ -860,7 +853,7 @@ impl FileFormat for PDBFormat<'_> {
                     let new_title = if current.is_empty() {
                         title.to_string()
                     } else {
-                        format!("{} {}", current, title)
+                        format!("{current} {title}")
                     };
                     frame
                         .properties
@@ -869,7 +862,7 @@ impl FileFormat for PDBFormat<'_> {
                 Record::CRYST1 => PDBFormat::parse_cryst1(&mut frame, &line).unwrap(),
                 Record::ATOM => self.parse_atom(&mut frame, &line, false).unwrap(),
                 Record::HETATM => self.parse_atom(&mut frame, &line, true).unwrap(),
-                Record::CONECT => self.parse_conect(&mut frame, &line).unwrap(),
+                Record::CONECT => self.parse_conect(&mut frame, &line),
                 Record::MODEL => *self.models.borrow_mut() += 1,
                 Record::ENDMDL => {
                     // look one line ahead to see if the next Record is an `END`
@@ -907,7 +900,7 @@ impl FileFormat for PDBFormat<'_> {
                 Record::END => got_end = true,
                 Record::IGNORED_ => {}
                 Record::UNKNOWN_ => {
-                    eprintln!("ignoring unknown record: {}", line);
+                    eprintln!("ignoring unknown record: {line}");
                 }
             }
             line.clear();
@@ -918,7 +911,7 @@ impl FileFormat for PDBFormat<'_> {
         }
 
         self.chain_ended(&mut frame);
-        self.link_standard_residue_bonds(&mut frame);
+        PDBFormat::link_standard_residue_bonds(&mut frame);
         Ok(frame)
     }
 
@@ -988,18 +981,18 @@ mod tests {
     #[test]
     fn check_nsteps() {
         let path = Path::new("./src/tests-data/pdb/water.pdb");
-        let trajectory = Trajectory::open(&path).unwrap();
+        let trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 100);
 
         let path = Path::new("./src/tests-data/pdb/2hkb.pdb");
-        let trajectory = Trajectory::open(&path).unwrap();
+        let trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 11);
     }
 
     #[test]
     fn sanity_check() {
         let path = Path::new("./src/tests-data/pdb/water.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 100);
 
         let mut frame = trajectory.read().unwrap().unwrap();
@@ -1038,7 +1031,7 @@ mod tests {
     #[test]
     fn read_bonds() {
         let path = Path::new("./src/tests-data/pdb/MOF-5.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let mut frame = trajectory.read().unwrap().unwrap();
 
         let topology: &mut Topology = frame.topology_as_mut();
@@ -1098,59 +1091,59 @@ mod tests {
         recycle_check!(4, -6, "-6");
         recycle_check!(4, 0, "0");
         recycle_check!(4, 9999, "9999");
-        recycle_check!(4, 10000, "A000");
-        recycle_check!(4, 10001, "A001");
-        recycle_check!(4, 10002, "A002");
-        recycle_check!(4, 10003, "A003");
-        recycle_check!(4, 10004, "A004");
-        recycle_check!(4, 10005, "A005");
-        recycle_check!(4, 10006, "A006");
-        recycle_check!(4, 10007, "A007");
-        recycle_check!(4, 10008, "A008");
-        recycle_check!(4, 10009, "A009");
-        recycle_check!(4, 10010, "A00A");
-        recycle_check!(4, 10011, "A00B");
-        recycle_check!(4, 10012, "A00C");
-        recycle_check!(4, 10013, "A00D");
-        recycle_check!(4, 10014, "A00E");
-        recycle_check!(4, 10015, "A00F");
-        recycle_check!(4, 10016, "A00G");
-        recycle_check!(4, 10017, "A00H");
-        recycle_check!(4, 10018, "A00I");
-        recycle_check!(4, 10019, "A00J");
-        recycle_check!(4, 10020, "A00K");
-        recycle_check!(4, 10021, "A00L");
-        recycle_check!(4, 10022, "A00M");
-        recycle_check!(4, 10023, "A00N");
-        recycle_check!(4, 10024, "A00O");
-        recycle_check!(4, 10025, "A00P");
-        recycle_check!(4, 10026, "A00Q");
-        recycle_check!(4, 10027, "A00R");
-        recycle_check!(4, 10028, "A00S");
-        recycle_check!(4, 10029, "A00T");
-        recycle_check!(4, 10030, "A00U");
-        recycle_check!(4, 10031, "A00V");
-        recycle_check!(4, 10032, "A00W");
-        recycle_check!(4, 10033, "A00X");
-        recycle_check!(4, 10034, "A00Y");
-        recycle_check!(4, 10035, "A00Z");
-        recycle_check!(4, 10036, "A010");
-        recycle_check!(4, 10046, "A01A");
-        recycle_check!(4, 10071, "A01Z");
-        recycle_check!(4, 10072, "A020");
-        recycle_check!(4, 10000 + 36 * 36 - 1, "A0ZZ");
-        recycle_check!(4, 10000 + 36 * 36, "A100");
-        recycle_check!(4, 10000 + 36 * 36 * 36 - 1, "AZZZ");
-        recycle_check!(4, 10000 + 36 * 36 * 36, "B000");
-        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 - 1, "ZZZZ");
-        recycle_check!(4, 10000 + 26 * 36 * 36 * 36, "a000");
-        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 + 35, "a00z");
-        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 + 36, "a010");
-        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 + 36 * 36 - 1, "a0zz");
-        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 + 36 * 36, "a100");
-        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 + 36 * 36 * 36 - 1, "azzz");
-        recycle_check!(4, 10000 + 26 * 36 * 36 * 36 + 36 * 36 * 36, "b000");
-        recycle_check!(4, 10000 + 2 * 26 * 36 * 36 * 36 - 1, "zzzz");
+        recycle_check!(4, 10_000, "A000");
+        recycle_check!(4, 10_001, "A001");
+        recycle_check!(4, 10_002, "A002");
+        recycle_check!(4, 10_003, "A003");
+        recycle_check!(4, 10_004, "A004");
+        recycle_check!(4, 10_005, "A005");
+        recycle_check!(4, 10_006, "A006");
+        recycle_check!(4, 10_007, "A007");
+        recycle_check!(4, 10_008, "A008");
+        recycle_check!(4, 10_009, "A009");
+        recycle_check!(4, 10_010, "A00A");
+        recycle_check!(4, 10_011, "A00B");
+        recycle_check!(4, 10_012, "A00C");
+        recycle_check!(4, 10_013, "A00D");
+        recycle_check!(4, 10_014, "A00E");
+        recycle_check!(4, 10_015, "A00F");
+        recycle_check!(4, 10_016, "A00G");
+        recycle_check!(4, 10_017, "A00H");
+        recycle_check!(4, 10_018, "A00I");
+        recycle_check!(4, 10_019, "A00J");
+        recycle_check!(4, 10_020, "A00K");
+        recycle_check!(4, 10_021, "A00L");
+        recycle_check!(4, 10_022, "A00M");
+        recycle_check!(4, 10_023, "A00N");
+        recycle_check!(4, 10_024, "A00O");
+        recycle_check!(4, 10_025, "A00P");
+        recycle_check!(4, 10_026, "A00Q");
+        recycle_check!(4, 10_027, "A00R");
+        recycle_check!(4, 10_028, "A00S");
+        recycle_check!(4, 10_029, "A00T");
+        recycle_check!(4, 10_030, "A00U");
+        recycle_check!(4, 10_031, "A00V");
+        recycle_check!(4, 10_032, "A00W");
+        recycle_check!(4, 10_033, "A00X");
+        recycle_check!(4, 10_034, "A00Y");
+        recycle_check!(4, 10_035, "A00Z");
+        recycle_check!(4, 10_036, "A010");
+        recycle_check!(4, 10_046, "A01A");
+        recycle_check!(4, 10_071, "A01Z");
+        recycle_check!(4, 10_072, "A020");
+        recycle_check!(4, 10_000 + 36 * 36 - 1, "A0ZZ");
+        recycle_check!(4, 10_000 + 36 * 36, "A100");
+        recycle_check!(4, 10_000 + 36 * 36 * 36 - 1, "AZZZ");
+        recycle_check!(4, 10_000 + 36 * 36 * 36, "B000");
+        recycle_check!(4, 10_000 + 26 * 36 * 36 * 36 - 1, "ZZZZ");
+        recycle_check!(4, 10_000 + 26 * 36 * 36 * 36, "a000");
+        recycle_check!(4, 10_000 + 26 * 36 * 36 * 36 + 35, "a00z");
+        recycle_check!(4, 10_000 + 26 * 36 * 36 * 36 + 36, "a010");
+        recycle_check!(4, 10_000 + 26 * 36 * 36 * 36 + 36 * 36 - 1, "a0zz");
+        recycle_check!(4, 10_000 + 26 * 36 * 36 * 36 + 36 * 36, "a100");
+        recycle_check!(4, 10_000 + 26 * 36 * 36 * 36 + 36 * 36 * 36 - 1, "azzz");
+        recycle_check!(4, 10_000 + 26 * 36 * 36 * 36 + 36 * 36 * 36, "b000");
+        recycle_check!(4, 10_000 + 2 * 26 * 36 * 36 * 36 - 1, "zzzz");
 
         assert_eq!(decode_hybrid36(5, "    ").unwrap(), 0);
         assert_eq!(decode_hybrid36(5, "  -0").unwrap(), 0);
@@ -1162,53 +1155,53 @@ mod tests {
         recycle_check!(5, 12, "12");
         recycle_check!(5, 345, "345");
         recycle_check!(5, 6789, "6789");
-        recycle_check!(5, 99999, "99999");
-        recycle_check!(5, 100000, "A0000");
-        recycle_check!(5, 100010, "A000A");
-        recycle_check!(5, 100035, "A000Z");
-        recycle_check!(5, 100036, "A0010");
-        recycle_check!(5, 100046, "A001A");
-        recycle_check!(5, 100071, "A001Z");
-        recycle_check!(5, 100072, "A0020");
-        recycle_check!(5, 100000 + 36 * 36 - 1, "A00ZZ");
-        recycle_check!(5, 100000 + 36 * 36, "A0100");
-        recycle_check!(5, 100000 + 36 * 36 * 36 - 1, "A0ZZZ");
-        recycle_check!(5, 100000 + 36 * 36 * 36, "A1000");
-        recycle_check!(5, 100000 + 36 * 36 * 36 * 36 - 1, "AZZZZ");
-        recycle_check!(5, 100000 + 36 * 36 * 36 * 36, "B0000");
-        recycle_check!(5, 100000 + 2 * 36 * 36 * 36 * 36, "C0000");
-        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36 - 1, "ZZZZZ");
-        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36, "a0000");
-        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36 + 36 - 1, "a000z");
-        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36 + 36, "a0010");
-        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 - 1, "a00zz");
-        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36 + 36 * 36, "a0100");
+        recycle_check!(5, 99_999, "99999");
+        recycle_check!(5, 100_000, "A0000");
+        recycle_check!(5, 100_010, "A000A");
+        recycle_check!(5, 100_035, "A000Z");
+        recycle_check!(5, 100_036, "A0010");
+        recycle_check!(5, 100_046, "A001A");
+        recycle_check!(5, 100_071, "A001Z");
+        recycle_check!(5, 100_072, "A0020");
+        recycle_check!(5, 100_000 + 36 * 36 - 1, "A00ZZ");
+        recycle_check!(5, 100_000 + 36 * 36, "A0100");
+        recycle_check!(5, 100_000 + 36 * 36 * 36 - 1, "A0ZZZ");
+        recycle_check!(5, 100_000 + 36 * 36 * 36, "A1000");
+        recycle_check!(5, 100_000 + 36 * 36 * 36 * 36 - 1, "AZZZZ");
+        recycle_check!(5, 100_000 + 36 * 36 * 36 * 36, "B0000");
+        recycle_check!(5, 100_000 + 2 * 36 * 36 * 36 * 36, "C0000");
+        recycle_check!(5, 100_000 + 26 * 36 * 36 * 36 * 36 - 1, "ZZZZZ");
+        recycle_check!(5, 100_000 + 26 * 36 * 36 * 36 * 36, "a0000");
+        recycle_check!(5, 100_000 + 26 * 36 * 36 * 36 * 36 + 36 - 1, "a000z");
+        recycle_check!(5, 100_000 + 26 * 36 * 36 * 36 * 36 + 36, "a0010");
+        recycle_check!(5, 100_000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 - 1, "a00zz");
+        recycle_check!(5, 100_000 + 26 * 36 * 36 * 36 * 36 + 36 * 36, "a0100");
         recycle_check!(
             5,
-            100000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 * 36 - 1,
+            100_000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 * 36 - 1,
             "a0zzz"
         );
-        recycle_check!(5, 100000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 * 36, "a1000");
+        recycle_check!(5, 100_000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 * 36, "a1000");
         recycle_check!(
             5,
-            100000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 * 36 * 36 - 1,
+            100_000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 * 36 * 36 - 1,
             "azzzz"
         );
         recycle_check!(
             5,
-            100000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 * 36 * 36,
+            100_000 + 26 * 36 * 36 * 36 * 36 + 36 * 36 * 36 * 36,
             "b0000"
         );
-        recycle_check!(5, 100000 + 2 * 26 * 36 * 36 * 36 * 36 - 1, "zzzzz");
+        recycle_check!(5, 100_000 + 2 * 26 * 36 * 36 * 36 * 36 - 1, "zzzzz");
 
-        assert_eq!(encode_hybrid36(4, -99999), "****");
-        assert_eq!(encode_hybrid36(4, 9999999), "****");
+        assert_eq!(encode_hybrid36(4, -99_999), "****");
+        assert_eq!(encode_hybrid36(4, 9_999_999), "****");
     }
 
     #[test]
     fn read_residue_information() {
         let path = Path::new("./src/tests-data/pdb/water.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         assert_eq!(frame.topology().residues.len(), 99);
@@ -1231,7 +1224,7 @@ mod tests {
         );
 
         let path = Path::new("./src/tests-data/pdb/MOF-5.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         assert_eq!(frame.topology().residues.len(), 1);
@@ -1243,7 +1236,7 @@ mod tests {
     #[test]
     fn read_atom_hetatm_information() {
         let path = Path::new("./src/tests-data/pdb/hemo.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
         let residues = frame.topology().residues.clone();
 
@@ -1258,7 +1251,7 @@ mod tests {
     #[test]
     fn handle_multiple_ter_records() {
         let path = Path::new("./src/tests-data/pdb/4hhb.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         assert_eq!(frame[4556].name, "ND");
@@ -1281,7 +1274,7 @@ mod tests {
     #[test]
     fn secondary_structure_with_insertion_code_test() {
         let path = Path::new("./src/tests-data/pdb/1bcu.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         // check that residues have been inserted correctly
@@ -1436,7 +1429,7 @@ mod tests {
     #[test]
     fn read_protein_residues() {
         let path = Path::new("./src/tests-data/pdb/hemo.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         let topology = frame.topology();
@@ -1451,7 +1444,7 @@ mod tests {
     #[test]
     fn read_nucleic_residues() {
         let path = Path::new("./src/tests-data/pdb/2hkb.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         let topology = frame.topology();
@@ -1464,7 +1457,7 @@ mod tests {
     #[test]
     fn read_atomic_insertion_codes() {
         let path = Path::new("./src/tests-data/pdb/insertion-code.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         let topology = frame.topology();
@@ -1502,7 +1495,7 @@ mod tests {
     #[test]
     fn multiple_residues_with_the_same_id() {
         let path = Path::new("./src/tests-data/pdb/psfgen-output.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         let topology = frame.topology();
@@ -1533,7 +1526,7 @@ mod tests {
     #[test]
     fn odd_pdb_numbering() {
         let path = Path::new("./src/tests-data/pdb/odd-start.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         assert_eq!(frame.size(), 20);
@@ -1552,7 +1545,7 @@ mod tests {
     #[test]
     fn atom_id_starts_at_0() {
         let path = Path::new("./src/tests-data/pdb/atom-id-0.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 1);
 
         let frame = trajectory.read().unwrap().unwrap();
@@ -1567,7 +1560,7 @@ mod tests {
     #[test]
     fn multiple_end_records() {
         let path = Path::new("./src/tests-data/pdb/end-endmdl.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 2);
 
         let frame = trajectory.read().unwrap().unwrap();
@@ -1580,7 +1573,7 @@ mod tests {
     #[test]
     fn multiple_model_without_end() {
         let path = Path::new("./src/tests-data/pdb/model.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 2);
 
         let frame = trajectory.read().unwrap().unwrap();
@@ -1593,7 +1586,7 @@ mod tests {
     #[test]
     fn file_generated_by_crystal_maker() {
         let path = Path::new("./src/tests-data/pdb/crystal-maker.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 1);
 
         let frame = trajectory.read().unwrap().unwrap();
@@ -1603,16 +1596,14 @@ mod tests {
     #[test]
     fn short_cryst1_record() {
         let path = Path::new("./src/tests-data/pdb/short-cryst1.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 1);
-
-        let frame = trajectory.read().unwrap().unwrap();
     }
 
     #[test]
     fn short_atom_record() {
         let path = Path::new("./src/tests-data/pdb/short-atom.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 9);
 
@@ -1635,7 +1626,7 @@ mod tests {
         // https://github.com/chemfiles/chemfiles/issues/328
         // some secondary structure residues are not in the expected order
         let path = Path::new("./src/tests-data/pdb/1htq.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
         let topology = frame.topology();
         // The residue IDs are out of order, but still read correctly
@@ -1693,7 +1684,7 @@ mod tests {
         // https://github.com/chemfiles/chemfiles/issues/342
         // some secondary structure residues are not in the expected order
         let path = Path::new("./src/tests-data/pdb/1avg.pdb");
-        let mut trajectory = Trajectory::open(&path).unwrap();
+        let mut trajectory = Trajectory::open(path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
         let topology = frame.topology();
 
@@ -1759,8 +1750,8 @@ mod tests {
     #[test]
     fn file_by_ase() {
         let path = Path::new("./src/tests-data/pdb/ase.pdb");
-        let trajectory = Trajectory::open(&path).unwrap();
-        assert_eq!(trajectory.size, 156)
+        let trajectory = Trajectory::open(path).unwrap();
+        assert_eq!(trajectory.size, 156);
     }
 
     // TODO: fix this test - requires implementing compressed reading

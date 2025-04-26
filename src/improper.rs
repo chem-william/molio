@@ -27,13 +27,16 @@ impl Improper {
     /// # Panics
     ///
     /// Panics if any of `i`, `j`, `k`, `m` has the same value as another
+    #[must_use]
     pub fn new(i: usize, j: usize, k: usize, m: usize) -> Self {
-        if j == i || j == k || j == m {
-            panic!("cannot have an atom linked to itself in an improper dihedral angle");
-        }
-        if i == k || i == m || k == m {
-            panic!("cannot have an atom twice in an improper dihedral angle");
-        }
+        assert!(
+            !(j == i || j == k || j == m),
+            "cannot have an atom linked to itself in an improper dihedral angle"
+        );
+        assert!(
+            !(i == k || i == m || k == m),
+            "cannot have an atom twice in an improper dihedral angle"
+        );
 
         // Sort i, k, m
         let mut others = [i, k, m];

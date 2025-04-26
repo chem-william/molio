@@ -40,14 +40,17 @@ impl Residue {
         self.atoms.insert(index);
     }
 
+    #[must_use]
     pub fn size(&self) -> usize {
         self.atoms.len()
     }
 
+    #[must_use]
     pub fn contains(&self, index: usize) -> bool {
         self.atoms.contains(&index)
     }
 
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Property> {
         self.properties.get(name)
     }

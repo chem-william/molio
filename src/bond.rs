@@ -55,9 +55,7 @@ impl Index<usize> for Bond {
     ///
     /// Panics if `index >= 2`.
     fn index(&self, index: usize) -> &Self::Output {
-        if index >= 2 {
-            panic!("cannot access atom n° {} in bond", index);
-        }
+        assert!(index < 2, "cannot access atom n° {index} in bond");
         &self.data[index]
     }
 }

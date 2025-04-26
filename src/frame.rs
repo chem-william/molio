@@ -2,9 +2,8 @@ use crate::bond::BondOrder;
 use crate::error::CError;
 use crate::property::Properties;
 use crate::residue::Residue;
-use crate::unit_cell::{self, UnitCell};
+use crate::unit_cell::UnitCell;
 use crate::{atom::Atom, topology::Topology};
-use std::collections::hash_set::Iter;
 use std::ops::{Deref, Index, IndexMut};
 
 #[derive(Debug, Default)]
@@ -23,6 +22,7 @@ pub struct Frame {
 }
 
 impl Frame {
+    #[must_use]
     pub fn new() -> Self {
         Frame {
             unit_cell: UnitCell::new(),
@@ -124,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "index out of bounds")]
     fn test_frame_indexing_out_of_bounds() {
         let frame = Frame::new();
         let _ = frame[0];

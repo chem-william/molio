@@ -83,7 +83,7 @@ impl<'a> ExtendedXyzParser<'a> {
         tokens
     }
 
-    /// Parses a single line of KEY=VALUE and standalone flags into a HashMap.
+    /// Parses a single line of KEY=VALUE and standalone flags into a [`HashMap`].
     pub fn parse(&self) -> ExtendedXyzProperties {
         let mut map = BTreeMap::new();
         for tok in ExtendedXyzParser::split_tokens(self.line) {
@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn simple_flags_and_values() {
-        let p = ExtendedXyzParser::new(r#"Properties=species:S:1:pos:R:3 name='test file' debug"#);
+        let p = ExtendedXyzParser::new(r"Properties=species:S:1:pos:R:3 name='test file' debug");
         let m = p.parse();
         assert_eq!(m["Properties"], "species:S:1:pos:R:3");
         assert_eq!(m["name"], "test file");
