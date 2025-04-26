@@ -12,7 +12,6 @@ pub struct Trajectory<'a> {
     pub frames: Vec<Frame>,
     pub size: usize,
 
-    path: &'a Path,
     strategy: Format<'a>,
     reader: Option<BufReader<File>>,
     writer: Option<BufWriter<File>>,
@@ -54,7 +53,6 @@ impl<'a> Trajectory<'a> {
 
         Ok(Trajectory {
             frames: vec![],
-            path,
             strategy,
             frame_positions,
             reader,
