@@ -191,7 +191,7 @@ impl XYZFormat {
 
         let mut all_properties = HashMap::new();
         let mut partially_defined_already_warned = HashSet::new();
-        
+
         // Process first atom to establish baseline properties
         let first_atom = &frame[0];
         if !first_atom.properties.is_empty() {
@@ -278,7 +278,7 @@ impl XYZFormat {
                 PropertyKind::Matrix3x3 => ('R', 9),
                 PropertyKind::VectorXD => todo!(),
             };
-            result.push_str(&format!("{}:{prop_type}:{count}", property.0));
+            result.push_str(&format!(":{}:{prop_type}:{count}", property.0));
         }
 
         // support for lattice
