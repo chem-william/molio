@@ -653,7 +653,7 @@ mod tests {
     fn test_properties_iter() {
         let mut properties = Properties::new();
         properties.insert("bool_prop".to_string(), Property::Bool(true));
-        properties.insert("double_prop".to_string(), Property::Double(3.14));
+        properties.insert("double_prop".to_string(), Property::Double(3.140));
 
         // Test direct iteration over properties
         let mut prop_count = 0;
@@ -661,7 +661,7 @@ mod tests {
             prop_count += 1;
             match key.as_str() {
                 "bool_prop" => assert_eq!(prop.as_bool(), Some(true)),
-                "double_prop" => assert_approx_eq!(prop.expect_double(), 3.14),
+                "double_prop" => assert_approx_eq!(prop.expect_double(), 3.140),
                 _ => panic!("Unexpected property key: {key}"),
             }
         }
