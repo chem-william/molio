@@ -835,4 +835,38 @@ F 4.0 5.0 6.0
         let contents = std::fs::read_to_string(named_tmpfile.path()).unwrap();
         assert_eq!(contents, EXPECTED_CONTENT);
     }
+
+    #[test]
+    fn triclinic_cell_with_negative_values() {
+        let mut matrix = Matrix3::zeros();
+        matrix[(0, 0)] = 6.923_95;
+        matrix[(1, 0)] = -3.224_55;
+        matrix[(2, 0)] = 0.000_0;
+        matrix[(0, 1)] = 0.000_00;
+        matrix[(1, 1)] = 5.453_55;
+        matrix[(2, 1)] = 0.000_0;
+        matrix[(0, 2)] = 0.100_667;
+        matrix[(1, 2)] = -3.320_57;
+        matrix[(2, 2)] = 7.283_6;
+        let mut frame = Frame::new();
+        frame.unit_cell = UnitCell::new_from_matrix(matrix).unwrap();
+        frame.resize(1);
+
+        let named_tmpfile = Builder::new()
+            .prefix("triclinic-xyz")
+            .suffix(".xyz")
+            .tempfile()
+            .unwrap();
+
+        // Write the expected content into the temp file
+        let mut trajectory = Trajectory::create(named_tmpfile.path()).unwrap();
+        trajectory.write(&frame).unwrap();
+
+        let expected = r#"1
+Properties=species:S:1:pos:R:3 Lattice="6.92395 0.0 0.100667 -3.22455 5.45355 -3.32057 0.0 0.0 7.2836"
+X 0.0 0.0 0.0
+"#;
+        let contents = std::fs::read_to_string(named_tmpfile.path()).unwrap();
+        assert_eq!(contents, expected);
+    }
 }
