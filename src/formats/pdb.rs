@@ -1606,7 +1606,7 @@ mod tests {
     #[test]
     fn short_cryst1_record() {
         let path = Path::new("./src/tests-data/pdb/short-cryst1.pdb");
-        let mut trajectory = Trajectory::new(path).unwrap();
+        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 1);
 
         let frame = trajectory.read().unwrap().unwrap();
@@ -1615,7 +1615,7 @@ mod tests {
     #[test]
     fn short_atom_record() {
         let path = Path::new("./src/tests-data/pdb/short-atom.pdb");
-        let mut trajectory = Trajectory::new(path).unwrap();
+        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 9);
 
@@ -1638,7 +1638,7 @@ mod tests {
         // https://github.com/chemfiles/chemfiles/issues/328
         // some secondary structure residues are not in the expected order
         let path = Path::new("./src/tests-data/pdb/1htq.pdb");
-        let mut trajectory = Trajectory::new(path).unwrap();
+        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
         let topology = frame.topology();
         // The residue IDs are out of order, but still read correctly
@@ -1696,7 +1696,7 @@ mod tests {
         // https://github.com/chemfiles/chemfiles/issues/342
         // some secondary structure residues are not in the expected order
         let path = Path::new("./src/tests-data/pdb/1avg.pdb");
-        let mut trajectory = Trajectory::new(path).unwrap();
+        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
         let topology = frame.topology();
 
@@ -1762,7 +1762,7 @@ mod tests {
     #[test]
     fn file_by_ase() {
         let path = Path::new("./src/tests-data/pdb/ase.pdb");
-        let trajectory = Trajectory::new(path).unwrap();
+        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 156)
     }
 
