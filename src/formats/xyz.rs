@@ -181,7 +181,7 @@ impl XYZFormat {
         // TODO: ASE also allow [] {} and () to function as quotes. This should
         // be updated when a specification is agreed on.
         s.chars()
-            .any(|c| c.is_ascii_whitespace() || c == '=' || c == '\\' || c == '"')
+            .any(|c| c.is_ascii_whitespace() || c == '=' || c == '\'' || c == '"')
     }
 
     fn get_atom_properties(&self, frame: &Frame) -> PropertiesList {
