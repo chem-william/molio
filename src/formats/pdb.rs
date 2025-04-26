@@ -979,7 +979,7 @@ mod tests {
         dihedral::Dihedral,
         formats::pdb::{decode_hybrid36, encode_hybrid36},
         topology::Topology,
-        trajectory::{FileMode, Trajectory},
+        trajectory::Trajectory,
         unit_cell::CellShape,
     };
 
@@ -988,18 +988,18 @@ mod tests {
     #[test]
     fn check_nsteps() {
         let path = Path::new("./src/tests-data/pdb/water.pdb");
-        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 100);
 
         let path = Path::new("./src/tests-data/pdb/2hkb.pdb");
-        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 11);
     }
 
     #[test]
     fn sanity_check() {
         let path = Path::new("./src/tests-data/pdb/water.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 100);
 
         let mut frame = trajectory.read().unwrap().unwrap();
@@ -1038,7 +1038,7 @@ mod tests {
     #[test]
     fn read_bonds() {
         let path = Path::new("./src/tests-data/pdb/MOF-5.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let mut frame = trajectory.read().unwrap().unwrap();
 
         let topology: &mut Topology = frame.topology_as_mut();
@@ -1208,7 +1208,7 @@ mod tests {
     #[test]
     fn read_residue_information() {
         let path = Path::new("./src/tests-data/pdb/water.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         assert_eq!(frame.topology().residues.len(), 99);
@@ -1231,7 +1231,7 @@ mod tests {
         );
 
         let path = Path::new("./src/tests-data/pdb/MOF-5.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         assert_eq!(frame.topology().residues.len(), 1);
@@ -1243,7 +1243,7 @@ mod tests {
     #[test]
     fn read_atom_hetatm_information() {
         let path = Path::new("./src/tests-data/pdb/hemo.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
         let residues = frame.topology().residues.clone();
 
@@ -1258,7 +1258,7 @@ mod tests {
     #[test]
     fn handle_multiple_ter_records() {
         let path = Path::new("./src/tests-data/pdb/4hhb.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         assert_eq!(frame[4556].name, "ND");
@@ -1281,7 +1281,7 @@ mod tests {
     #[test]
     fn secondary_structure_with_insertion_code_test() {
         let path = Path::new("./src/tests-data/pdb/1bcu.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         // check that residues have been inserted correctly
@@ -1436,7 +1436,7 @@ mod tests {
     #[test]
     fn read_protein_residues() {
         let path = Path::new("./src/tests-data/pdb/hemo.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         let topology = frame.topology();
@@ -1451,7 +1451,7 @@ mod tests {
     #[test]
     fn read_nucleic_residues() {
         let path = Path::new("./src/tests-data/pdb/2hkb.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         let topology = frame.topology();
@@ -1464,7 +1464,7 @@ mod tests {
     #[test]
     fn read_atomic_insertion_codes() {
         let path = Path::new("./src/tests-data/pdb/insertion-code.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         let topology = frame.topology();
@@ -1502,7 +1502,7 @@ mod tests {
     #[test]
     fn multiple_residues_with_the_same_id() {
         let path = Path::new("./src/tests-data/pdb/psfgen-output.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         let topology = frame.topology();
@@ -1533,7 +1533,7 @@ mod tests {
     #[test]
     fn odd_pdb_numbering() {
         let path = Path::new("./src/tests-data/pdb/odd-start.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
         assert_eq!(frame.size(), 20);
@@ -1552,7 +1552,7 @@ mod tests {
     #[test]
     fn atom_id_starts_at_0() {
         let path = Path::new("./src/tests-data/pdb/atom-id-0.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 1);
 
         let frame = trajectory.read().unwrap().unwrap();
@@ -1567,7 +1567,7 @@ mod tests {
     #[test]
     fn multiple_end_records() {
         let path = Path::new("./src/tests-data/pdb/end-endmdl.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 2);
 
         let frame = trajectory.read().unwrap().unwrap();
@@ -1580,7 +1580,7 @@ mod tests {
     #[test]
     fn multiple_model_without_end() {
         let path = Path::new("./src/tests-data/pdb/model.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 2);
 
         let frame = trajectory.read().unwrap().unwrap();
@@ -1593,7 +1593,7 @@ mod tests {
     #[test]
     fn file_generated_by_crystal_maker() {
         let path = Path::new("./src/tests-data/pdb/crystal-maker.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 1);
 
         let frame = trajectory.read().unwrap().unwrap();
@@ -1603,7 +1603,7 @@ mod tests {
     #[test]
     fn short_cryst1_record() {
         let path = Path::new("./src/tests-data/pdb/short-cryst1.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 1);
 
         let frame = trajectory.read().unwrap().unwrap();
@@ -1612,7 +1612,7 @@ mod tests {
     #[test]
     fn short_atom_record() {
         let path = Path::new("./src/tests-data/pdb/short-atom.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 9);
 
@@ -1635,7 +1635,7 @@ mod tests {
         // https://github.com/chemfiles/chemfiles/issues/328
         // some secondary structure residues are not in the expected order
         let path = Path::new("./src/tests-data/pdb/1htq.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
         let topology = frame.topology();
         // The residue IDs are out of order, but still read correctly
@@ -1693,7 +1693,7 @@ mod tests {
         // https://github.com/chemfiles/chemfiles/issues/342
         // some secondary structure residues are not in the expected order
         let path = Path::new("./src/tests-data/pdb/1avg.pdb");
-        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let mut trajectory = Trajectory::open(&path).unwrap();
         let frame = trajectory.read().unwrap().unwrap();
         let topology = frame.topology();
 
@@ -1759,7 +1759,7 @@ mod tests {
     #[test]
     fn file_by_ase() {
         let path = Path::new("./src/tests-data/pdb/ase.pdb");
-        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
+        let trajectory = Trajectory::open(&path).unwrap();
         assert_eq!(trajectory.size, 156)
     }
 
@@ -1767,7 +1767,7 @@ mod tests {
     // #[test]
     // fn test_left_handed_helix() {
     //     let path = Path::new("./src/tests-data/pdb/insertion-code.pdb");
-    //     let mut trajectory = Trajectory::new(path).unwrap();
+    //     let mut trajectory = Trajectory::open(&path).unwrap();
     //     let frame = trajectory.read().unwrap().unwrap();
 
     //     let topology = frame.topology();
