@@ -5,13 +5,14 @@ use crate::error::CError;
 use crate::extendedxyzparser::ExtendedXyzParser;
 use crate::format::FileFormat;
 use crate::frame::Frame;
-use crate::property::Properties;
+use crate::property::{self, Properties};
 use crate::property::{Property, PropertyKind};
-use crate::unit_cell::UnitCell;
-use std::collections::BTreeMap;
+use crate::unit_cell::{self, UnitCell};
+use std::borrow::BorrowMut;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs::File;
-use std::io::{BufRead, BufReader, Seek};
-use std::path::Path;
+use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
 use std::str::SplitWhitespace;
 
 pub struct XYZFormat;
@@ -167,6 +168,153 @@ impl XYZFormat {
 
         Ok(PropertiesList::new())
     }
+
+    fn is_valid_property_name(name: &str) -> bool {
+        if name.is_empty() {
+            return false;
+        }
+
+        return name.chars().all(|c| !c.is_ascii_alphanumeric() && c != '_');
+    }
+
+    fn should_be_quoted(s: &str) -> bool {
+        // TODO: ASE also allow [] {} and () to function as quotes. This should
+        // be updated when a specification is agreed on.
+        return s
+            .chars()
+            .any(|c| c.is_ascii_whitespace() || c == '=' || c == '\\' || c == '"');
+    }
+
+    fn get_atom_properties(&self, frame: &Frame) -> PropertiesList {
+        if frame.size() == 0 {
+            return PropertiesList::new();
+        };
+
+        let mut all_properties = RefCell::new(HashMap::new());
+        let mut partially_defined_already_warned = HashSet::new();
+        let first_atom = frame[0].clone();
+        if !first_atom.properties.is_empty() {
+            for property in first_atom.properties {
+                if !XYZFormat::is_valid_property_name(&property.0) {
+                    eprintln!(
+                        "warning: '{}' is not a valid property name for extended XYZ. it will not be saved",
+                        property.0
+                    );
+                    partially_defined_already_warned.insert(property.0.clone());
+                    continue;
+                }
+
+                if let Some(string_prop) = property.1.as_string() {
+                    if XYZFormat::should_be_quoted(&string_prop) {
+                        eprint!(
+                            "warning: string value for property '{}' on atom 0 cannot be saved as an atomic property",
+                            property.0
+                        );
+                        continue;
+                    }
+                }
+                all_properties
+                    .borrow_mut()
+                    .insert(property.0, property.1.kind());
+            }
+        }
+
+        for atom in frame.iter() {
+            let mut to_remove = vec![];
+            let properties = all_properties.borrow();
+            for property in properties.iter() {
+                let current_property = atom.properties.get(property.0);
+                if current_property.is_none() {
+                    // this property was present for all atoms until now, but not on the current one
+                    eprintln!(
+                        "warning: property '{}' wis only defined for a subset of atoms. it will not be saved",
+                        property.0
+                    );
+
+                    to_remove.push(property.0);
+                    continue;
+                }
+
+                if current_property.unwrap().kind() != *property.1 {
+                    eprintln!(
+                        "warning: property '{}' is defined with different types on different atoms. it will not be saved",
+                        property.0
+                    );
+
+                    partially_defined_already_warned.insert(property.0.clone());
+                    to_remove.push(property.0);
+                }
+            }
+
+            let atom_properties = &atom.properties;
+            if !atom_properties.is_empty()
+                && (atom_properties.len() > all_properties.borrow().len())
+            {
+                // warn for properties defined on this atom but not on others
+                for property in &atom.properties {
+                    if !all_properties.borrow().contains_key(property.0)
+                        && !partially_defined_already_warned.contains(property.0)
+                    {
+                        eprintln!(
+                            "warning: property '{}' is only defined for a subset of atoms. it will not be saved",
+                            property.0
+                        );
+                        partially_defined_already_warned.insert(property.0.clone());
+                    }
+                }
+            }
+
+            for name in to_remove {
+                all_properties.borrow_mut().remove(name);
+            }
+        }
+
+        let mut results = PropertiesList::new();
+        for property in all_properties.borrow().iter() {
+            results.insert(property.0.clone(), property.1.clone());
+        }
+        results
+    }
+
+    fn write_extended_comment_line(&self, frame: &Frame, properties: &PropertiesList) -> String {
+        let mut result = "Properties=species:S:1:pos:R:3".to_string();
+
+        for property in properties {
+            let (prop_type, count) = match *property.1 {
+                PropertyKind::String => ('S', 1),
+                PropertyKind::Bool => ('L', 1),
+                PropertyKind::Double => ('R', 1),
+                PropertyKind::Vector3D => ('R', 3),
+                PropertyKind::Matrix3x3 => ('R', 9),
+                PropertyKind::VectorXD => todo!(),
+            };
+            result.push_str(&format!("{}:{prop_type}:{count}", property.0));
+        }
+
+        // support for lattice
+
+        if frame.unit_cell.shape != unit_cell::CellShape::Infinite {
+            // set small elements to 0
+            let m = frame
+                .unit_cell
+                .matrix
+                .map(|m| if m.abs() < 1e-12 { 0.0 } else { m });
+            result.push_str(&format!(
+                " Lattice=\"{:e} {:e} {:e} {:e} {:e} {:e} {:e} {:e} {:e}\"",
+                m[(0, 0)],
+                m[(0, 1)],
+                m[(0, 2)],
+                m[(1, 0)],
+                m[(1, 1)],
+                m[(1, 2)],
+                m[(2, 0)],
+                m[(2, 1)],
+                m[(2, 2)]
+            ));
+        }
+
+        result
+    }
 }
 
 impl FileFormat for XYZFormat {
@@ -247,46 +395,104 @@ impl FileFormat for XYZFormat {
         Ok(Some(position))
     }
 
-    fn write(&self, path: &Path, frame: &Frame) -> Result<(), CError> {
-        println!(
-            "Writing {:?} as XYZ format with {} atoms",
-            path,
-            frame.size()
-        );
+    fn write_next(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
+        let positions = frame.positions();
+        let properties = self.get_atom_properties(frame);
+
+        write!(writer, "{}", frame.size())?;
+        write!(
+            writer,
+            "{}",
+            self.write_extended_comment_line(frame, &properties)
+        )?;
+        dbg!(properties);
+
         Ok(())
+        //         const auto& positions = frame.positions();
+        // auto properties = get_atom_properties(frame);
+
+        // file_.print("{}\n", frame.size());
+        // file_.print("{}\n", write_extended_comment_line(frame, properties));
+
+        // for (size_t i = 0; i < frame.size(); i++) {
+        //     const auto& atom = frame[i];
+
+        //     auto name = atom.name();
+        //     if (name.empty()) {
+        //         name = "X";
+        //     }
+
+        //     file_.print("{} {:g} {:g} {:g}",
+        //         name, positions[i][0], positions[i][1], positions[i][2]
+        //     );
+
+        //     for (const auto& property: properties) {
+        //         const auto& value = atom.get(property.name).value();
+
+        //         if (property.type == Property::STRING) {
+        //             file_.print(" {}", value.as_string());
+        //         } else if (property.type == Property::BOOL) {
+        //             if (value.as_bool()) {
+        //                 file_.print(" T");
+        //             } else {
+        //                 file_.print(" F");
+        //             }
+        //         } else if (property.type == Property::DOUBLE) {
+        //             file_.print(" {:g}", value.as_double());
+        //         } else if (property.type == Property::VECTOR3D) {
+        //             const auto& vector = value.as_vector3d();
+        //             file_.print(" {:g} {:g} {:g}", vector[0], vector[1], vector[2]);
+        //         }
+        //     }
+
+        //     file_.print("\n");
+        // }
     }
+
+    // fn write(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
+    //     self.write_next(writer, frame);
+    //     self.frame
+    //     println!("Writingmut  as XYZ format with {} atoms", frame.size());
+    //     Ok(())
+    // }
 }
 
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
-    use crate::{frame::Frame, trajectory::Trajectory, unit_cell::UnitCell};
+    use crate::{
+        frame::Frame,
+        property::Property,
+        trajectory::{FileMode, Trajectory},
+        unit_cell::UnitCell,
+    };
     use assert_approx_eq::assert_approx_eq;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn check_nsteps() {
         let path = Path::new("./src/tests-data/xyz/single_struct.xyz");
-        let trajectory = Trajectory::new(path).unwrap();
+        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 1);
 
         let path = Path::new("./src/tests-data/xyz/trajectory.xyz");
-        let trajectory = Trajectory::new(path).unwrap();
+        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 2);
 
         let path = Path::new("./src/tests-data/xyz/helium.xyz");
-        let trajectory = Trajectory::new(path).unwrap();
+        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 397);
 
         let path = Path::new("./src/tests-data/xyz/topology.xyz");
-        let trajectory = Trajectory::new(path).unwrap();
+        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 1);
     }
 
     #[test]
     fn extended_xyz() {
         let path = Path::new("./src/tests-data/xyz/extended.xyz");
-        let mut trajectory = Trajectory::new(path).unwrap();
+        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 3);
 
         let frame = trajectory.read_at(0).unwrap();
@@ -376,7 +582,7 @@ mod tests {
     #[test]
     fn read_whole_file() {
         let path = Path::new("./src/tests-data/xyz/helium.xyz");
-        let mut trajectory = Trajectory::new(path).unwrap();
+        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 397);
 
         let mut frame = Frame::new();
@@ -395,7 +601,7 @@ mod tests {
     #[test]
     fn various_files_formatting() {
         let path = Path::new("./src/tests-data/xyz/spaces.xyz");
-        let mut trajectory = Trajectory::new(path).unwrap();
+        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 1);
         let frame = trajectory.read().unwrap().unwrap();
         let positions = frame.positions();
@@ -408,7 +614,7 @@ mod tests {
     macro_rules! assert_read_at_fails {
         ($index:expr) => {
             let path = Path::new(BAD_EXTENDED);
-            let mut trajectory = Trajectory::new(path).unwrap();
+            let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
             trajectory.read_at($index).unwrap();
         };
     }
@@ -460,4 +666,125 @@ mod tests {
     fn read_bad_files8() {
         assert_read_at_fails!(8);
     }
+
+    #[test]
+    fn test_xyz_file_contents() -> std::io::Result<()> {
+        let mut tmpfile = NamedTempFile::new()?;
+        const EXPECTED_CONTENT: &str = r#"4
+Properties=species:S:1:pos:R:3:bool:L:1:double:R:1:string:S:1:vector:R:3 name="Test"
+A 1 2 3 T 10 atom_0 10 20 30
+B 1 2 3 F 11 atom_1 11 21 31
+C 1 2 3 T 12 atom_2 12 22 32
+D 1 2 3 T 13 atom_2 13 23 33
+6
+Properties=species:S:1:pos:R:3 Lattice="12 0 0 0 13 0 0 0 14" direction="1 0 2" is_open=F name="Test" 'quotes"'=T "quotes'"=T speed=33.4 "with space"=T
+A 1 2 3
+B 1 2 3
+C 1 2 3
+D 1 2 3
+E 4 5 6
+F 4 5 6
+"#;
+
+        // Write the expected content into the temp file
+        let mut trajectory = Trajectory::new(tmpfile.path(), FileMode::Write).unwrap();
+        let mut frame = Frame::new();
+        frame
+            .properties
+            .insert("name".to_string(), Property::String("Test".to_string()));
+        // frame.add_atom(Atom("A","O"), {1, 2, 3});
+        // frame.add_atom(Atom("B"), {1, 2, 3});
+        // frame.add_atom(Atom("C"), {1, 2, 3});
+        // frame.add_atom(Atom("D"), {1, 2, 3});
+
+        trajectory.write(&frame);
+        // tmpfile.write_all(EXPECTED_CONTENT.as_bytes())?;
+
+        // …now you can reopen/read the file, feed it into your parser, assert on the results, etc.
+
+        Ok(())
+    }
+
+    // TEST_CASE("Write files in XYZ format") {
+    //     auto tmpfile = NamedTempPath(".xyz");
+    //     const auto* EXPECTED_CONTENT =
+    // R"(4
+    // Properties=species:S:1:pos:R:3:bool:L:1:double:R:1:string:S:1:vector:R:3 name="Test"
+    // A 1 2 3 T 10 atom_0 10 20 30
+    // B 1 2 3 F 11 atom_1 11 21 31
+    // C 1 2 3 T 12 atom_2 12 22 32
+    // D 1 2 3 T 13 atom_2 13 23 33
+    // 6
+    // Properties=species:S:1:pos:R:3 Lattice="12 0 0 0 13 0 0 0 14" direction="1 0 2" is_open=F name="Test" 'quotes"'=T "quotes'"=T speed=33.4 "with space"=T
+    // A 1 2 3
+    // B 1 2 3
+    // C 1 2 3
+    // D 1 2 3
+    // E 4 5 6
+    // F 4 5 6
+    // )";
+
+    //     auto frame = Frame();
+    //     frame.set("name", "Test");
+    //     frame.add_atom(Atom("A","O"), {1, 2, 3});
+    //     frame.add_atom(Atom("B"), {1, 2, 3});
+    //     frame.add_atom(Atom("C"), {1, 2, 3});
+    //     frame.add_atom(Atom("D"), {1, 2, 3});
+
+    //     // atomic properties
+    //     frame[0].set("string", "atom_0");
+    //     frame[1].set("string", "atom_1");
+    //     frame[2].set("string", "atom_2");
+    //     frame[3].set("string", "atom_2");
+
+    //     frame[0].set("bool", true);
+    //     frame[1].set("bool", false);
+    //     frame[2].set("bool", true);
+    //     frame[3].set("bool", true);
+
+    //     frame[0].set("double", 10);
+    //     frame[1].set("double", 11);
+    //     frame[2].set("double", 12);
+    //     frame[3].set("double", 13);
+
+    //     frame[0].set("vector", Vector3D{10, 20, 30});
+    //     frame[1].set("vector", Vector3D{11, 21, 31});
+    //     frame[2].set("vector", Vector3D{12, 22, 32});
+    //     frame[3].set("vector", Vector3D{13, 23, 33});
+
+    //     // not saved, bad property name
+    //     frame[0].set("value with spaces", 0);
+    //     frame[1].set("value with spaces", 0);
+    //     frame[2].set("value with spaces", 0);
+    //     frame[3].set("value with spaces", 0);
+
+    //     // not saved, different types
+    //     frame[0].set("value", 0);
+    //     frame[1].set("value", "0");
+    //     frame[2].set("value", false);
+    //     frame[3].set("value", 0);
+
+    //     auto file = Trajectory(tmpfile, 'w');
+    //     file.write(frame);
+
+    //     frame.set_cell(UnitCell({12, 13, 14}));
+    //     frame.set("is_open", false);
+    //     frame.set("speed", 33.4);
+    //     frame.set("direction", Vector3D(1, 0, 2));
+    //     frame.set("with space", true);
+    //     frame.set("quotes'", true);
+    //     frame.set("quotes\"", true);
+
+    //     // properties with two type of quotes are skipped
+    //     frame.set("all_quotes'\"", true);
+
+    //     frame.add_atom(Atom("E"), {4, 5, 6});
+    //     frame.add_atom(Atom("F"), {4, 5, 6});
+
+    //     file.write(frame);
+    //     file.close();
+
+    //     auto content = read_text_file(tmpfile);
+    //     CHECK(content == EXPECTED_CONTENT);
+    // }
 }

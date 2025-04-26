@@ -1,6 +1,6 @@
 use crate::property::Properties;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Atom {
     pub x: f64,
     pub y: f64,

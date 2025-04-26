@@ -4,7 +4,8 @@ use crate::property::Properties;
 use crate::residue::Residue;
 use crate::unit_cell::UnitCell;
 use crate::{atom::Atom, topology::Topology};
-use std::ops::{Index, IndexMut};
+use std::collections::hash_set::Iter;
+use std::ops::{Deref, Index, IndexMut};
 
 #[derive(Debug, Default)]
 pub struct Frame {
@@ -74,6 +75,14 @@ impl Index<usize> for Frame {
 impl IndexMut<usize> for Frame {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.topology.atoms[index]
+    }
+}
+
+impl Deref for Frame {
+    type Target = Vec<Atom>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.topology.atoms
     }
 }
 

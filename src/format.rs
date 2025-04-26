@@ -3,7 +3,7 @@ use crate::formats::pdb::PDBFormat;
 use crate::formats::xyz::XYZFormat;
 use crate::frame::Frame;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, BufWriter};
 use std::path::Path;
 
 pub enum TextFormat {
@@ -40,7 +40,8 @@ pub trait FileFormat {
     fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError>;
     fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError>;
     // fn read_at(&mut self, index: usize) -> Result<Frame, CError>;
-    fn write(&self, path: &Path, frame: &Frame) -> Result<(), CError>;
+    // fn write(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError>;
+    fn write_next(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError>;
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError>;
 }
 
@@ -51,6 +52,7 @@ impl FileFormat for Format<'_> {
             Format::PDB(format) => format.read_next(reader),
         }
     }
+
     fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
         match self {
             Format::XYZ(format) => format.read(reader),
@@ -58,12 +60,13 @@ impl FileFormat for Format<'_> {
         }
     }
 
-    fn write(&self, path: &Path, frame: &Frame) -> Result<(), CError> {
+    fn write_next(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
         match self {
-            Format::XYZ(format) => format.write(path, frame),
-            Format::PDB(format) => format.write(path, frame),
+            Format::XYZ(format) => format.write_next(writer, frame),
+            Format::PDB(format) => format.write_next(writer, frame),
         }
     }
+
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
         match self {
             Format::XYZ(format) => format.forward(reader),
