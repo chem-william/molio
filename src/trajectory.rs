@@ -34,7 +34,7 @@ impl<'a> Trajectory<'a> {
     pub fn with_format(path: &'a Path, fmt: TextFormat, mode: FileMode) -> Result<Self, CError> {
         let strategy = Format::new_from_format(fmt, path)?;
 
-        let (mut reader, mut writer) = match mode {
+        let (mut reader, writer) = match mode {
             FileMode::Read => {
                 let file = File::open(path).map_err(CError::IoError)?;
                 (Some(BufReader::new(file)), None)
