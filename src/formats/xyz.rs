@@ -332,6 +332,13 @@ impl XYZFormat {
                     let v = item.1.expect_vector3d();
                     result.push_str(&format!("\"{:?} {:?} {:?}\"", v[0], v[1], v[2]));
                 }
+                PropertyKind::Matrix3x3 => {
+                    let v = item.1.expect_matrix3x3();
+                    result.push_str(&format!(
+                        "\"{:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?}\"",
+                        v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]
+                    ));
+                }
                 _ => todo!(),
             }
         }
@@ -474,6 +481,7 @@ mod tests {
         atom::Atom, frame::Frame, property::Property, trajectory::Trajectory, unit_cell::UnitCell,
     };
     use assert_approx_eq::assert_approx_eq;
+    use nalgebra::Matrix3;
     use tempfile::Builder;
 
     #[test]
@@ -682,13 +690,13 @@ mod tests {
             .unwrap();
         // let tmpfile = named_tmpfile.tempfile().unwrap();
         const EXPECTED_CONTENT: &str = r#"4
-Properties=species:S:1:pos:R:3:bool:L:1:double:R:1:string:S:1:vector:R:3 name="Test"
+Properties=species:S:1:pos:R:3:bool:L:1:double:R:1:string:S:1:vector:R:3 name="Test" stress="0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0"
 A 1.0 2.0 3.0 T 10.0 atom_0 10.0 20.0 30.0
 B 1.0 2.0 3.0 F 11.0 atom_1 11.0 21.0 31.0
 C 1.0 2.0 3.0 T 12.0 atom_2 12.0 22.0 32.0
 D 1.0 2.0 3.0 T 13.0 atom_2 13.0 23.0 33.0
 6
-Properties=species:S:1:pos:R:3 Lattice="12.0 0.0 0.0 0.0 13.0 0.0 0.0 0.0 14.0" direction="1.0 0.0 2.0" is_open=F name="Test" 'quotes"'=T "quotes'"=T speed=33.4 "with space"=T
+Properties=species:S:1:pos:R:3 Lattice="12.0 0.0 0.0 0.0 13.0 0.0 0.0 0.0 14.0" direction="1.0 0.0 2.0" is_open=F name="Test" 'quotes"'=T "quotes'"=T speed=33.4 stress="0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0" "with space"=T
 A 1.0 2.0 3.0
 B 1.0 2.0 3.0
 C 1.0 2.0 3.0
@@ -703,6 +711,9 @@ F 4.0 5.0 6.0
         frame
             .properties
             .insert("name".to_string(), Property::String("Test".to_string()));
+        frame
+            .properties
+            .insert("stress".to_string(), Property::Matrix3x3(Matrix3::zeros()));
         let atom = Atom::with_symbol("A".to_string(), "O".to_string());
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
         let atom = Atom::new("B".to_string());
