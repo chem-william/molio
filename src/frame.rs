@@ -2,14 +2,23 @@ use crate::bond::BondOrder;
 use crate::error::CError;
 use crate::property::Properties;
 use crate::residue::Residue;
-use crate::unit_cell::UnitCell;
+use crate::unit_cell::{self, UnitCell};
 use crate::{atom::Atom, topology::Topology};
-use std::ops::{Index, IndexMut};
+use std::collections::hash_set::Iter;
+use std::ops::{Deref, Index, IndexMut};
 
 #[derive(Debug, Default)]
 pub struct Frame {
+    /// Unit cell of the system
     pub unit_cell: UnitCell,
+
+    /// Properties stored in this frame
     pub properties: Properties,
+
+    /// Positions of the particles
+    positions: Vec<[f64; 3]>,
+
+    /// Topology of the described system
     topology: Topology,
 }
 
@@ -18,6 +27,7 @@ impl Frame {
         Frame {
             unit_cell: UnitCell::new(),
             properties: Properties::new(),
+            positions: vec![],
             topology: Topology::default(),
         }
     }
@@ -40,16 +50,13 @@ impl Frame {
         self.topology.size()
     }
 
-    pub fn positions(&self) -> Vec<[f64; 3]> {
-        self.topology
-            .atoms
-            .iter()
-            .map(|a| [a.x, a.y, a.z])
-            .collect()
+    pub fn positions(&self) -> &Vec<[f64; 3]> {
+        &self.positions
     }
 
-    pub fn add_atom(&mut self, atom: Atom) {
-        self.topology.atoms.push(atom)
+    pub fn add_atom(&mut self, atom: Atom, position: [f64; 3]) {
+        self.topology.atoms.push(atom);
+        self.positions.push(position);
     }
 
     pub fn add_residue(&mut self, residue: Residue) -> Result<(), CError> {
@@ -77,6 +84,14 @@ impl IndexMut<usize> for Frame {
     }
 }
 
+impl Deref for Frame {
+    type Target = Vec<Atom>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.topology.atoms
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use assert_approx_eq::assert_approx_eq;
@@ -87,34 +102,25 @@ mod tests {
     fn test_frame_indexing() {
         let mut frame = Frame::new();
         let atom1 = Atom {
-            x: 1.0,
-            y: 2.0,
-            z: 3.0,
             symbol: "H".to_string(),
             name: "hydrogen".to_string(),
             properties: Properties::new(),
         };
         let atom2 = Atom {
-            x: 4.0,
-            y: 5.0,
-            z: 6.0,
             symbol: "O".to_string(),
             name: "oxygen".to_string(),
             properties: Properties::new(),
         };
 
-        frame.add_atom(atom1);
-        frame.add_atom(atom2);
+        frame.add_atom(atom1, [1.0, 2.0, 3.0]);
+        frame.add_atom(atom2, [4.0, 5.0, 6.0]);
 
         // Test read access
         assert_eq!(frame[0].symbol, "H");
         assert_eq!(frame[1].symbol, "O");
-        assert_approx_eq!(frame[0].x, 1.0);
-        assert_approx_eq!(frame[1].x, 4.0);
-
-        // Test write access
-        frame[0].x = 10.0;
-        assert_approx_eq!(frame[0].x, 10.0);
+        let pos = frame.positions();
+        assert_approx_eq!(pos[0][0], 1.0);
+        assert_approx_eq!(pos[1][0], 4.0);
     }
 
     #[test]

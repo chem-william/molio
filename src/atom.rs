@@ -1,25 +1,27 @@
 use crate::property::Properties;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Atom {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-    pub symbol: String,
     pub name: String,
+    pub symbol: String,
     // pub mass: f64,
     // pub charge: f64,
     pub properties: Properties,
 }
 
 impl Atom {
-    pub fn new(x: f64, y: f64, z: f64, symbol: String, name: String) -> Self {
+    pub fn new(name: String) -> Self {
         Self {
-            x,
-            y,
-            z,
-            symbol,
+            name: name.clone(),
+            symbol: name,
+            properties: Properties::new(),
+        }
+    }
+
+    pub fn with_symbol(name: String, symbol: String) -> Self {
+        Self {
             name,
+            symbol,
             properties: Properties::new(),
         }
     }

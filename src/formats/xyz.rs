@@ -5,13 +5,11 @@ use crate::error::CError;
 use crate::extendedxyzparser::ExtendedXyzParser;
 use crate::format::FileFormat;
 use crate::frame::Frame;
-use crate::property::Properties;
-use crate::property::{Property, PropertyKind};
-use crate::unit_cell::UnitCell;
-use std::collections::BTreeMap;
+use crate::property::{Properties, Property, PropertyKind};
+use crate::unit_cell::{self, UnitCell};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
-use std::io::{BufRead, BufReader, Seek};
-use std::path::Path;
+use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
 use std::str::SplitWhitespace;
 
 pub struct XYZFormat;
@@ -167,6 +165,179 @@ impl XYZFormat {
 
         Ok(PropertiesList::new())
     }
+
+    fn is_valid_property_name(name: &str) -> bool {
+        let mut chars = name.chars();
+        // Must have at least one character and start with an ASCII letter
+        match chars.next() {
+            Some(first) if first.is_ascii_alphabetic() => {
+                chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+            }
+            _ => false,
+        }
+    }
+
+    fn should_be_quoted(s: &str) -> bool {
+        // TODO: ASE also allow [] {} and () to function as quotes. This should
+        // be updated when a specification is agreed on.
+        s.chars()
+            .any(|c| c.is_ascii_whitespace() || c == '=' || c == '\'' || c == '"')
+    }
+
+    fn get_atom_properties(&self, frame: &Frame) -> PropertiesList {
+        if frame.size() == 0 {
+            return PropertiesList::new();
+        };
+
+        let mut all_properties = HashMap::new();
+        let mut partially_defined_already_warned = HashSet::new();
+
+        // Process first atom to establish baseline properties
+        let first_atom = &frame[0];
+        if !first_atom.properties.is_empty() {
+            for (name, property) in &first_atom.properties {
+                if !XYZFormat::is_valid_property_name(name) {
+                    eprintln!(
+                        "warning: '{}' is not a valid property name for extended XYZ. it will not be saved",
+                        name
+                    );
+                    partially_defined_already_warned.insert(name.clone());
+                    continue;
+                }
+
+                if let Some(string_prop) = property.as_string() {
+                    if XYZFormat::should_be_quoted(string_prop) {
+                        eprint!(
+                            "warning: string value for property '{}' on atom 0 cannot be saved as an atomic property",
+                            name
+                        );
+                        continue;
+                    }
+                }
+                all_properties.insert(name.clone(), property.kind());
+            }
+        }
+
+        // Check remaining atoms
+        for atom in frame.iter().skip(1) {
+            // Use retain to filter properties in-place
+            all_properties.retain(|prop_name, prop_kind| {
+                match atom.properties.get(prop_name) {
+                    None => {
+                        // Property missing on this atom
+                        eprintln!(
+                            "warning: property '{}' is only defined for a subset of atoms. it will not be saved",
+                            prop_name
+                        );
+                        false // Remove this property
+                    }
+                    Some(prop) if prop.kind() != *prop_kind => {
+                        // Property has different type on this atom
+                        eprintln!(
+                            "warning: property '{}' is defined with different types on different atoms. it will not be saved",
+                            prop_name
+                        );
+                        partially_defined_already_warned.insert(prop_name.clone());
+                        false // Remove this property
+                    }
+                    _ => true, // Keep this property
+                }
+            });
+
+            // Check for properties on this atom that weren't on the first atom
+            for (prop_name, _) in &atom.properties {
+                if !all_properties.contains_key(prop_name)
+                    && !partially_defined_already_warned.contains(prop_name)
+                {
+                    eprintln!(
+                        "warning: property '{}' is only defined for a subset of atoms. it will not be saved",
+                        prop_name
+                    );
+                    partially_defined_already_warned.insert(prop_name.clone());
+                }
+            }
+        }
+
+        // Convert to BTreeMap for result
+        let mut results = PropertiesList::new();
+        for (name, kind) in all_properties {
+            results.insert(name, kind);
+        }
+        results
+    }
+
+    fn write_extended_comment_line(&self, frame: &Frame, properties: &PropertiesList) -> String {
+        let mut result = "Properties=species:S:1:pos:R:3".to_string();
+
+        for property in properties {
+            let (prop_type, count) = match *property.1 {
+                PropertyKind::String => ('S', 1),
+                PropertyKind::Bool => ('L', 1),
+                PropertyKind::Double => ('R', 1),
+                PropertyKind::Vector3D => ('R', 3),
+                PropertyKind::Matrix3x3 => ('R', 9),
+                PropertyKind::VectorXD => todo!(),
+            };
+            result.push_str(&format!(":{}:{prop_type}:{count}", property.0));
+        }
+
+        // support for lattice
+        if frame.unit_cell.shape != unit_cell::CellShape::Infinite {
+            // set small elements to 0
+            let m = frame
+                .unit_cell
+                .matrix
+                .map(|m| if m.abs() < 1e-12 { 0.0 } else { m });
+            result.push_str(&format!(
+                " Lattice=\"{:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?}\"",
+                m[(0, 0)],
+                m[(0, 1)],
+                m[(0, 2)],
+                m[(1, 0)],
+                m[(1, 1)],
+                m[(1, 2)],
+                m[(2, 0)],
+                m[(2, 1)],
+                m[(2, 2)]
+            ));
+        }
+
+        // sort properties to have reproducible output
+        let sorted_properties: BTreeMap<_, _> = frame.properties.iter().collect();
+
+        // support for generic frame properties
+        for item in sorted_properties {
+            if XYZFormat::should_be_quoted(item.0) {
+                // quote the string
+                if !item.0.contains("\"") {
+                    result.push_str(&format!(" \"{}\"=", item.0));
+                } else if !item.0.contains("'") {
+                    result.push_str(&format!(" '{}'=", item.0));
+                } else {
+                    eprintln!(
+                        "warning: frame property '{}' contains both single and double quote. it will not be saved",
+                        item.0
+                    );
+                    continue;
+                }
+            } else {
+                result.push_str(&format!(" {}=", item.0));
+            }
+
+            match item.1.kind() {
+                PropertyKind::String => result.push_str(&format!("\"{}\"", item.1.expect_string())),
+                PropertyKind::Bool => result.push_str(if item.1.expect_bool() { "T" } else { "F" }),
+                PropertyKind::Double => result.push_str(&format!("{:?}", item.1.expect_double())),
+                PropertyKind::Vector3D => {
+                    let v = item.1.expect_vector3d();
+                    result.push_str(&format!("\"{:?} {:?} {:?}\"", v[0], v[1], v[2]));
+                }
+                _ => todo!(),
+            }
+        }
+
+        result
+    }
 }
 
 impl FileFormat for XYZFormat {
@@ -196,16 +367,13 @@ impl FileFormat for XYZFormat {
             let z: f64 = tokens.next().ok_or(CError::MissingToken)?.parse()?;
 
             let mut atom = Atom {
-                x,
-                y,
-                z,
                 symbol,
                 name: "".to_string(),
                 properties: Properties::new(),
             };
             XYZFormat::read_atomic_properties(&properties, &mut tokens, &mut atom)?;
 
-            frame.add_atom(atom);
+            frame.add_atom(atom, [x, y, z]);
         }
 
         Ok(frame)
@@ -247,46 +415,94 @@ impl FileFormat for XYZFormat {
         Ok(Some(position))
     }
 
-    fn write(&self, path: &Path, frame: &Frame) -> Result<(), CError> {
-        println!(
-            "Writing {:?} as XYZ format with {} atoms",
-            path,
-            frame.size()
-        );
+    fn write_next(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
+        let positions = frame.positions();
+        let properties = self.get_atom_properties(frame);
+
+        writeln!(writer, "{}", frame.size())?;
+        writeln!(
+            writer,
+            "{}",
+            self.write_extended_comment_line(frame, &properties)
+        )?;
+
+        for (atom, pos) in frame.iter().zip(positions) {
+            let mut name = atom.name.clone();
+
+            if name.is_empty() {
+                name = "X".to_string();
+            }
+            write!(writer, "{name} {:?} {:?} {:?}", pos[0], pos[1], pos[2])?;
+
+            for property in &properties {
+                let val = atom.properties.get(property.0).unwrap();
+
+                if *property.1 == PropertyKind::String {
+                    write!(writer, " {}", val.expect_string())?;
+                } else if *property.1 == PropertyKind::Bool {
+                    if val.expect_bool() {
+                        write!(writer, " T")?;
+                    } else {
+                        write!(writer, " F")?;
+                    };
+                } else if *property.1 == PropertyKind::Double {
+                    write!(writer, " {:?}", val.expect_double())?;
+                } else if *property.1 == PropertyKind::Vector3D {
+                    let v = val.expect_vector3d();
+                    write!(writer, " {:?} {:?} {:?}", v[0], v[1], v[2])?;
+                }
+            }
+            writeln!(writer)?;
+        }
+
         Ok(())
     }
+
+    // fn write(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
+    //     self.write_next(writer, frame);
+    //     self.frame
+    //     println!("Writingmut  as XYZ format with {} atoms", frame.size());
+    //     Ok(())
+    // }
 }
 
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
-    use crate::{frame::Frame, trajectory::Trajectory, unit_cell::UnitCell};
+    use crate::{
+        atom::Atom,
+        frame::Frame,
+        property::Property,
+        trajectory::{FileMode, Trajectory},
+        unit_cell::UnitCell,
+    };
     use assert_approx_eq::assert_approx_eq;
+    use tempfile::Builder;
 
     #[test]
     fn check_nsteps() {
         let path = Path::new("./src/tests-data/xyz/single_struct.xyz");
-        let trajectory = Trajectory::new(path).unwrap();
+        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 1);
 
         let path = Path::new("./src/tests-data/xyz/trajectory.xyz");
-        let trajectory = Trajectory::new(path).unwrap();
+        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 2);
 
         let path = Path::new("./src/tests-data/xyz/helium.xyz");
-        let trajectory = Trajectory::new(path).unwrap();
+        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 397);
 
         let path = Path::new("./src/tests-data/xyz/topology.xyz");
-        let trajectory = Trajectory::new(path).unwrap();
+        let trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 1);
     }
 
     #[test]
     fn extended_xyz() {
         let path = Path::new("./src/tests-data/xyz/extended.xyz");
-        let mut trajectory = Trajectory::new(path).unwrap();
+        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 3);
 
         let frame = trajectory.read_at(0).unwrap();
@@ -376,7 +592,7 @@ mod tests {
     #[test]
     fn read_whole_file() {
         let path = Path::new("./src/tests-data/xyz/helium.xyz");
-        let mut trajectory = Trajectory::new(path).unwrap();
+        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 397);
 
         let mut frame = Frame::new();
@@ -395,7 +611,7 @@ mod tests {
     #[test]
     fn various_files_formatting() {
         let path = Path::new("./src/tests-data/xyz/spaces.xyz");
-        let mut trajectory = Trajectory::new(path).unwrap();
+        let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
         assert_eq!(trajectory.size, 1);
         let frame = trajectory.read().unwrap().unwrap();
         let positions = frame.positions();
@@ -408,7 +624,7 @@ mod tests {
     macro_rules! assert_read_at_fails {
         ($index:expr) => {
             let path = Path::new(BAD_EXTENDED);
-            let mut trajectory = Trajectory::new(path).unwrap();
+            let mut trajectory = Trajectory::new(path, FileMode::Read).unwrap();
             trajectory.read_at($index).unwrap();
         };
     }
@@ -459,5 +675,164 @@ mod tests {
     #[should_panic(expected = "MissingToken")]
     fn read_bad_files8() {
         assert_read_at_fails!(8);
+    }
+
+    #[test]
+    fn test_xyz_file_contents() {
+        let named_tmpfile = Builder::new()
+            .prefix("temporary-xyz")
+            .suffix(".xyz")
+            .tempfile()
+            .unwrap();
+        // let tmpfile = named_tmpfile.tempfile().unwrap();
+        const EXPECTED_CONTENT: &str = r#"4
+Properties=species:S:1:pos:R:3:bool:L:1:double:R:1:string:S:1:vector:R:3 name="Test"
+A 1.0 2.0 3.0 T 10.0 atom_0 10.0 20.0 30.0
+B 1.0 2.0 3.0 F 11.0 atom_1 11.0 21.0 31.0
+C 1.0 2.0 3.0 T 12.0 atom_2 12.0 22.0 32.0
+D 1.0 2.0 3.0 T 13.0 atom_2 13.0 23.0 33.0
+6
+Properties=species:S:1:pos:R:3 Lattice="12.0 0.0 0.0 0.0 13.0 0.0 0.0 0.0 14.0" direction="1.0 0.0 2.0" is_open=F name="Test" 'quotes"'=T "quotes'"=T speed=33.4 "with space"=T
+A 1.0 2.0 3.0
+B 1.0 2.0 3.0
+C 1.0 2.0 3.0
+D 1.0 2.0 3.0
+E 4.0 5.0 6.0
+F 4.0 5.0 6.0
+"#;
+
+        // Write the expected content into the temp file
+        let mut trajectory = Trajectory::new(named_tmpfile.path(), FileMode::Write).unwrap();
+        let mut frame = Frame::new();
+        frame
+            .properties
+            .insert("name".to_string(), Property::String("Test".to_string()));
+        let atom = Atom::with_symbol("A".to_string(), "O".to_string());
+        frame.add_atom(atom, [1.0, 2.0, 3.0]);
+        let atom = Atom::new("B".to_string());
+        frame.add_atom(atom, [1.0, 2.0, 3.0]);
+        let atom = Atom::new("C".to_string());
+        frame.add_atom(atom, [1.0, 2.0, 3.0]);
+        let atom = Atom::new("D".to_string());
+        frame.add_atom(atom, [1.0, 2.0, 3.0]);
+
+        // atomic properties
+        frame[0]
+            .properties
+            .insert("string".to_string(), Property::String("atom_0".to_string()));
+        frame[1]
+            .properties
+            .insert("string".to_string(), Property::String("atom_1".to_string()));
+        frame[2]
+            .properties
+            .insert("string".to_string(), Property::String("atom_2".to_string()));
+        frame[3]
+            .properties
+            .insert("string".to_string(), Property::String("atom_2".to_string()));
+
+        frame[0]
+            .properties
+            .insert("bool".to_string(), Property::Bool(true));
+        frame[1]
+            .properties
+            .insert("bool".to_string(), Property::Bool(false));
+        frame[2]
+            .properties
+            .insert("bool".to_string(), Property::Bool(true));
+        frame[3]
+            .properties
+            .insert("bool".to_string(), Property::Bool(true));
+
+        frame[0]
+            .properties
+            .insert("double".to_string(), Property::Double(10.0));
+        frame[1]
+            .properties
+            .insert("double".to_string(), Property::Double(11.0));
+        frame[2]
+            .properties
+            .insert("double".to_string(), Property::Double(12.0));
+        frame[3]
+            .properties
+            .insert("double".to_string(), Property::Double(13.0));
+
+        frame[0]
+            .properties
+            .insert("vector".to_string(), Property::Vector3D([10.0, 20.0, 30.0]));
+        frame[1]
+            .properties
+            .insert("vector".to_string(), Property::Vector3D([11.0, 21.0, 31.0]));
+        frame[2]
+            .properties
+            .insert("vector".to_string(), Property::Vector3D([12.0, 22.0, 32.0]));
+        frame[3]
+            .properties
+            .insert("vector".to_string(), Property::Vector3D([13.0, 23.0, 33.0]));
+
+        // not saved, bad property name
+        frame[0]
+            .properties
+            .insert("value with spaces".to_string(), Property::Double(0.0));
+        frame[1]
+            .properties
+            .insert("value with spaces".to_string(), Property::Double(0.0));
+        frame[2]
+            .properties
+            .insert("value with spaces".to_string(), Property::Double(0.0));
+        frame[3]
+            .properties
+            .insert("value with spaces".to_string(), Property::Double(0.0));
+
+        // not saved, different types
+        frame[0]
+            .properties
+            .insert("value".to_string(), Property::Double(0.0));
+        frame[1]
+            .properties
+            .insert("value".to_string(), Property::String("0.0".to_string()));
+        frame[2]
+            .properties
+            .insert("value".to_string(), Property::Bool(false));
+        frame[3]
+            .properties
+            .insert("value".to_string(), Property::Double(0.0));
+
+        trajectory.write(&frame).unwrap();
+
+        frame.unit_cell = UnitCell::new_from_lengths([12.0, 13.0, 14.0]);
+        frame
+            .properties
+            .insert("is_open".to_string(), Property::Bool(false));
+        frame
+            .properties
+            .insert("speed".to_string(), Property::Double(33.4));
+        frame
+            .properties
+            .insert("direction".to_string(), Property::Vector3D([1.0, 0.0, 2.0]));
+        frame
+            .properties
+            .insert("with space".to_string(), Property::Bool(true));
+        frame
+            .properties
+            .insert("quotes'".to_string(), Property::Bool(true));
+        frame
+            .properties
+            .insert("quotes\"".to_string(), Property::Bool(true));
+
+        // properties with two types of quotes are skipped
+        frame
+            .properties
+            .insert("all_quotes'\"".to_string(), Property::Bool(true));
+
+        let atom = Atom::new("E".to_string());
+        frame.add_atom(atom, [4.0, 5.0, 6.0]);
+
+        let atom = Atom::new("F".to_string());
+        frame.add_atom(atom, [4.0, 5.0, 6.0]);
+
+        trajectory.write(&frame).unwrap();
+
+        let contents = std::fs::read_to_string(named_tmpfile.path()).unwrap();
+        assert_eq!(contents, EXPECTED_CONTENT);
     }
 }

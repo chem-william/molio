@@ -124,7 +124,35 @@ impl IntoIterator for Properties {
     }
 }
 
+impl<'a> IntoIterator for &'a Properties {
+    type Item = (&'a String, &'a Property);
+    type IntoIter = <&'a HashMap<String, Property> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Properties {
+    type Item = (&'a String, &'a mut Property);
+    type IntoIter = <&'a mut HashMap<String, Property> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter_mut()
+    }
+}
+
 impl Property {
+    pub fn kind(&self) -> PropertyKind {
+        match self {
+            Property::Bool(_) => PropertyKind::Bool,
+            Property::Double(_) => PropertyKind::Double,
+            Property::String(_) => PropertyKind::String,
+            Property::Vector3D(_) => PropertyKind::Vector3D,
+            Property::Matrix3x3(_) => PropertyKind::Matrix3x3,
+            Property::VectorXD(_) => PropertyKind::VectorXD,
+        }
+    }
     #[must_use]
     pub fn as_bool(&self) -> Option<bool> {
         if let Property::Bool(b) = *self {
@@ -619,5 +647,32 @@ mod tests {
 
         // Should not be equal
         assert_ne!(prop1, prop3);
+    }
+
+    #[test]
+    fn test_properties_iter() {
+        let mut properties = Properties::new();
+        properties.insert("bool_prop".to_string(), Property::Bool(true));
+        properties.insert("double_prop".to_string(), Property::Double(3.140));
+
+        // Test direct iteration over properties
+        let mut prop_count = 0;
+        for (key, prop) in properties.iter() {
+            prop_count += 1;
+            match key.as_str() {
+                "bool_prop" => assert_eq!(prop.as_bool(), Some(true)),
+                "double_prop" => assert_approx_eq!(prop.expect_double(), 3.140),
+                _ => panic!("Unexpected property key: {key}"),
+            }
+        }
+        assert_eq!(prop_count, 2);
+
+        // Test iteration through IntoIterator implementation
+        let mut prop_count = 0;
+        for (key, _) in &properties {
+            prop_count += 1;
+            assert!(key == "bool_prop" || key == "double_prop");
+        }
+        assert_eq!(prop_count, 2);
     }
 }
