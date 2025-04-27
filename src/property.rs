@@ -482,12 +482,9 @@ mod tests {
         let mut properties = Properties::new();
 
         // Test insertion
-        properties.insert("bool_prop".to_string(), Property::Bool(true));
-        properties.insert("double_prop".to_string(), Property::Double(3.140));
-        properties.insert(
-            "string_prop".to_string(),
-            Property::String("hello".to_string()),
-        );
+        properties.insert("bool_prop".into(), Property::Bool(true));
+        properties.insert("double_prop".into(), Property::Double(3.140));
+        properties.insert("string_prop".into(), Property::String("hello".to_string()));
 
         // Test retrieval
         assert_eq!(properties.get("bool_prop").unwrap().as_bool(), Some(true));
@@ -504,7 +501,7 @@ mod tests {
         assert!(properties.get("nonexistent").is_none());
 
         // Test update
-        properties.insert("bool_prop".to_string(), Property::Bool(false));
+        properties.insert("bool_prop".into(), Property::Bool(false));
         assert_eq!(properties.get("bool_prop").unwrap().as_bool(), Some(false));
 
         // Test removal
@@ -514,8 +511,8 @@ mod tests {
         // Test iteration
         let keys: Vec<_> = properties.keys().cloned().collect();
         assert_eq!(keys.len(), 2);
-        assert!(keys.contains(&"bool_prop".to_string()));
-        assert!(keys.contains(&"double_prop".to_string()));
+        assert!(keys.contains(&"bool_prop".into()));
+        assert!(keys.contains(&"double_prop".into()));
     }
 
     #[test]
@@ -661,8 +658,8 @@ mod tests {
     #[test]
     fn test_properties_iter() {
         let mut properties = Properties::new();
-        properties.insert("bool_prop".to_string(), Property::Bool(true));
-        properties.insert("double_prop".to_string(), Property::Double(3.140));
+        properties.insert("bool_prop".into(), Property::Bool(true));
+        properties.insert("double_prop".into(), Property::Double(3.140));
 
         // Test direct iteration over properties
         let mut prop_count = 0;
