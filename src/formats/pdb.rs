@@ -1223,8 +1223,8 @@ impl FileFormat for PDBFormat<'_> {
             ));
         }
 
-        for idx in 0..frame.size() {
-            let connections = connect[idx].len();
+        for (idx, c) in connect.iter().enumerate().take(frame.size()) {
+            let connections = c.len();
             let lines = connections / 4 + 1;
             if connections == 0 {
                 continue;
@@ -1240,8 +1240,8 @@ impl FileFormat for PDBFormat<'_> {
                 )?;
 
                 let last = std::cmp::min(connections, 4 * (conect_line + 1));
-                for j in (4 * conect_line)..last {
-                    write!(writer, "{:>5}", PDBFormat::to_pdb_index(connect[idx][j], 5))?;
+                for c_ij in c.iter().take(last).skip(4 * conect_line) {
+                    write!(writer, "{:>5}", PDBFormat::to_pdb_index(*c_ij, 5))?;
                 }
                 writeln!(writer)?;
             }
