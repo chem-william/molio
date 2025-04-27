@@ -1,5 +1,4 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use molio::trajectory::Trajectory;
 use std::path::Path;
 use std::time::Duration;
 
