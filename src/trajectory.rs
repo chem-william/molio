@@ -89,7 +89,7 @@ impl Trajectory {
     }
 }
 
-impl TrajectoryReader<'_> {
+impl<'a> TrajectoryReader<'a> {
     /// Reads the next frame from the trajectory
     pub fn read(&mut self) -> Result<Option<Frame>, CError> {
         self.strategy.read(&mut self.reader)
@@ -117,7 +117,7 @@ impl TrajectoryReader<'_> {
     }
 
     /// Returns an iterator over all frames in the trajectory
-    pub fn frames(&mut self) -> impl Iterator<Item = Result<Frame, CError>> + '_ {
+    pub fn frames(&'a mut self) -> impl Iterator<Item = Result<Frame, CError>> + 'a {
         let indices = 0..self.size;
         indices.filter_map(move |i| self.frame_index(i).map(|idx| self.read_frame(idx)))
     }
