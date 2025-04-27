@@ -40,16 +40,17 @@ impl Topology {
         self.atoms.len()
     }
 
-    pub fn resize(&mut self, size: usize) {
+    pub fn resize(&mut self, size: usize) -> Result<(), CError> {
         for bond in &self.connect.bonds {
             if bond[0] >= size || bond[1] >= size {
-                panic!(
+                return Err(CError::GenericError(format!(
                     "can not resize the topology to contain {size} as there is a bond between atoms {} - {}",
                     bond[0], bond[1]
-                );
+                )));
             }
         }
         self.atoms.resize(size, Atom::new("X".to_string()));
+        Ok(())
     }
 
     pub fn bonds(&self) -> Vec<Bond> {

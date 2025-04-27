@@ -845,7 +845,7 @@ F 4.0 5.0 6.0
         matrix[(2, 2)] = 7.283_6;
         let mut frame = Frame::new();
         frame.unit_cell = UnitCell::new_from_matrix(matrix).unwrap();
-        frame.resize(1);
+        frame.resize(1).unwrap();
 
         let named_tmpfile = Builder::new()
             .prefix("triclinic-xyz")

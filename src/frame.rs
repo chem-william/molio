@@ -63,12 +63,13 @@ impl Frame {
         self.topology.add_residue(residue)
     }
 
-    pub fn resize(&mut self, size: usize) {
-        self.topology.resize(size);
+    pub fn resize(&mut self, size: usize) -> Result<(), CError> {
+        self.topology.resize(size)?;
         self.positions.resize(size, [0.0, 0.0, 0.0]);
         // if self.velocities.is_some() {
         //     self.velocities.resize();
         // }
+        Ok(())
     }
 
     /// Add a bond in the system, between the atoms at index `i` and
