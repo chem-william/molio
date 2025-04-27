@@ -8,10 +8,9 @@ pub enum CError {
     IoError(#[from] std::io::Error),
     #[error("generic error: {0}")]
     GenericError(String),
-    #[error("{format} format: not enough lines at step {step} (expected {expected}, got {got})")]
+    #[error("{format} format: not enough lines (expected {expected}, got {got})")]
     UnexpectedEof {
         format: String,
-        step: usize,
         expected: usize,
         got: usize,
     },

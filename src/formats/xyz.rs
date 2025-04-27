@@ -395,21 +395,18 @@ impl FileFormat for XYZFormat {
         }
         let n_atoms: usize = line.trim().parse().unwrap();
 
-        let mut line_position = 0;
         for i in 0..=n_atoms {
             line.clear();
             let bytes = reader.read_line(&mut line)?;
             if bytes == 0 {
                 return Err(CError::UnexpectedEof {
                     format: "XYZ".to_string(),
-                    step: line_position,
                     expected: n_atoms + 2, // first count line + n_atoms atom lines + blank/comment?
                     got: i + 1,            // how many we actually read
                 });
             }
         }
         let position = reader.stream_position().unwrap();
-        line_position += 1;
         Ok(Some(position))
     }
 
