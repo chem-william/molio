@@ -1,3 +1,5 @@
+[![Codecov](https://codecov.io/github/chem-william/molio/coverage.svg?branch=main)](https://codecov.io/gh/chem-william/molio)
+
 # molio
 
 A Rust library for parsing molecular trajectory files.
