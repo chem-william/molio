@@ -25,7 +25,7 @@ impl Index<usize> for Angle {
     ///
     /// Panics if `index` is not 0, 1, or 2
     fn index(&self, index: usize) -> &Self::Output {
-        assert!(index < 3, "can not access atom n° {} in angle", index);
+        assert!(index < 3, "can not access atom n° {index} in angle");
         &self.data[index]
     }
 }

@@ -25,9 +25,7 @@ impl Index<usize> for Dihedral {
     ///
     /// Panics if `index` is not 0, 1, 2 or 3.
     fn index(&self, index: usize) -> &Self::Output {
-        if index >= 4 {
-            panic!("can not access atom n° {index} in dihedral")
-        }
+        assert!(index < 4, "can not access atom n° {index} in dihedral");
 
         &self.data[index]
     }
@@ -36,12 +34,15 @@ impl Index<usize> for Dihedral {
 impl Dihedral {
     /// Create a new `Dihedral` containing the atoms `i`, `j`, `k` and `m`.
     pub fn new(i: usize, j: usize, k: usize, m: usize) -> Self {
-        if i == j || j == k || k == m {
-            panic!("cannot have an atom linked to itself in a dihedral angle");
-        }
-        if i == k || j == m || i == m {
-            panic!("cannot have an atom twice in a dihedral angle");
-        }
+        assert!(
+            !(i == j || j == k || k == m),
+            "cannot have an atom linked to itself in a dihedral angle"
+        );
+
+        assert!(
+            !(i == k || j == m || i == m),
+            "cannot have an atom twice in a dihedral angle"
+        );
 
         let data = if std::cmp::max(i, j) < std::cmp::max(k, m) {
             [i, j, k, m]

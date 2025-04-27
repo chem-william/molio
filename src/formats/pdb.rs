@@ -15,10 +15,10 @@ use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
 use super::pdb_connectivity::{self, find};
 
 /// Maximum value for a width 4 number
-const MAX_HYBRID36_W4_NUMBER: i64 = 2436111;
+const MAX_HYBRID36_W4_NUMBER: i64 = 2_436_111;
 
 /// Maximum value for a width 5 number
-const MAX_HYBRID36_W5_NUMBER: i64 = 87440031;
+const MAX_HYBRID36_W5_NUMBER: i64 = 87_440_031;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Record {
@@ -118,7 +118,7 @@ fn decode_pure(s: &str) -> i64 {
 
     for c in s.chars() {
         result *= base;
-        result += digit_to_value(c) as i64;
+        result += i64::from(digit_to_value(c));
     }
 
     result
@@ -127,7 +127,7 @@ fn decode_pure(s: &str) -> i64 {
 fn encode_pure(digits: &str, value: i64) -> String {
     if value == 0 {
         return digits.chars().nth(1).unwrap().to_string();
-    };
+    }
 
     let n = i64::try_from(digits.len()).unwrap();
     let mut result = String::new();
@@ -146,9 +146,9 @@ fn encode_pure(digits: &str, value: i64) -> String {
 
 fn digit_to_value(c: char) -> i32 {
     match c {
-        '0'..='9' => (c as u8 - b'0') as i32,
-        'A'..='Z' => (c as u8 - b'A') as i32 + 10,
-        'a'..='z' => (c as u8 - b'a') as i32 + 10,
+        '0'..='9' => i32::from(c as u8 - b'0'),
+        'A'..='Z' => i32::from(c as u8 - b'A') + 10,
+        'a'..='z' => i32::from(c as u8 - b'a') + 10,
         _ => panic!("Invalid character: {c}"),
     }
 }
@@ -220,12 +220,12 @@ pub(crate) fn encode_hybrid36(width: usize, value: i64) -> String {
     // the number is too negative to be encoded
     if value < (1 - pow_int(10, width - 1)) {
         return "*".repeat(width);
-    };
+    }
 
     // no need to encode
     if value < pow_int(10, width) {
         return value.to_string();
-    };
+    }
 
     // use upper case set
     let mut val = value;
@@ -233,7 +233,7 @@ pub(crate) fn encode_hybrid36(width: usize, value: i64) -> String {
     if val < 26 * pow_int(36, width - 1) {
         val += 10 * pow_int(36, width - 1);
         return encode_pure(DIGITS_UPPER, val);
-    };
+    }
 
     // use lower case set
     val -= 26 * pow_int(36, width - 1);
@@ -250,7 +250,7 @@ pub struct PDBFormat<'a> {
     /// Residue information in the current step
     pub residues: RefCell<Vec<(FullResidueId, Residue)>>,
 
-    /// List of all atom offsets. This maybe pushed in read_ATOM or if a TER
+    /// List of all atom offsets. This maybe pushed in `parse_atom` or if a TER
     /// record is found. It is reset every time a frame is read.
     pub atom_offsets: RefCell<Vec<usize>>,
 
@@ -296,13 +296,13 @@ impl<'a> PDBFormat<'a> {
                     usize::try_from(unwrapped).expect("decode_hybrid36 returned a negative number")
                         - 1,
                 );
-            };
+            }
         }
 
         let name = &line[12..16].trim();
         let mut atom = if line.len() >= 78 {
             let atom_type = &line[76..78];
-            let name = name.to_string();
+            let name = (*name).to_string();
             let symbol = atom_type.trim().to_string();
             Atom::with_symbol(name, symbol)
         } else {
@@ -324,10 +324,9 @@ impl<'a> PDBFormat<'a> {
 
         let atom_id = frame.size() - 1;
         let insertion_code = line.chars().nth(26).unwrap();
-        let resid = match decode_hybrid36(4, &line[22..26]) {
-            Ok(resid) => resid,
-            // No residue information so return early
-            Err(_) => return Ok(()),
+        // If there's no residue information so return early
+        let Ok(resid) = decode_hybrid36(4, &line[22..26]) else {
+            return Ok(());
         };
 
         let chain = &line.chars().nth(21).unwrap();
@@ -514,7 +513,7 @@ impl<'a> PDBFormat<'a> {
         Ok(usize::try_from(pdb_atom_id).unwrap() - self.atom_offsets.borrow().first().unwrap())
     }
 
-    fn add_bond(&self, frame: &mut Frame, line: &str, i: usize, j: usize) {
+    fn add_bond(frame: &mut Frame, line: &str, i: usize, j: usize) {
         if i >= frame.size() || j >= frame.size() {
             eprintln!(
                 "warning: PDB reader: ignoring CONECT ('{}') with atomic indexes bigger than frame size ({})",
@@ -539,29 +538,29 @@ impl<'a> PDBFormat<'a> {
 
         if line_length > 11 {
             let index_j = self.read_index(line, 11).unwrap();
-            self.add_bond(frame, line, index_i, index_j);
-        };
+            PDBFormat::add_bond(frame, line, index_i, index_j);
+        }
 
         if line_length > 16 {
             let index_j = self.read_index(line, 16).unwrap();
-            self.add_bond(frame, line, index_i, index_j);
-        };
+            PDBFormat::add_bond(frame, line, index_i, index_j);
+        }
 
         if line_length > 21 {
             let index_j = self.read_index(line, 21).unwrap();
-            self.add_bond(frame, line, index_i, index_j);
-        };
+            PDBFormat::add_bond(frame, line, index_i, index_j);
+        }
 
         if line_length > 26 {
             let index_j = self.read_index(line, 26).unwrap();
-            self.add_bond(frame, line, index_i, index_j);
-        };
+            PDBFormat::add_bond(frame, line, index_i, index_j);
+        }
     }
 
     fn parse_helix(&self, line: &str) -> Result<(), CError> {
         if line.len() < 33 + 5 {
             eprintln!("warning: HELIX record too short: {line}");
-        };
+        }
 
         let chain_start = line.chars().nth(19).expect("start of chain");
         let chain_end = line.chars().nth(31).expect("end of chain");
@@ -585,6 +584,7 @@ impl<'a> PDBFormat<'a> {
             resname: resname_start.to_string(),
             insertion_code: inscode_start,
         };
+
         let end = FullResidueId {
             chain: chain_end,
             resid: resid_end,
@@ -614,7 +614,7 @@ impl<'a> PDBFormat<'a> {
     fn parse_secondary(&self, line: &str, start: usize, end: usize) -> Result<(), CError> {
         if line.len() < end + 10 {
             eprintln!("warning: secondary structure record too short: '{line}'");
-        };
+        }
 
         let resname_start = &line[start..start + 3].trim();
         let resname_end = &line[end..end + 3].trim();
@@ -848,7 +848,7 @@ impl<'a> PDBFormat<'a> {
     }
 
     fn get_residue_information(
-        residue: &Option<Residue>,
+        residue: Option<&Residue>,
         max_resid: &mut i64,
     ) -> ResidueInformation {
         let mut info = ResidueInformation::new();
@@ -858,17 +858,18 @@ impl<'a> PDBFormat<'a> {
             *max_resid += 1;
             info.resid = PDBFormat::to_pdb_index(val, 4);
             return info;
-        };
+        }
 
         let residue = residue.as_ref().unwrap();
 
         if residue
             .get("is_standard_pdb")
-            .and_then(|prop| prop.as_bool())
+            .and_then(Property::as_bool)
             .unwrap_or(false)
         {
             info.atom_hetatm = "ATOM  ".to_string();
-        };
+        }
+
         info.resname = residue.name.clone();
         if info.resname.len() > 3 {
             eprint!(
@@ -876,15 +877,15 @@ impl<'a> PDBFormat<'a> {
                 info.resname
             );
             info.resname = info.resname.chars().take(3).collect();
-        };
+        }
 
         if residue.id.is_some() {
             info.resid = PDBFormat::to_pdb_index(residue.id.unwrap() - 1, 4);
-        };
+        }
 
         info.chainid = residue
             .get("chainid")
-            .and_then(|prop| prop.as_string())
+            .and_then(Property::as_string)
             .unwrap_or(" ")
             .to_string();
         if info.chainid.len() > 1 {
@@ -893,11 +894,11 @@ impl<'a> PDBFormat<'a> {
                 info.chainid
             );
             info.chainid = info.chainid.chars().nth(0).unwrap().to_string();
-        };
+        }
 
         info.insertion_code = residue
             .get("insertion_code")
-            .and_then(|prop| prop.as_string())
+            .and_then(Property::as_string)
             .unwrap_or("")
             .to_string();
         if info.insertion_code.len() > 1 {
@@ -906,11 +907,11 @@ impl<'a> PDBFormat<'a> {
                 info.insertion_code
             );
             info.insertion_code = info.insertion_code.chars().nth(0).unwrap().to_string();
-        };
+        }
 
         info.segment = residue
             .get("segname")
-            .and_then(|prop| prop.as_string())
+            .and_then(Property::as_string)
             .unwrap_or("")
             .to_string();
         if info.segment.len() > 4 {
@@ -919,11 +920,11 @@ impl<'a> PDBFormat<'a> {
                 info.segment
             );
             info.segment = info.segment.chars().take(4).collect();
-        };
+        }
 
         info.composition_type = residue
             .get("composition_type")
-            .and_then(|prop| prop.as_string())
+            .and_then(Property::as_string)
             .unwrap_or("")
             .to_string();
 
@@ -1137,7 +1138,7 @@ impl FileFormat for PDBFormat<'_> {
             }
 
             let residue = frame.topology().residue_for_atom(idx);
-            let resinfo = PDBFormat::get_residue_information(&residue, &mut max_resid);
+            let resinfo = PDBFormat::get_residue_information(residue.as_ref(), &mut max_resid);
 
             if resinfo.atom_hetatm == "ATOM  " {
                 is_atom_record[idx] = true;

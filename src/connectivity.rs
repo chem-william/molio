@@ -71,10 +71,11 @@ impl Connectivity {
 
         if i > self.biggest_atom {
             self.biggest_atom = i;
-        };
+        }
+
         if j > self.biggest_atom {
             self.biggest_atom = j;
-        };
+        }
 
         if was_new {
             let diff = self

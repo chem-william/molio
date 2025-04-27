@@ -8,6 +8,7 @@ use crate::frame::Frame;
 use crate::property::{Properties, Property, PropertyKind};
 use crate::unit_cell::{self, UnitCell};
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Write as _;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
 use std::str::SplitWhitespace;
@@ -183,7 +184,7 @@ impl XYZFormat {
     fn get_atom_properties(frame: &Frame) -> PropertiesList {
         if frame.size() == 0 {
             return PropertiesList::new();
-        };
+        }
 
         let mut all_properties = HashMap::new();
         let mut partially_defined_already_warned = HashSet::new();
@@ -269,7 +270,7 @@ impl XYZFormat {
                 PropertyKind::Matrix3x3 => ('R', 9),
                 PropertyKind::VectorXD => todo!(),
             };
-            result.push_str(&format!(":{}:{prop_type}:{count}", property.0));
+            write!(result, ":{}:{prop_type}:{count}", property.0).unwrap();
         }
 
         // support for lattice
@@ -279,7 +280,8 @@ impl XYZFormat {
                 .unit_cell
                 .matrix
                 .map(|m| if m.abs() < 1e-12 { 0.0 } else { m });
-            result.push_str(&format!(
+            write!(
+                result,
                 " Lattice=\"{:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?}\"",
                 m[(0, 0)],
                 m[(0, 1)],
@@ -290,7 +292,8 @@ impl XYZFormat {
                 m[(2, 0)],
                 m[(2, 1)],
                 m[(2, 2)]
-            ));
+            )
+            .unwrap();
         }
 
         // sort properties to have reproducible output
@@ -301,9 +304,9 @@ impl XYZFormat {
             if XYZFormat::should_be_quoted(item.0) {
                 // quote the string
                 if !item.0.contains('\"') {
-                    result.push_str(&format!(" \"{}\"=", item.0));
+                    write!(result, " \"{}\"=", item.0).unwrap();
                 } else if !item.0.contains('\'') {
-                    result.push_str(&format!(" '{}'=", item.0));
+                    write!(result, " '{}'=", item.0).unwrap();
                 } else {
                     eprintln!(
                         "warning: frame property '{}' contains both single and double quote. it will not be saved",
@@ -312,23 +315,25 @@ impl XYZFormat {
                     continue;
                 }
             } else {
-                result.push_str(&format!(" {}=", item.0));
+                write!(result, " {}=", item.0).unwrap();
             }
 
             match item.1.kind() {
-                PropertyKind::String => result.push_str(&format!("\"{}\"", item.1.expect_string())),
+                PropertyKind::String => write!(result, "\"{}\"", item.1.expect_string()).unwrap(),
                 PropertyKind::Bool => result.push_str(if item.1.expect_bool() { "T" } else { "F" }),
-                PropertyKind::Double => result.push_str(&format!("{:?}", item.1.expect_double())),
+                PropertyKind::Double => write!(result, "{:?}", item.1.expect_double()).unwrap(),
                 PropertyKind::Vector3D => {
                     let v = item.1.expect_vector3d();
-                    result.push_str(&format!("\"{:?} {:?} {:?}\"", v[0], v[1], v[2]));
+                    write!(result, "\"{:?} {:?} {:?}\"", v[0], v[1], v[2]).unwrap();
                 }
                 PropertyKind::Matrix3x3 => {
                     let v = item.1.expect_matrix3x3();
-                    result.push_str(&format!(
+                    write!(
+                        result,
                         "\"{:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?}\"",
                         v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]
-                    ));
+                    )
+                    .unwrap();
                 }
                 PropertyKind::VectorXD => todo!(),
             }
@@ -439,7 +444,7 @@ impl FileFormat for XYZFormat {
                         write!(writer, " T")?;
                     } else {
                         write!(writer, " F")?;
-                    };
+                    }
                 } else if *property.1 == PropertyKind::Double {
                     write!(writer, " {:?}", val.expect_double())?;
                 } else if *property.1 == PropertyKind::Vector3D {

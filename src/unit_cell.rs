@@ -224,7 +224,7 @@ impl UnitCell {
             return Err(CError::GenericError(
                 "invalid unit cell matrix with negative determinant".to_string(),
             ));
-        };
+        }
 
         let lengths = utils::calc_lengths_from_matrix(matrix);
         let angles = utils::calc_angles_from_matrix(matrix);
@@ -232,7 +232,7 @@ impl UnitCell {
         let is_diagonal_matrix = utils::is_diagonal(matrix);
         if !is_diagonal_matrix && utils::is_orthorhombic(lengths, angles) {
             return Err(CError::GenericError("orthorhombic cell must have their a vector along x axis, b vector along y axis and c vector along z axis".to_string()));
-        };
+        }
 
         let shape = if is_diagonal_matrix {
             if matrix.diagonal().iter().all(|&x| utils::is_roughly_zero(x)) {

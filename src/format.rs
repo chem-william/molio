@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
 
+#[derive(Clone, Copy)]
 pub enum TextFormat {
     XYZ,
     PDB,

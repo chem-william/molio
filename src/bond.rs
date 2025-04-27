@@ -67,9 +67,7 @@ impl Bond {
     ///
     /// Panics if `i == j`.
     pub fn new(i: usize, j: usize) -> Self {
-        if i == j {
-            panic!("can not have a bond between an atom and itself");
-        }
+        assert!(i != j, "can not have a bond between an atom and itself");
         let a = std::cmp::min(i, j);
         let b = std::cmp::max(i, j);
         Bond { data: [a, b] }

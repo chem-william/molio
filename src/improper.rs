@@ -59,7 +59,7 @@ impl Index<usize> for Improper {
     /// Panics if `index` is not 0, 1, 2 or 3.
     fn index(&self, index: usize) -> &Self::Output {
         if index >= 4 {
-            panic!("can not access atom n° {} in dihedral", index)
+            panic!("can not access atom n° {index} in dihedral")
         }
 
         &self.data[index]

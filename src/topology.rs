@@ -96,7 +96,7 @@ impl Topology {
             return Err(CError::GenericError(format!(
                 "out of bounds atomic index. We have {amount_atoms}, but the bond indices are {i} and {j}"
             )));
-        };
+        }
 
         self.connect.add_bond(i, j, bond_order);
         Ok(())
@@ -109,7 +109,7 @@ impl Topology {
             return Err(CError::GenericError(format!(
                 "out of bounds atomic index. We have {amount_atoms}, but the bond indices are {i} and {j}"
             )));
-        };
+        }
 
         self.connect.remove_bond(i, j);
         Ok(())

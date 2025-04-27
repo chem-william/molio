@@ -163,7 +163,7 @@ impl Drop for TrajectoryWriter<'_> {
         // Attempt to finalize the file when the writer is dropped.
         // Ignore errors since we can't return them from drop().
         if let Err(e) = self.finish() {
-            eprintln!("Warning: Failed to finalize trajectory file: {}", e);
+            eprintln!("warning: Failed to finalize trajectory file: {e}");
         }
     }
 }
