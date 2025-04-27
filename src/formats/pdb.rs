@@ -309,7 +309,7 @@ impl<'a> PDBFormat<'a> {
         let altloc = &line[16..17];
         if altloc != " " {
             atom.properties
-                .insert("altloc".into(), Property::String(altloc.to_string()));
+                .insert("altloc".to_string(), Property::String(altloc.to_string()));
         }
 
         let x = Property::parse_value(line[30..38].trim(), &PropertyKind::Double)?.expect_double();
@@ -358,7 +358,7 @@ impl<'a> PDBFormat<'a> {
 
             if insertion_code != ' ' {
                 residue.properties.insert(
-                    "insertion_code".into(),
+                    "insertion_code".to_string(),
                     Property::String(insertion_code.to_string()),
                 );
             }
@@ -366,18 +366,18 @@ impl<'a> PDBFormat<'a> {
             // Set whether or not the residue is standardized
             residue
                 .properties
-                .insert("is_standard_pdb".into(), Property::Bool(!is_hetatm));
+                .insert("is_standard_pdb".to_string(), Property::Bool(!is_hetatm));
 
             // This is saved as a string (instead of a number) on purpose
             // to match MMTF format
             residue.properties.insert(
-                "chainid".into(),
+                "chainid".to_string(),
                 Property::String(line.chars().nth(21).unwrap().to_string()),
             );
 
             // PDB format makes no distinction between chainid and chainname
             residue.properties.insert(
-                "chainname".into(),
+                "chainname".to_string(),
                 Property::String(line.chars().nth(21).unwrap().to_string()),
             );
 
@@ -388,7 +388,7 @@ impl<'a> PDBFormat<'a> {
                 if !segname.is_empty() {
                     residue
                         .properties
-                        .insert("segname".into(), Property::String(segname.to_string()));
+                        .insert("segname".to_string(), Property::String(segname.to_string()));
                 }
             }
 
@@ -399,7 +399,7 @@ impl<'a> PDBFormat<'a> {
                 let current_secinfo_borrow = self.current_secinfo.borrow();
                 if let Some((end_residue_id, description)) = current_secinfo_borrow.as_ref() {
                     residue.properties.insert(
-                        "secondary_structure".into(),
+                        "secondary_structure".to_string(),
                         Property::String(description.to_string()),
                     );
 
@@ -417,7 +417,7 @@ impl<'a> PDBFormat<'a> {
             if let Some(secinfo_for_residue) = self.secinfo.borrow().get(&full_residue_id) {
                 *self.current_secinfo.borrow_mut() = Some(secinfo_for_residue.clone());
                 residue.properties.insert(
-                    "secondary_structure".into(),
+                    "secondary_structure".to_string(),
                     Property::String(secinfo_for_residue.1.to_string()),
                 );
             }
@@ -823,19 +823,19 @@ impl FileFormat for PDBFormat<'_> {
                 Record::HEADER => {
                     if line.len() >= 50 {
                         frame.properties.insert(
-                            "classification".into(),
+                            "classification".to_string(),
                             Property::String(line[10..50].trim().to_string()),
                         );
                     }
                     if line.len() >= 59 {
                         frame.properties.insert(
-                            "deposition_date".into(),
+                            "deposition_date".to_string(),
                             Property::String(line[50..59].trim().to_string()),
                         );
                     }
                     if line.len() >= 66 {
                         frame.properties.insert(
-                            "pdb_idcode".into(),
+                            "pdb_idcode".to_string(),
                             Property::String(line[62..66].trim().to_string()),
                         );
                     }
@@ -857,7 +857,7 @@ impl FileFormat for PDBFormat<'_> {
                     };
                     frame
                         .properties
-                        .insert("name".into(), Property::String(new_title));
+                        .insert("name".to_string(), Property::String(new_title));
                 }
                 Record::CRYST1 => PDBFormat::parse_cryst1(&mut frame, &line).unwrap(),
                 Record::ATOM => self.parse_atom(&mut frame, &line, false).unwrap(),

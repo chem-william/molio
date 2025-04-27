@@ -1,5 +1,4 @@
 use nalgebra::Matrix3;
-use smol_str::ToSmolStr;
 
 use crate::atom::Atom;
 use crate::error::CError;
@@ -42,11 +41,11 @@ impl XYZFormat {
                 let z = tokens.next().ok_or(CError::MissingToken)?;
                 let value = format!("{x} {y} {z}");
                 let property = Property::parse_value(&value, kind)?;
-                atom.properties.insert(name.into(), property);
+                atom.properties.insert(name.clone(), property);
             } else {
                 let value = tokens.next().ok_or(CError::MissingToken)?;
                 let property = Property::parse_value(value, kind)?;
-                atom.properties.insert(name.into(), property);
+                atom.properties.insert(name.clone(), property);
             }
         }
 
@@ -57,14 +56,16 @@ impl XYZFormat {
         const PREFIX: &str = "species:S:1:pos:R:3:";
 
         let rest = line.strip_prefix(PREFIX).ok_or_else(|| {
-            CError::GenericError("Invalid property list format: missing expected prefix".into())
+            CError::GenericError(
+                "Invalid property list format: missing expected prefix".to_string(),
+            )
         })?;
 
         let fields: Vec<&str> = rest.split(':').collect();
 
         if fields.len() % 3 != 0 {
             return Err(CError::GenericError(
-                "Invalid property list format: property definitions must be in groups of 3 (name:type:count)".into(),
+                "Invalid property list format: property definitions must be in groups of 3 (name:type:count)".to_string(),
             ));
         }
 
@@ -95,10 +96,10 @@ impl XYZFormat {
 
             match (count, &kind) {
                 (3, PropertyKind::Double) => {
-                    properties.insert(name.into(), PropertyKind::Vector3D);
+                    properties.insert(name.to_string(), PropertyKind::Vector3D);
                 }
                 (1, k) => {
-                    properties.insert(name.into(), k.clone());
+                    properties.insert(name.to_string(), k.clone());
                 }
                 (n, k) => {
                     for i in 0..n {
@@ -116,20 +117,20 @@ impl XYZFormat {
         let lowercased = value.to_lowercase();
         if ["t", "true", "f", "false"].contains(&lowercased.as_str()) {
             return Property::parse_value(&lowercased, &PropertyKind::Bool)
-                .unwrap_or_else(|_| Property::String(value.into()));
+                .unwrap_or_else(|_| Property::String(value.to_string()));
         }
 
         // Try parsing as vector/matrix
         let parts: Vec<&str> = value.split_whitespace().collect();
         match parts.len() {
             1 => Property::parse_value(value, &PropertyKind::Double)
-                .unwrap_or_else(|_| Property::String(value.into())),
+                .unwrap_or_else(|_| Property::String(value.to_string())),
             3 => Property::parse_value(value, &PropertyKind::Vector3D)
-                .unwrap_or_else(|_| Property::String(value.into())),
+                .unwrap_or_else(|_| Property::String(value.to_string())),
             9 => Property::parse_value(value, &PropertyKind::Matrix3x3)
-                .unwrap_or_else(|_| Property::String(value.into())),
+                .unwrap_or_else(|_| Property::String(value.to_string())),
             _ => Property::parse_value(value, &PropertyKind::VectorXD)
-                .unwrap_or_else(|_| Property::String(value.into())),
+                .unwrap_or_else(|_| Property::String(value.to_string())),
         }
     }
 
@@ -147,7 +148,7 @@ impl XYZFormat {
         {
             frame
                 .properties
-                .insert(k.into(), Self::parse_frame_property(v));
+                .insert(k.clone(), Self::parse_frame_property(v));
         }
 
         if let Some(lattice) = properties.get("Lattice") {
@@ -251,7 +252,7 @@ impl XYZFormat {
         // Convert to BTreeMap for result
         let mut results = PropertiesList::new();
         for (name, kind) in all_properties {
-            results.insert(name.into(), kind);
+            results.insert(name, kind);
         }
         results
     }
@@ -357,7 +358,7 @@ impl FileFormat for XYZFormat {
             let _ = reader.read_line(&mut line)?;
             let mut tokens = line.split_whitespace();
 
-            let symbol = tokens.next().ok_or(CError::UnexpectedSymbol)?.into();
+            let symbol = tokens.next().ok_or(CError::UnexpectedSymbol)?.to_string();
 
             let x: f64 = tokens.next().ok_or(CError::MissingToken)?.parse()?;
             let y: f64 = tokens.next().ok_or(CError::MissingToken)?.parse()?;
@@ -400,7 +401,7 @@ impl FileFormat for XYZFormat {
             let bytes = reader.read_line(&mut line)?;
             if bytes == 0 {
                 return Err(CError::UnexpectedEof {
-                    format: "XYZ".into(),
+                    format: "XYZ".to_string(),
                     step: line_position,
                     expected: n_atoms + 2, // first count line + n_atoms atom lines + blank/comment?
                     got: i + 1,            // how many we actually read
@@ -427,7 +428,7 @@ impl FileFormat for XYZFormat {
             let mut name = atom.name.clone();
 
             if name.is_empty() {
-                name = "X".into();
+                name = "X".to_string();
             }
             write!(writer, "{name} {:?} {:?} {:?}", pos[0], pos[1], pos[2])?;
 
@@ -702,131 +703,131 @@ F 4.0 5.0 6.0
         let mut frame = Frame::new();
         frame
             .properties
-            .insert("name".into(), Property::String("Test".into()));
+            .insert("name".to_string(), Property::String("Test".to_string()));
         frame
             .properties
-            .insert("stress".into(), Property::Matrix3x3(Matrix3::zeros()));
-        let atom = Atom::with_symbol("A".into(), "O".into());
+            .insert("stress".to_string(), Property::Matrix3x3(Matrix3::zeros()));
+        let atom = Atom::with_symbol("A".to_string(), "O".to_string());
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
-        let atom = Atom::new("B".into());
+        let atom = Atom::new("B".to_string());
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
-        let atom = Atom::new("C".into());
+        let atom = Atom::new("C".to_string());
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
-        let atom = Atom::new("D".into());
+        let atom = Atom::new("D".to_string());
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
 
         // atomic properties
         frame[0]
             .properties
-            .insert("string".into(), Property::String("atom_0".into()));
+            .insert("string".to_string(), Property::String("atom_0".to_string()));
         frame[1]
             .properties
-            .insert("string".into(), Property::String("atom_1".into()));
+            .insert("string".to_string(), Property::String("atom_1".to_string()));
         frame[2]
             .properties
-            .insert("string".into(), Property::String("atom_2".into()));
+            .insert("string".to_string(), Property::String("atom_2".to_string()));
         frame[3]
             .properties
-            .insert("string".into(), Property::String("atom_2".into()));
+            .insert("string".to_string(), Property::String("atom_2".to_string()));
 
         frame[0]
             .properties
-            .insert("bool".into(), Property::Bool(true));
+            .insert("bool".to_string(), Property::Bool(true));
         frame[1]
             .properties
-            .insert("bool".into(), Property::Bool(false));
+            .insert("bool".to_string(), Property::Bool(false));
         frame[2]
             .properties
-            .insert("bool".into(), Property::Bool(true));
+            .insert("bool".to_string(), Property::Bool(true));
         frame[3]
             .properties
-            .insert("bool".into(), Property::Bool(true));
+            .insert("bool".to_string(), Property::Bool(true));
 
         frame[0]
             .properties
-            .insert("double".into(), Property::Double(10.0));
+            .insert("double".to_string(), Property::Double(10.0));
         frame[1]
             .properties
-            .insert("double".into(), Property::Double(11.0));
+            .insert("double".to_string(), Property::Double(11.0));
         frame[2]
             .properties
-            .insert("double".into(), Property::Double(12.0));
+            .insert("double".to_string(), Property::Double(12.0));
         frame[3]
             .properties
-            .insert("double".into(), Property::Double(13.0));
+            .insert("double".to_string(), Property::Double(13.0));
 
         frame[0]
             .properties
-            .insert("vector".into(), Property::Vector3D([10.0, 20.0, 30.0]));
+            .insert("vector".to_string(), Property::Vector3D([10.0, 20.0, 30.0]));
         frame[1]
             .properties
-            .insert("vector".into(), Property::Vector3D([11.0, 21.0, 31.0]));
+            .insert("vector".to_string(), Property::Vector3D([11.0, 21.0, 31.0]));
         frame[2]
             .properties
-            .insert("vector".into(), Property::Vector3D([12.0, 22.0, 32.0]));
+            .insert("vector".to_string(), Property::Vector3D([12.0, 22.0, 32.0]));
         frame[3]
             .properties
-            .insert("vector".into(), Property::Vector3D([13.0, 23.0, 33.0]));
+            .insert("vector".to_string(), Property::Vector3D([13.0, 23.0, 33.0]));
 
         // not saved, bad property name
         frame[0]
             .properties
-            .insert("value with spaces".into(), Property::Double(0.0));
+            .insert("value with spaces".to_string(), Property::Double(0.0));
         frame[1]
             .properties
-            .insert("value with spaces".into(), Property::Double(0.0));
+            .insert("value with spaces".to_string(), Property::Double(0.0));
         frame[2]
             .properties
-            .insert("value with spaces".into(), Property::Double(0.0));
+            .insert("value with spaces".to_string(), Property::Double(0.0));
         frame[3]
             .properties
-            .insert("value with spaces".into(), Property::Double(0.0));
+            .insert("value with spaces".to_string(), Property::Double(0.0));
 
         // not saved, different types
         frame[0]
             .properties
-            .insert("value".into(), Property::Double(0.0));
+            .insert("value".to_string(), Property::Double(0.0));
         frame[1]
             .properties
-            .insert("value".into(), Property::String("0.0".into()));
+            .insert("value".to_string(), Property::String("0.0".to_string()));
         frame[2]
             .properties
-            .insert("value".into(), Property::Bool(false));
+            .insert("value".to_string(), Property::Bool(false));
         frame[3]
             .properties
-            .insert("value".into(), Property::Double(0.0));
+            .insert("value".to_string(), Property::Double(0.0));
 
         trajectory.write(&frame).unwrap();
 
         frame.unit_cell = UnitCell::new_from_lengths([12.0, 13.0, 14.0]);
         frame
             .properties
-            .insert("is_open".into(), Property::Bool(false));
+            .insert("is_open".to_string(), Property::Bool(false));
         frame
             .properties
-            .insert("speed".into(), Property::Double(33.4));
+            .insert("speed".to_string(), Property::Double(33.4));
         frame
             .properties
-            .insert("direction".into(), Property::Vector3D([1.0, 0.0, 2.0]));
+            .insert("direction".to_string(), Property::Vector3D([1.0, 0.0, 2.0]));
         frame
             .properties
-            .insert("with space".into(), Property::Bool(true));
+            .insert("with space".to_string(), Property::Bool(true));
         frame
             .properties
-            .insert("quotes'".into(), Property::Bool(true));
+            .insert("quotes'".to_string(), Property::Bool(true));
         frame
             .properties
-            .insert("quotes\"".into(), Property::Bool(true));
+            .insert("quotes\"".to_string(), Property::Bool(true));
 
         // properties with two types of quotes are skipped
         frame
             .properties
-            .insert("all_quotes'\"".into(), Property::Bool(true));
+            .insert("all_quotes'\"".to_string(), Property::Bool(true));
 
-        let atom = Atom::new("E".into());
+        let atom = Atom::new("E".to_string());
         frame.add_atom(atom, [4.0, 5.0, 6.0]);
 
-        let atom = Atom::new("F".into());
+        let atom = Atom::new("F".to_string());
         frame.add_atom(atom, [4.0, 5.0, 6.0]);
 
         trajectory.write(&frame).unwrap();
