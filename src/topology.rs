@@ -144,3 +144,182 @@ impl Topology {
         false
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Atom, BondOrder, Residue, Topology};
+
+    #[test]
+    fn check_size() {
+        let mut topology = Topology::default();
+        assert_eq!(topology.size(), 0);
+
+        topology.atoms.push(Atom::new("C".to_string()));
+        topology.atoms.push(Atom::new("H".to_string()));
+        assert_eq!(topology.size(), 2);
+    }
+
+    #[test]
+    fn resize_success() {
+        let mut topology = Topology::default();
+        topology.atoms.push(Atom::new("C".to_string()));
+
+        // Resize to a larger size should succeed
+        assert!(topology.resize(3).is_ok());
+        assert_eq!(topology.size(), 3);
+
+        // Resize to the same size should succeed
+        assert!(topology.resize(3).is_ok());
+        assert_eq!(topology.size(), 3);
+
+        // Resize to a smaller size should succeed when no bonds exist
+        assert!(topology.resize(2).is_ok());
+        assert_eq!(topology.size(), 2);
+    }
+
+    #[test]
+    fn check_resize_with_bonds() {
+        let mut topology = Topology::default();
+
+        // Add three atoms
+        topology.atoms.push(Atom::new("C".to_string()));
+        topology.atoms.push(Atom::new("H".to_string()));
+        topology.atoms.push(Atom::new("O".to_string()));
+
+        // Add a bond
+        assert!(topology.add_bond(0, 2, BondOrder::Single).is_ok());
+
+        // Resize to a smaller size that would break the bond should fail
+        let result = topology.resize(2);
+        assert!(result.is_err());
+
+        // Topology size should remain unchanged
+        assert_eq!(topology.size(), 3);
+    }
+
+    #[test]
+    fn add_bond() {
+        let mut topology = Topology::default();
+
+        // Add atoms
+        topology.atoms.push(Atom::new("C".to_string()));
+        topology.atoms.push(Atom::new("H".to_string()));
+
+        // Adding a valid bond should succeed
+        assert!(topology.add_bond(0, 1, BondOrder::Single).is_ok());
+
+        // Adding an out-of-bounds bond should fail
+        let result = topology.add_bond(0, 2, BondOrder::Single);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn remove_bond() {
+        let mut topology = Topology::default();
+
+        // Add atoms
+        topology.atoms.push(Atom::new("C".to_string()));
+        topology.atoms.push(Atom::new("H".to_string()));
+
+        // Add a bond
+        assert!(topology.add_bond(0, 1, BondOrder::Single).is_ok());
+
+        // Removing an existing bond should succeed
+        assert!(topology.remove_bond(0, 1).is_ok());
+
+        // Bond should no longer exist
+        assert!(topology.bond_order(0, 1).is_err());
+
+        // Removing a non-existent bond should still return Ok
+        assert!(topology.remove_bond(0, 1).is_ok());
+
+        // Removing an out-of-bounds bond should fail
+        let result = topology.remove_bond(0, 2);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn add_residue() {
+        let mut topology = Topology::default();
+
+        // Add atoms
+        topology.atoms.push(Atom::new("C".to_string()));
+        topology.atoms.push(Atom::new("H".to_string()));
+        topology.atoms.push(Atom::new("O".to_string()));
+
+        // Create a residue
+        let mut residue = Residue::new("ALA".to_string(), 1);
+        residue.add_atom(0);
+        residue.add_atom(1);
+
+        // Adding a valid residue should succeed
+        assert!(topology.add_residue(residue).is_ok());
+        assert_eq!(topology.residues.len(), 1);
+
+        // Create another residue with an atom already assigned to the first residue
+        let mut residue2 = Residue::new("GLY".to_string(), 2);
+        residue2.add_atom(1); // Already in first residue
+        residue2.add_atom(2);
+
+        // Adding a residue with overlapping atoms should fail
+        let result = topology.add_residue(residue2);
+        assert!(result.is_err());
+        assert_eq!(topology.residues.len(), 1);
+    }
+
+    #[test]
+    fn residue_for_atom() {
+        let mut topology = Topology::default();
+
+        // Add atoms
+        topology.atoms.push(Atom::new("C".to_string()));
+        topology.atoms.push(Atom::new("H".to_string()));
+
+        // Create and add a residue
+        let mut residue = Residue::new("ALA".to_string(), 1);
+        residue.add_atom(0);
+        assert!(topology.add_residue(residue).is_ok());
+
+        // Should find residue for atom 0
+        let found = topology.residue_for_atom(0);
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().name, "ALA");
+
+        // Should not find residue for atom 1
+        assert!(topology.residue_for_atom(1).is_none());
+    }
+
+    #[test]
+    fn are_linked() {
+        let mut topology = Topology::default();
+
+        // Add atoms
+        topology.atoms.push(Atom::new("C".to_string()));
+        topology.atoms.push(Atom::new("H".to_string()));
+        topology.atoms.push(Atom::new("O".to_string()));
+        topology.atoms.push(Atom::new("N".to_string()));
+
+        // Create and add two residues
+        let mut residue1 = Residue::new("ALA".to_string(), 1);
+        residue1.add_atom(0);
+        residue1.add_atom(1);
+        assert!(topology.add_residue(residue1.clone()).is_ok());
+
+        let mut residue2 = Residue::new("GLY".to_string(), 2);
+        residue2.add_atom(2);
+        residue2.add_atom(3);
+        assert!(topology.add_residue(residue2.clone()).is_ok());
+
+        // Initially residues are not linked
+        assert!(!topology.are_linked(&residue1, &residue2));
+
+        // Add a bond between atoms in different residues
+        assert!(topology.add_bond(1, 2, BondOrder::Single).is_ok());
+
+        // Now residues should be linked
+        assert!(topology.are_linked(&residue1, &residue2));
+
+        // Same residue is always linked to itself
+        assert!(topology.are_linked(&residue1, &residue1));
+    }
+}
