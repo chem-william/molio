@@ -1,5 +1,5 @@
 use crate::property::{Properties, Property};
-use std::collections::{BTreeSet, btree_set::Iter};
+use std::collections::{btree_set::Iter, BTreeSet};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 // the specific order of the struct matters in the following when deriving `[Ord]`

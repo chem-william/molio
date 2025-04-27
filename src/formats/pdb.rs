@@ -1397,16 +1397,12 @@ mod tests {
         assert!(topology.angles().contains(&Angle::new(20, 21, 23)));
         assert!(topology.angles().contains(&Angle::new(9, 38, 44)));
 
-        assert!(
-            topology
-                .dihedrals()
-                .contains(&Dihedral::new(64, 62, 58, 53))
-        );
-        assert!(
-            topology
-                .dihedrals()
-                .contains(&Dihedral::new(22, 21, 23, 33))
-        );
+        assert!(topology
+            .dihedrals()
+            .contains(&Dihedral::new(64, 62, 58, 53)));
+        assert!(topology
+            .dihedrals()
+            .contains(&Dihedral::new(22, 21, 23, 33)));
     }
 
     macro_rules! recycle_check {
@@ -1642,13 +1638,11 @@ mod tests {
                 .expect_string(),
             "A"
         );
-        assert!(
-            topology
-                .residue_for_atom(13)
-                .unwrap()
-                .get("insertion_code")
-                .is_none(),
-        );
+        assert!(topology
+            .residue_for_atom(13)
+            .unwrap()
+            .get("insertion_code")
+            .is_none(),);
 
         // // Check secondary structure, no insertion code
         assert_eq!(
