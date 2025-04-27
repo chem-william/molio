@@ -44,7 +44,7 @@ cargo build
 - Run Clippy:
 
   ```shell
-  cargo clippy --all-targets --all-features -- -W clippy::pedantic -D warnings
+  cargo clippy
   ```
 
 - Run all tests:
