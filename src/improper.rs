@@ -99,13 +99,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "cannot have an atom linked to itself in an improper dihedral angle")]
     fn test_improper_with_duplicate_central() {
-        Improper::new(1, 2, 2, 3);
+        let _ = Improper::new(1, 2, 2, 3);
     }
 
     #[test]
     #[should_panic(expected = "cannot have an atom twice in an improper dihedral angle")]
     fn test_improper_with_duplicate_outer() {
-        Improper::new(1, 2, 1, 3);
+        let _ = Improper::new(1, 2, 1, 3);
     }
 
     #[test]
