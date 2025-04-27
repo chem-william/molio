@@ -1,18 +1,32 @@
-use std::{hint::black_box, path::Path};
-
-use molio::trajectory::Trajectory;
+use std::{env, path::Path};
 
 fn main() {
-    // let path = Path::new("./helium.xyz");
-    let path = Path::new("./src/tests-data/xyz/helium.xyz");
-    // let path = Path::new("./src/tests-data/pdb/water.pdb");
-    // let path = Path::new("./water.pdb");
-    for _ in 0..32 {
-        let mut trajectory = Trajectory::open(path).unwrap();
-        let mut dummy = 0;
-        while let Some(next_frame) = trajectory.read().unwrap() {
-            dummy += next_frame.size();
+    let args: Vec<String> = env::args().collect();
+
+    // Check for profiling mode flag
+    let mut profiling_mode = false;
+    let mut file_path = "./water.pdb";
+
+    // Parse command line arguments
+    for arg in &args[1..] {
+        if arg == "--profile" || arg == "-p" {
+            profiling_mode = true;
+        } else if !arg.starts_with("-") {
+            // Assume this is a file path
+            file_path = arg;
         }
-        black_box(dummy);
+    }
+
+    let path = Path::new(file_path);
+
+    if profiling_mode {
+        // Profiling mode: run multiple iterations for flamegraph
+        println!("Running in profiling mode (32 iterations)");
+        for _ in 0..32 {
+            molio::read_trajectory(path);
+        }
+    } else {
+        // Normal benchmarking mode: run once
+        molio::read_trajectory(path);
     }
 }
