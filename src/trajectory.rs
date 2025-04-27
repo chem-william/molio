@@ -142,9 +142,29 @@ impl TrajectoryWriter<'_> {
         Ok(())
     }
 
+    /// Finalizes the trajectory file by writing any necessary closing records
+    ///
+    /// This should be called when done writing to ensure the file is properly finalized.
+    /// If not called explicitly, the file will be finalized when the writer is dropped.
+    pub fn finish(&mut self) -> Result<(), CError> {
+        self.strategy.finalize(&mut self.writer)?;
+        self.writer.flush()?;
+        Ok(())
+    }
+
     /// Returns the number of frames written so far
     pub fn frame_count(&self) -> usize {
         self.frame_count
+    }
+}
+
+impl Drop for TrajectoryWriter<'_> {
+    fn drop(&mut self) {
+        // Attempt to finalize the file when the writer is dropped.
+        // Ignore errors since we can't return them from drop().
+        if let Err(e) = self.finish() {
+            eprintln!("Warning: Failed to finalize trajectory file: {}", e);
+        }
     }
 }
 

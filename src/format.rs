@@ -43,6 +43,11 @@ pub trait FileFormat {
     // fn write(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError>;
     fn write_next(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError>;
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError>;
+
+    /// Finalize writing to a file, performing any necessary cleanup operations
+    ///
+    /// This should be called when done writing to a file to ensure it's properly closed
+    fn finalize(&self, writer: &mut BufWriter<File>) -> Result<(), CError>;
 }
 
 impl FileFormat for Format<'_> {
@@ -71,6 +76,13 @@ impl FileFormat for Format<'_> {
         match self {
             Format::XYZ(format) => format.forward(reader),
             Format::PDB(format) => format.forward(reader),
+        }
+    }
+
+    fn finalize(&self, writer: &mut BufWriter<File>) -> Result<(), CError> {
+        match self {
+            Format::XYZ(format) => format.finalize(writer),
+            Format::PDB(format) => format.finalize(writer),
         }
     }
 }

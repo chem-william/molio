@@ -10,10 +10,15 @@ use crate::unit_cell::UnitCell;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
-use std::io::BufWriter;
-use std::io::{BufRead, BufReader, Seek};
+use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
 
 use super::pdb_connectivity::{self, find};
+
+/// Maximum value for a width 4 number
+const MAX_HYBRID36_W4_NUMBER: i64 = 2436111;
+
+/// Maximum value for a width 5 number
+const MAX_HYBRID36_W5_NUMBER: i64 = 87440031;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Record {
@@ -309,7 +314,7 @@ impl<'a> PDBFormat<'a> {
         let altloc = &line[16..17];
         if altloc != " " {
             atom.properties
-                .insert("altloc".to_string(), Property::String(altloc.to_string()));
+                .insert("altloc".into(), Property::String(altloc.to_string()));
         }
 
         let x = Property::parse_value(line[30..38].trim(), &PropertyKind::Double)?.expect_double();
@@ -358,7 +363,7 @@ impl<'a> PDBFormat<'a> {
 
             if insertion_code != ' ' {
                 residue.properties.insert(
-                    "insertion_code".to_string(),
+                    "insertion_code".into(),
                     Property::String(insertion_code.to_string()),
                 );
             }
@@ -366,18 +371,18 @@ impl<'a> PDBFormat<'a> {
             // Set whether or not the residue is standardized
             residue
                 .properties
-                .insert("is_standard_pdb".to_string(), Property::Bool(!is_hetatm));
+                .insert("is_standard_pdb".into(), Property::Bool(!is_hetatm));
 
             // This is saved as a string (instead of a number) on purpose
             // to match MMTF format
             residue.properties.insert(
-                "chainid".to_string(),
+                "chainid".into(),
                 Property::String(line.chars().nth(21).unwrap().to_string()),
             );
 
             // PDB format makes no distinction between chainid and chainname
             residue.properties.insert(
-                "chainname".to_string(),
+                "chainname".into(),
                 Property::String(line.chars().nth(21).unwrap().to_string()),
             );
 
@@ -388,7 +393,7 @@ impl<'a> PDBFormat<'a> {
                 if !segname.is_empty() {
                     residue
                         .properties
-                        .insert("segname".to_string(), Property::String(segname.to_string()));
+                        .insert("segname".into(), Property::String(segname.to_string()));
                 }
             }
 
@@ -399,7 +404,7 @@ impl<'a> PDBFormat<'a> {
                 let current_secinfo_borrow = self.current_secinfo.borrow();
                 if let Some((end_residue_id, description)) = current_secinfo_borrow.as_ref() {
                     residue.properties.insert(
-                        "secondary_structure".to_string(),
+                        "secondary_structure".into(),
                         Property::String(description.to_string()),
                     );
 
@@ -417,7 +422,7 @@ impl<'a> PDBFormat<'a> {
             if let Some(secinfo_for_residue) = self.secinfo.borrow().get(&full_residue_id) {
                 *self.current_secinfo.borrow_mut() = Some(secinfo_for_residue.clone());
                 residue.properties.insert(
-                    "secondary_structure".to_string(),
+                    "secondary_structure".into(),
                     Property::String(secinfo_for_residue.1.to_string()),
                 );
             }
@@ -805,6 +810,142 @@ impl<'a> PDBFormat<'a> {
                 .expect("unable to add bond to frame");
         }
     }
+
+    // Check the number of digits before the decimal separator to be sure than we
+    // can represent them. In case of error, use the given `context` in the error
+    // message
+    fn check_values_size(values: [f64; 3], width: i32, context: &str) -> Result<(), CError> {
+        let max_pos = f64::powi(10.0, width) - 1.0;
+        let max_neg = -f64::powi(10.0, width) - 1.0;
+
+        if values[0] > max_pos
+            || values[1] > max_pos
+            || values[2] > max_pos
+            || values[0] < max_neg
+            || values[1] < max_neg
+            || values[2] < max_neg
+        {
+            return Err(CError::GenericError(format!(
+                "value in {context} is too big for representation in PDB format"
+            )));
+        }
+
+        Ok(())
+    }
+
+    fn to_pdb_index(value: i64, width: usize) -> String {
+        let encoded = encode_hybrid36(width, value + 1);
+        if encoded.chars().nth(0).unwrap() == '*'
+            && (value == MAX_HYBRID36_W4_NUMBER || value == MAX_HYBRID36_W5_NUMBER)
+        {
+            let t = if width == 5 { "atom" } else { "residue" };
+            eprintln!(
+                "warning: the value for a {t} serial/id is too large, using '{encoded}' instead"
+            );
+        }
+
+        encoded
+    }
+
+    fn get_residue_information(
+        residue: &Option<Residue>,
+        max_resid: &mut i64,
+    ) -> ResidueInformation {
+        let mut info = ResidueInformation::new();
+
+        if residue.is_none() {
+            let val = *max_resid;
+            *max_resid += 1;
+            info.resid = PDBFormat::to_pdb_index(val, 4);
+            return info;
+        };
+
+        let residue = residue.as_ref().unwrap();
+
+        if residue
+            .get("is_standard_pdb")
+            .and_then(|prop| prop.as_bool())
+            .unwrap_or(false)
+        {
+            info.atom_hetatm = "ATOM  ".to_string();
+        };
+        info.resname = residue.name.clone();
+        if info.resname.len() > 3 {
+            eprint!(
+                "warning: residue '{}' name is too long, it will be truncated",
+                info.resname
+            );
+            info.resname = info.resname.chars().take(3).collect();
+        };
+
+        if residue.id.is_some() {
+            info.resid = PDBFormat::to_pdb_index(residue.id.unwrap() - 1, 4);
+        };
+
+        info.chainid = residue
+            .get("chainid")
+            .and_then(|prop| prop.as_string())
+            .unwrap_or(" ")
+            .to_string();
+        if info.chainid.len() > 1 {
+            eprintln!(
+                "warning: residues's chain id '{}' is too long, it will be trunctated",
+                info.chainid
+            );
+            info.chainid = info.chainid.chars().nth(0).unwrap().to_string();
+        };
+
+        info.insertion_code = residue
+            .get("insertion_code")
+            .and_then(|prop| prop.as_string())
+            .unwrap_or("")
+            .to_string();
+        if info.insertion_code.len() > 1 {
+            eprintln!(
+                "warning: residue's insertion code '{}' is too long, it will be truncated",
+                info.insertion_code
+            );
+            info.insertion_code = info.insertion_code.chars().nth(0).unwrap().to_string();
+        };
+
+        info.segment = residue
+            .get("segname")
+            .and_then(|prop| prop.as_string())
+            .unwrap_or("")
+            .to_string();
+        if info.segment.len() > 4 {
+            eprintln!(
+                "residue's segment name '{}' is too long, it will be truncated",
+                info.segment
+            );
+            info.segment = info.segment.chars().take(4).collect();
+        };
+
+        info.composition_type = residue
+            .get("composition_type")
+            .and_then(|prop| prop.as_string())
+            .unwrap_or("")
+            .to_string();
+
+        info
+    }
+
+    // This function adjusts a given index to account for intervening TER records.
+    // It does so by determining the position of the greatest TER record in `ters`
+    // and uses iterator arithmetic to calculate the adjustment. Note that `ters`
+    // is expected to be sorted
+    fn adjust_for_ter_residues(v: usize, ters: &[usize]) -> i64 {
+        let insertion_point = ters
+            .binary_search_by(|&ter| {
+                if ter < v + 1 {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Greater
+                }
+            })
+            .unwrap_err();
+        (v + insertion_point) as i64
+    }
 }
 
 impl FileFormat for PDBFormat<'_> {
@@ -823,19 +964,19 @@ impl FileFormat for PDBFormat<'_> {
                 Record::HEADER => {
                     if line.len() >= 50 {
                         frame.properties.insert(
-                            "classification".to_string(),
+                            "classification".into(),
                             Property::String(line[10..50].trim().to_string()),
                         );
                     }
                     if line.len() >= 59 {
                         frame.properties.insert(
-                            "deposition_date".to_string(),
+                            "deposition_date".into(),
                             Property::String(line[50..59].trim().to_string()),
                         );
                     }
                     if line.len() >= 66 {
                         frame.properties.insert(
-                            "pdb_idcode".to_string(),
+                            "pdb_idcode".into(),
                             Property::String(line[62..66].trim().to_string()),
                         );
                     }
@@ -857,7 +998,7 @@ impl FileFormat for PDBFormat<'_> {
                     };
                     frame
                         .properties
-                        .insert("name".to_string(), Property::String(new_title));
+                        .insert("name".into(), Property::String(new_title));
                 }
                 Record::CRYST1 => PDBFormat::parse_cryst1(&mut frame, &line).unwrap(),
                 Record::ATOM => self.parse_atom(&mut frame, &line, false).unwrap(),
@@ -948,7 +1089,169 @@ impl FileFormat for PDBFormat<'_> {
     }
 
     fn write_next(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
-        todo!();
+        writeln!(writer, "MODEL {:>4}", *self.models.borrow() + 1)?;
+
+        let lengths = frame.unit_cell.lengths();
+        let angles = frame.unit_cell.angles();
+
+        PDBFormat::check_values_size(lengths, 9, "cell lengths")?;
+        PDBFormat::check_values_size(angles, 7, "cell angles")?;
+        // Do not try to guess the space group and the z value, just use the
+        // default one.
+        writeln!(
+            writer,
+            "CRYST1{:9.3}{:9.3}{:9.3}{:7.2}{:7.2}{:7.2} P 1           1",
+            lengths[0], lengths[1], lengths[2], angles[0], angles[1], angles[2]
+        )?;
+
+        // Only use numbers bigger than the biggest residue id as "resSeq" for
+        // atoms without associated residue.
+        let mut max_resid = 0;
+        for residue in &frame.topology().residues {
+            let resid = residue.id;
+            if resid.is_some() && resid.unwrap() > max_resid {
+                max_resid = resid.unwrap();
+            }
+        }
+
+        // Used to skip writing unnecessary connect record
+        // use std::deque because std::vector<bool> have a surprising behavior due
+        // to C++ standard requiring it to pack multiple bool in a byte
+        let mut is_atom_record = vec![false; frame.len()];
+
+        // Used for writing TER records.
+        let mut ter_count = 0;
+        let mut last_residue: Option<ResidueInformation> = None;
+        let mut ter_serial_numbers: Vec<usize> = vec![];
+
+        for (idx, pos) in frame.positions().iter().enumerate() {
+            let mut altloc = frame[idx]
+                .properties
+                .get("altloc")
+                .and_then(|prop| prop.as_string())
+                .unwrap_or(" ")
+                .to_string();
+            if altloc.len() > 1 {
+                eprintln!("warning: altloc '{altloc}' is too long, it will be truncated");
+                altloc = altloc.chars().next().unwrap().to_string();
+            }
+
+            let residue = frame.topology().residue_for_atom(idx);
+            let resinfo = PDBFormat::get_residue_information(&residue, &mut max_resid);
+
+            if resinfo.atom_hetatm == "ATOM  " {
+                is_atom_record[idx] = true;
+            }
+
+            debug_assert!(resinfo.resname.len() <= 3);
+
+            if last_residue.is_some()
+                && last_residue.as_ref().unwrap().chainid != resinfo.chainid
+                && last_residue.as_ref().unwrap().needs_ter_record()
+            {
+                let pdb_index = PDBFormat::to_pdb_index(
+                    i64::try_from(idx + ter_count).expect("idx + ter_count fits in i64"),
+                    5,
+                );
+                let unwrapped = last_residue.as_ref().unwrap();
+                writeln!(
+                    writer,
+                    "TER   {:>5}      {:3} {}{:>4}{}",
+                    pdb_index,
+                    unwrapped.resname,
+                    unwrapped.chainid,
+                    unwrapped.resid,
+                    unwrapped.insertion_code
+                )?;
+                ter_serial_numbers.push(idx + ter_count);
+                ter_count += 1;
+            }
+
+            PDBFormat::check_values_size(*pos, 8, "atomic position")?;
+            writeln!(
+                writer,
+                "{:<6}{:>5} {:<4}{:1}{:3} {:1}{:>4}{:1}   {:8.3}{:8.3}{:8.3}{:6.2}{:6.2}      {: <4}{: >2}",
+                resinfo.atom_hetatm,
+                PDBFormat::to_pdb_index(
+                    i64::try_from(idx + ter_count).expect("convert idx + ter_count"),
+                    5
+                ),
+                frame[idx].name,
+                altloc,
+                resinfo.resname,
+                resinfo.chainid,
+                resinfo.resid,
+                // 444,
+                resinfo.insertion_code,
+                pos[0],
+                pos[1],
+                pos[2],
+                1.0,
+                0.0,
+                resinfo.segment,
+                frame[idx].symbol
+            )?;
+            if residue.as_ref().is_some() {
+                last_residue = Some(resinfo);
+            } else {
+                last_residue = None;
+            }
+        }
+
+        let mut connect = vec![Vec::new(); frame.size()];
+        for bond in frame.topology().bonds() {
+            if is_atom_record[bond[0]] && is_atom_record[bond[1]] {
+                // both must be standard residue atoms
+                continue;
+            }
+            if bond[0] > MAX_HYBRID36_W5_NUMBER as usize
+                || bond[1] > MAX_HYBRID36_W5_NUMBER as usize
+            {
+                eprintln!(
+                    "warning: atomic index is too big for CONNECT, removing the bond between {} and {}",
+                    bond[0], bond[1]
+                );
+            }
+
+            connect[bond[0]].push(PDBFormat::adjust_for_ter_residues(
+                bond[1],
+                &ter_serial_numbers,
+            ));
+            connect[bond[1]].push(PDBFormat::adjust_for_ter_residues(
+                bond[0],
+                &ter_serial_numbers,
+            ));
+        }
+
+        for idx in 0..frame.size() {
+            let connections = connect[idx].len();
+            let lines = connections / 4 + 1;
+            if connections == 0 {
+                continue;
+            }
+
+            let correction = PDBFormat::adjust_for_ter_residues(idx, &ter_serial_numbers);
+
+            for conect_line in 0..lines {
+                write!(
+                    writer,
+                    "CONECT{:>5}",
+                    PDBFormat::to_pdb_index(correction, 5)
+                )?;
+
+                let last = std::cmp::min(connections, 4 * (conect_line + 1));
+                for j in (4 * conect_line)..last {
+                    write!(writer, "{:>5}", PDBFormat::to_pdb_index(connect[idx][j], 5))?;
+                }
+                writeln!(writer)?;
+            }
+        }
+
+        writeln!(writer, "ENDMDL")?;
+        let current_models = *self.models.borrow();
+        *self.models.borrow_mut() = current_models + 1;
+
+        Ok(())
     }
 
     fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
@@ -958,6 +1261,42 @@ impl FileFormat for PDBFormat<'_> {
             Ok(None)
         }
     }
+    /// Finalize the PDB file by writing the END record if needed
+    ///
+    /// This should be called when done writing to a PDB file to ensure it's properly closed
+    fn finalize(&self, writer: &mut BufWriter<File>) -> Result<(), CError> {
+        if *self.models.borrow() > 0 {
+            writeln!(writer, "END")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct ResidueInformation {
+    atom_hetatm: String,
+    resname: String,
+    resid: String,
+    chainid: String,
+    insertion_code: String,
+    composition_type: String,
+    segment: String,
+}
+
+impl ResidueInformation {
+    pub fn new() -> Self {
+        Self {
+            atom_hetatm: "HETATM".to_string(),
+            ..Default::default()
+        }
+    }
+
+    pub fn needs_ter_record(&self) -> bool {
+        let ct = &self.composition_type;
+        // If it's empty, or matches "other"/"non-polymer" (in any ASCII case), we skip.
+        let skip = ["other", "non-polymer"];
+        !(ct.is_empty() || skip.iter().any(|&s| ct.eq_ignore_ascii_case(s)))
+    }
 }
 
 #[cfg(test)]
@@ -965,15 +1304,20 @@ mod tests {
     use std::path::Path;
 
     use assert_approx_eq::assert_approx_eq;
+    use tempfile::Builder;
 
     use crate::{
         angle::Angle,
+        atom::Atom,
         bond::{Bond, BondOrder},
         dihedral::Dihedral,
         formats::pdb::{decode_hybrid36, encode_hybrid36},
+        frame::Frame,
+        property::Property,
+        residue::Residue,
         topology::Topology,
         trajectory::Trajectory,
-        unit_cell::CellShape,
+        unit_cell::{CellShape, UnitCell},
     };
 
     use std::borrow::ToOwned;
@@ -1804,5 +2148,135 @@ mod tests {
     #[should_panic(expected = "length of '12345' is greater than the width '2'. this is a bug")]
     fn decode_bad4() {
         decode_hybrid36(2, "12345").unwrap();
+    }
+
+    #[test]
+    fn write_file() {
+        const EXPECTED: &str = r#"MODEL    1
+CRYST1   22.000   22.000   22.000  90.00  90.00  90.00 P 1           1
+HETATM    1 A   A        1       1.000   2.000   3.000  1.00  0.00           A
+HETATM    2 B   B        2       1.000   2.000   3.000  1.00  0.00           B
+HETATM    3 C            3       1.000   2.000   3.000  1.00  0.00           C
+HETATM    4 D            4       1.000   2.000   3.000  1.00  0.00           D
+CONECT    1    2
+CONECT    2    1
+ENDMDL
+MODEL    2
+CRYST1   22.000   22.000   22.000  90.00  90.00  90.00 P 1           1
+HETATM    1 A   A        4       1.000   2.000   3.000  1.00  0.00           A
+ATOM      2 B   Bfoo A   3       1.000   2.000   3.000  1.00  0.00           B
+ATOM      3 C    foo A   3       1.000   2.000   3.000  1.00  0.00           C
+TER       4      foo A   3
+HETATM    5 D    bar C    B      1.000   2.000   3.000  1.00  0.00      SEGM D
+HETATM    6 E            5       4.000   5.000   6.000  1.00  0.00           E
+HETATM    7 F    baz    -2       4.000   5.000   6.000  1.00  0.00           F
+HETATM    8 G            6       4.000   5.000   6.000  1.00  0.00           G
+CONECT    1    2    8
+CONECT    2    1    8
+CONECT    3    8
+CONECT    5    8
+CONECT    6    7    8
+CONECT    7    6    8
+CONECT    8    1    2    3    5
+CONECT    8    6    7
+ENDMDL
+END
+"#;
+        let named_tmpfile = Builder::new()
+            .prefix("test-pdb")
+            .suffix(".pdb")
+            .tempfile()
+            .unwrap();
+
+        // Write the expected content into the temp file
+        let mut trajectory = Trajectory::create(named_tmpfile.path()).unwrap();
+
+        let mut frame = Frame::new();
+        frame.unit_cell = UnitCell::new_from_lengths([22.0, 22.0, 22.0]);
+        let atom = Atom::new("A".into());
+        frame.add_atom(atom, [1.0, 2.0, 3.0]);
+        let atom = Atom::new("B".into());
+        frame.add_atom(atom, [1.0, 2.0, 3.0]);
+        let atom = Atom::new("C".into());
+        frame.add_atom(atom, [1.0, 2.0, 3.0]);
+        let atom = Atom::new("D".into());
+        frame.add_atom(atom, [1.0, 2.0, 3.0]);
+        frame.add_bond(0, 1, BondOrder::Unknown).unwrap();
+        frame[0]
+            .properties
+            .insert("altloc".into(), Property::String("A".into()));
+        frame[1]
+            .properties
+            .insert("altloc".into(), Property::String("BB".into()));
+
+        trajectory.write(&frame).unwrap();
+
+        let atom = Atom::new("E".into());
+        frame.add_atom(atom, [4.0, 5.0, 6.0]);
+        let atom = Atom::new("F".into());
+        frame.add_atom(atom, [4.0, 5.0, 6.0]);
+        let atom = Atom::new("G".into());
+        frame.add_atom(atom, [4.0, 5.0, 6.0]);
+
+        frame.add_bond(4, 5, BondOrder::Unknown).unwrap();
+        frame.add_bond(0, 6, BondOrder::Unknown).unwrap();
+        frame.add_bond(1, 6, BondOrder::Unknown).unwrap();
+        frame.add_bond(1, 2, BondOrder::Unknown).unwrap(); // This bond will not be printed
+        frame.add_bond(2, 6, BondOrder::Unknown).unwrap();
+        frame.add_bond(3, 6, BondOrder::Unknown).unwrap();
+        frame.add_bond(4, 6, BondOrder::Unknown).unwrap();
+        frame.add_bond(5, 6, BondOrder::Unknown).unwrap();
+
+        let mut residue = Residue::new("foo".into(), 3);
+        residue.add_atom(1);
+        residue.add_atom(2);
+        residue
+            .properties
+            .insert("chainid".into(), Property::String("A".into()));
+        residue
+            .properties
+            .insert("is_standard_pdb".into(), Property::Bool(true));
+        residue.properties.insert(
+            "composition_type".into(),
+            Property::String("L-PEPTIDE LINKING".into()),
+        );
+        frame.add_residue(residue).unwrap();
+
+        residue = Residue::new_from_name("barbar".into()); // Name will be truncated in output
+        residue.add_atom(3);
+        residue
+            .properties
+            .insert("chainid".into(), Property::String("CB".into()));
+        residue
+            .properties
+            .insert("insertion_code".into(), Property::String("BB".into()));
+        residue
+            .properties
+            .insert("segname".into(), Property::String("SEGMENT".into()));
+        frame.add_residue(residue).unwrap();
+
+        residue = Residue::new("baz".into(), -2);
+        residue.add_atom(5);
+        frame.add_residue(residue).unwrap();
+
+        trajectory.write(&frame).unwrap();
+        trajectory.finish().unwrap();
+
+        let mut read_trajectory = Trajectory::open(named_tmpfile.path()).unwrap();
+        assert_eq!(read_trajectory.size, 2);
+        let frame1 = read_trajectory.read().unwrap().unwrap();
+        assert_eq!(frame1.size(), 4);
+        assert_eq!(
+            frame1[0].properties.get("altloc").unwrap().expect_string(),
+            "A"
+        );
+        assert_eq!(
+            frame1[1].properties.get("altloc").unwrap().expect_string(),
+            "B"
+        );
+        assert_eq!(read_trajectory.read().unwrap().unwrap().size(), 7);
+
+        let contents = std::fs::read_to_string(named_tmpfile.path()).unwrap();
+        assert_eq!(contents, EXPECTED);
     }
 }

@@ -36,6 +36,21 @@ pub struct Residue {
 }
 
 impl Residue {
+    pub fn new(name: String, id: i64) -> Self {
+        Self {
+            name,
+            id: Some(id),
+            ..Default::default()
+        }
+    }
+
+    pub fn new_from_name(name: String) -> Self {
+        Self {
+            name,
+            ..Default::default()
+        }
+    }
+
     pub fn add_atom(&mut self, index: usize) {
         self.atoms.insert(index);
     }

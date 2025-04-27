@@ -456,12 +456,10 @@ impl FileFormat for XYZFormat {
         Ok(())
     }
 
-    // fn write(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
-    //     self.write_next(writer, frame);
-    //     self.frame
-    //     println!("Writingmut  as XYZ format with {} atoms", frame.size());
-    //     Ok(())
-    // }
+    fn finalize(&self, _writer: &mut BufWriter<File>) -> Result<(), CError> {
+        // XYZ format doesn't need any special finalization
+        Ok(())
+    }
 }
 
 #[cfg(test)]
