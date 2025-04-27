@@ -4,16 +4,20 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-thiserror = "2"
-nalgebra = "0.33"
+thiserror = "2.0.12"
+nalgebra = "0.33.2"
 assert_approx_eq = "1.1.0"
-phf = { version = "0.11", features = ["macros"]}
-fast-float = "0.2"
-smallvec = "1.15"
-tempfile = "3.19"
+phf = { version = "0.11.3", features = ["macros"]}
+fast-float = "0.2.0"
+smallvec = "1.15.0"
+tempfile = "3.19.1"
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"]}
+criterion = { version = "0.5.1", features = ["html_reports"]}
+
+# to appease -Zminimal-version
+serde = { version = "1.0.100" }
+regex = { version = "1.5.1" }
 
 [[bench]]
 name = "my_benchmark"
