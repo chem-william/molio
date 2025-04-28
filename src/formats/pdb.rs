@@ -136,7 +136,7 @@ fn encode_pure(digits: &str, value: i64) -> String {
     while val != 0 {
         let rest = val / n;
         let rem = usize::try_from(val - rest * n).unwrap();
-        let ch = digits.chars().nth(rem).expect("digit index out of bounds");
+        let ch = digits.as_bytes()[rem] as char;
         result.push(ch);
         val = rest;
     }
@@ -323,16 +323,16 @@ impl<'a> PDBFormat<'a> {
         frame.add_atom(atom, [x, y, z]);
 
         let atom_id = frame.size() - 1;
-        let insertion_code = line.chars().nth(26).unwrap();
+        let insertion_code = line.as_bytes()[26] as char;
         // If there's no residue information so return early
         let Ok(resid) = decode_hybrid36(4, &line[22..26]) else {
             return Ok(());
         };
 
-        let chain = &line.chars().nth(21).unwrap();
+        let chain = line.as_bytes()[21] as char;
         let resname = line[17..20].trim().to_string();
         let full_residue_id = FullResidueId {
-            chain: *chain,
+            chain,
             resid,
             resname: resname.clone(),
             insertion_code,
@@ -376,13 +376,13 @@ impl<'a> PDBFormat<'a> {
             // to match MMTF format
             residue.properties.insert(
                 "chainid".into(),
-                Property::String(line.chars().nth(21).unwrap().to_string()),
+                Property::String((line.as_bytes()[21] as char).to_string()),
             );
 
             // PDB format makes no distinction between chainid and chainname
             residue.properties.insert(
                 "chainname".into(),
-                Property::String(line.chars().nth(21).unwrap().to_string()),
+                Property::String((line.as_bytes()[21] as char).to_string()),
             );
 
             // segment name is not part of the standard, but something added by
@@ -562,10 +562,10 @@ impl<'a> PDBFormat<'a> {
             eprintln!("warning: HELIX record too short: {line}");
         }
 
-        let chain_start = line.chars().nth(19).expect("start of chain");
-        let chain_end = line.chars().nth(31).expect("end of chain");
-        let inscode_start = line.chars().nth(25).expect("start of insertion code");
-        let inscode_end = line.chars().nth(37).expect("end of insertion code");
+        let chain_start = line.as_bytes()[19] as char;
+        let chain_end = line.as_bytes()[31] as char;
+        let inscode_start = line.as_bytes()[25] as char;
+        let inscode_end = line.as_bytes()[37] as char;
         let resname_start = line[15..18].trim();
         let resname_end = line[27..30].trim();
 
@@ -618,8 +618,8 @@ impl<'a> PDBFormat<'a> {
 
         let resname_start = &line[start..start + 3].trim();
         let resname_end = &line[end..end + 3].trim();
-        let chain_start = &line.chars().nth(start + 4).expect("start of chain");
-        let chain_end = &line.chars().nth(end + 4).expect("end of chain");
+        let chain_start = line.as_bytes()[start + 4] as char;
+        let chain_end = line.as_bytes()[end + 4] as char;
 
         if chain_start != chain_end {
             return Err(CError::GenericError(format!(
@@ -629,24 +629,21 @@ impl<'a> PDBFormat<'a> {
 
         let resid_start = decode_hybrid36(4, &line[start..start + 4])?;
         let resid_end = decode_hybrid36(4, &line[end..end + 4])?;
-        let inscode_start = &line
-            .chars()
-            .nth(start + 9)
-            .expect("start of insertion code");
-        let inscode_end = &line.chars().nth(end + 9).expect("end of insertion code");
+        let inscode_start = line.as_bytes()[start + 9] as char;
+        let inscode_end = line.as_bytes()[end + 9] as char;
 
         let start = FullResidueId {
-            chain: *chain_start,
+            chain: chain_start,
             resid: resid_start,
             resname: (*resname_start).to_string(),
-            insertion_code: *inscode_start,
+            insertion_code: inscode_start,
         };
 
         let end = FullResidueId {
-            chain: *chain_end,
+            chain: chain_end,
             resid: resid_end,
             resname: (*resname_end).to_string(),
-            insertion_code: *inscode_end,
+            insertion_code: inscode_end,
         };
 
         self.secinfo.borrow_mut().insert(start, (end, "extended"));
@@ -760,15 +757,14 @@ impl<'a> PDBFormat<'a> {
 
                 if first_atom.is_none() {
                     let first_name = pdb_connectivity::INTERNER[link.0];
-                    let mut chars = first_name.chars();
-                    let first_char = chars.next();
-                    let second_char = chars.next();
+                    let first_char = first_name.as_bytes()[0] as char;
+                    let second_char = first_name.as_bytes().get(1);
 
-                    if first_char != Some('H')
+                    if first_char != 'H'
                         && first_name != "OXT"
-                        && first_char != Some('P')
-                        && first_char != Some('O')
-                        && second_char != Some('P')
+                        && first_char != 'P'
+                        && first_char != 'O'
+                        && second_char != Some(&b'P')
                     {
                         eprintln!(
                             "warning: could not find standard atom '{first_name}' in residue '{}' (resid {resid})",
@@ -780,15 +776,14 @@ impl<'a> PDBFormat<'a> {
 
                 if second_atom.is_none() {
                     let second_name = pdb_connectivity::INTERNER[link.1];
-                    let mut chars = second_name.chars();
-                    let first_char = chars.next();
-                    let second_char = chars.next();
+                    let first_char = second_name.as_bytes()[0] as char;
+                    let second_char = second_name.as_bytes().get(1);
 
-                    if first_char != Some('H')
+                    if first_char != 'H'
                         && second_name != "OXT"
-                        && first_char != Some('P')
-                        && first_char != Some('O')
-                        && second_char != Some('P')
+                        && first_char != 'P'
+                        && first_char != 'O'
+                        && second_char != Some(&b'P')
                     {
                         eprintln!(
                             "warning: could not find standard atom '{second_name}' in residue '{}' (resid {resid})",
