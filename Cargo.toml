@@ -2,6 +2,12 @@
 name = "molio"
 version = "0.1.0"
 edition = "2021"
+description = "A library for reading chemical file formats"
+readme = "README.md"
+repository = "https://github.com/chem-william/molio"
+license = "BSD-3-Clause"
+keywords = ["chemistry"]
+categories = ["text-processing", "science", "parser-implementations"]
 
 [dependencies]
 thiserror = "2.0.12"
