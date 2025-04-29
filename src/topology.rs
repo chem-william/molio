@@ -88,6 +88,7 @@ impl Topology {
     /// Adds a residue to this topology.
     ///
     /// # Errors
+    ///
     /// Returns an error if any atom in the given [`Residue`] is already part of another residue.
     pub fn add_residue(&mut self, residue: Residue) -> Result<(), CError> {
         for &atom_id in &residue {
@@ -138,6 +139,7 @@ impl Topology {
     /// Returns the [`BondOrder`] between two atoms.
     ///
     /// # Errors
+    ///
     /// Returns an error if no bond exists between the specified atom indices or if indices are out of bounds.
     pub fn bond_order(&self, i: usize, j: usize) -> Result<BondOrder, CError> {
         self.connect.bond_order(i, j)

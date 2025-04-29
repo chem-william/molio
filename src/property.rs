@@ -68,7 +68,7 @@ impl PartialEq for Property {
                 .zip(b.iter())
                 .all(|(x, y)| almost_eq(*x, *y, EPSILON)),
 
-            // nalgebra’s Matrix3<f64>: compare each entry
+            // nalgebra's Matrix3<f64>: compare each entry
             (Property::Matrix3x3(a), Property::Matrix3x3(b)) => {
                 for i in 0..3 {
                     for j in 0..3 {
@@ -149,6 +149,7 @@ impl<'a> IntoIterator for &'a mut Properties {
 }
 
 impl Property {
+    /// Returns the kind of this property.
     #[must_use]
     pub fn kind(&self) -> PropertyKind {
         match self {
@@ -161,6 +162,7 @@ impl Property {
         }
     }
 
+    /// Returns the boolean value if this is a [`Property::Bool`] property, or `None` otherwise.
     pub fn as_bool(&self) -> Option<bool> {
         if let Property::Bool(b) = *self {
             Some(b)
@@ -169,6 +171,11 @@ impl Property {
         }
     }
 
+    /// Returns the boolean value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the property is not [`Property::Bool`].
     pub fn expect_bool(&self) -> bool {
         match *self {
             Property::Bool(b) => b,
@@ -176,6 +183,7 @@ impl Property {
         }
     }
 
+    /// Returns the double value if this is a [`Property::Double`] property, or `None` otherwise.
     pub fn as_double(&self) -> Option<f64> {
         if let Property::Double(x) = *self {
             Some(x)
@@ -184,6 +192,11 @@ impl Property {
         }
     }
 
+    /// Returns the double value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the property is not [`Property::Double`].
     pub fn expect_double(&self) -> f64 {
         match *self {
             Property::Double(d) => d,
@@ -191,6 +204,7 @@ impl Property {
         }
     }
 
+    /// Returns the string slice if this is a [`Property::String`] property, or `None` otherwise.
     pub fn as_string(&self) -> Option<&str> {
         if let Property::String(ref s) = *self {
             Some(s)
@@ -199,6 +213,11 @@ impl Property {
         }
     }
 
+    /// Returns the string slice.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the property is not [`Property::String`].
     pub fn expect_string(&self) -> &str {
         match *self {
             Property::String(ref s) => s,
@@ -206,6 +225,7 @@ impl Property {
         }
     }
 
+    /// Returns the 3D vector if this is a [`Property::Vector3D`] property, or `None` otherwise.
     pub fn as_vector3d(&self) -> Option<[f64; 3]> {
         if let Property::Vector3D(v) = *self {
             Some(v)
@@ -214,6 +234,11 @@ impl Property {
         }
     }
 
+    /// Returns the 3D vector.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the property is not [`Property::Vector3D`].
     pub fn expect_vector3d(&self) -> [f64; 3] {
         match *self {
             Property::Vector3D(v) => v,
@@ -221,6 +246,7 @@ impl Property {
         }
     }
 
+    /// Returns the 3×3 matrix array if this is a [`Property::Matrix3x3`] property, or `None` otherwise.
     pub fn as_matrix3x3(&self) -> Option<[f64; 9]> {
         if let Property::Matrix3x3(m) = *self {
             let mut array = [0.0; 9];
@@ -231,6 +257,11 @@ impl Property {
         }
     }
 
+    /// Returns the 3×3 matrix array.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the property is not [`Property::Matrix3x3`].
     pub fn expect_matrix3x3(&self) -> [f64; 9] {
         match *self {
             Property::Matrix3x3(m) => {
@@ -242,6 +273,11 @@ impl Property {
         }
     }
 
+    /// Parses the given string `value` into a [`Property`] of the specified [`PropertyKind`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` cannot be parsed into the requested kind.
     pub fn parse_value(value: &str, kind: &PropertyKind) -> Result<Property, CError> {
         match kind {
             PropertyKind::String => StringParser::parse(value),
