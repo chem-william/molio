@@ -4,7 +4,6 @@
 //
 // See LICENSE at the project root for full text.
 
-use smallvec::SmallVec;
 use std::collections::BTreeSet;
 
 use crate::{
@@ -126,7 +125,7 @@ impl Connectivity {
         self.impropers.clear();
 
         // Pre-allocate space for bonded_to vectors
-        let mut bonded_to = vec![SmallVec::<[usize; 4]>::new(); self.biggest_atom + 1];
+        let mut bonded_to = vec![Vec::with_capacity(4); self.biggest_atom + 1];
 
         // Generate the list of which atom is bonded to which one
         for bond in &self.bonds {
