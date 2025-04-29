@@ -4,8 +4,6 @@
 //
 // See LICENSE at the project root for full text.
 
-use nalgebra::Matrix3;
-
 use crate::atom::Atom;
 use crate::error::CError;
 use crate::extendedxyzparser::ExtendedXyzParser;
@@ -13,6 +11,8 @@ use crate::format::FileFormat;
 use crate::frame::Frame;
 use crate::property::{Properties, Property, PropertyKind};
 use crate::unit_cell::{self, UnitCell};
+use log::warn;
+use nalgebra::Matrix3;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::fs::File;
@@ -200,8 +200,8 @@ impl XYZFormat {
         if !first_atom.properties.is_empty() {
             for (name, property) in &first_atom.properties {
                 if !XYZFormat::is_valid_property_name(name) {
-                    eprintln!(
-                        "warning: '{name}' is not a valid property name for extended XYZ. it will not be saved"
+                    warn!(
+                        "'{name}' is not a valid property name for extended XYZ. it will not be saved"
                     );
                     partially_defined_already_warned.insert(name.clone());
                     continue;
@@ -209,8 +209,8 @@ impl XYZFormat {
 
                 if let Some(string_prop) = property.as_string() {
                     if XYZFormat::should_be_quoted(string_prop) {
-                        eprint!(
-                            "warning: string value for property '{name}' on atom 0 cannot be saved as an atomic property"
+                        warn!(
+                            "string value for property '{name}' on atom 0 cannot be saved as an atomic property"
                         );
                         continue;
                     }
@@ -226,15 +226,15 @@ impl XYZFormat {
                 match atom.properties.get(prop_name) {
                     None => {
                         // Property missing on this atom
-                        eprintln!(
-                            "warning: property '{prop_name}' is only defined for a subset of atoms. it will not be saved"
+                        warn!(
+                            "property '{prop_name}' is only defined for a subset of atoms. it will not be saved"
                         );
                         false // Remove this property
                     }
                     Some(prop) if prop.kind() != *prop_kind => {
                         // Property has different type on this atom
-                        eprintln!(
-                            "warning: property '{prop_name}' is defined with different types on different atoms. it will not be saved",
+                        warn!(
+                            "property '{prop_name}' is defined with different types on different atoms. it will not be saved",
                         );
                         partially_defined_already_warned.insert(prop_name.clone());
                         false // Remove this property
@@ -248,8 +248,8 @@ impl XYZFormat {
                 if !all_properties.contains_key(prop_name)
                     && !partially_defined_already_warned.contains(prop_name)
                 {
-                    eprintln!(
-                        "warning: property '{prop_name}' is only defined for a subset of atoms. it will not be saved",
+                    warn!(
+                        "property '{prop_name}' is only defined for a subset of atoms. it will not be saved",
                     );
                     partially_defined_already_warned.insert(prop_name.clone());
                 }
@@ -314,8 +314,8 @@ impl XYZFormat {
                 } else if !item.0.contains('\'') {
                     write!(result, " '{}'=", item.0).unwrap();
                 } else {
-                    eprintln!(
-                        "warning: frame property '{}' contains both single and double quote. it will not be saved",
+                    warn!(
+                        "frame property '{}' contains both single and double quote. it will not be saved",
                         item.0
                     );
                     continue;

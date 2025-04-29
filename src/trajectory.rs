@@ -9,6 +9,7 @@ use crate::format::FileFormat;
 use crate::format::Format;
 use crate::format::TextFormat;
 use crate::frame::Frame;
+use log::error;
 use std::fs::File;
 use std::io::BufWriter;
 use std::io::Write;
@@ -169,7 +170,7 @@ impl Drop for TrajectoryWriter<'_> {
         // Attempt to finalize the file when the writer is dropped.
         // Ignore errors since we can't return them from drop().
         if let Err(e) = self.finish() {
-            eprintln!("warning: Failed to finalize trajectory file: {e}");
+            error!("warning: Failed to finalize trajectory file: {e}");
         }
     }
 }
