@@ -41,11 +41,17 @@ impl Index<usize> for Topology {
 }
 
 impl Topology {
+    /// Returns the current number of atoms in the topology.
     #[must_use]
     pub fn size(&self) -> usize {
         self.atoms.len()
     }
 
+    /// Resizes the topology to contain `size` atoms.
+    ///
+    /// If `size` is larger than the current number of atoms, new atoms with element name "X" will be appended.
+    /// # Errors
+    /// Returns an error if any existing bond references an atom index >= `size`.
     pub fn resize(&mut self, size: usize) -> Result<(), CError> {
         for bond in &self.connect.bonds {
             if bond[0] >= size || bond[1] >= size {
@@ -59,22 +65,30 @@ impl Topology {
         Ok(())
     }
 
+    /// Returns a vector of all bonds present in the topology.
     pub fn bonds(&self) -> Vec<Bond> {
         self.connect.bonds.iter().copied().collect()
     }
 
+    /// Returns a vector of all angles present in the topology.
     pub fn angles(&mut self) -> Vec<Angle> {
         self.connect.angles().iter().copied().collect()
     }
 
+    /// Returns a vector of all dihedrals present in the topology.
     pub fn dihedrals(&mut self) -> Vec<Dihedral> {
         self.connect.dihedrals().iter().copied().collect()
     }
 
+    /// Returns a vector of all improper torsions present in the topology.
     pub fn impropers(&mut self) -> Vec<Improper> {
         self.connect.impropers().iter().copied().collect()
     }
 
+    /// Adds a residue to this topology.
+    ///
+    /// # Errors
+    /// Returns an error if any atom in the given [`Residue`] is already part of another residue.
     pub fn add_residue(&mut self, residue: Residue) -> Result<(), CError> {
         for &atom_id in &residue {
             if self.residue_mapping.contains_key(&atom_id) {
@@ -121,10 +135,15 @@ impl Topology {
         Ok(())
     }
 
+    /// Returns the [`BondOrder`] between two atoms.
+    ///
+    /// # Errors
+    /// Returns an error if no bond exists between the specified atom indices or if indices are out of bounds.
     pub fn bond_order(&self, i: usize, j: usize) -> Result<BondOrder, CError> {
         self.connect.bond_order(i, j)
     }
 
+    /// Returns the [`Residue`] containing the specified atom index, if any.
     #[must_use]
     pub fn residue_for_atom(&self, index: usize) -> Option<Residue> {
         self.residue_mapping
@@ -132,6 +151,7 @@ impl Topology {
             .map(|residue_index| self.residues[*residue_index].clone())
     }
 
+    /// Returns `true` if the two specified residues are linked by a bond.
     #[must_use]
     pub fn are_linked(&self, first: &Residue, second: &Residue) -> bool {
         if first == second {
