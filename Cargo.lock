@@ -319,6 +319,7 @@ version = "0.1.0"
 dependencies = [
  "assert_approx_eq",
  "criterion",
+ "log",
  "nalgebra",
  "phf",
  "regex",

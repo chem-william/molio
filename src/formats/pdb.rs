@@ -4,6 +4,7 @@
 //
 // See LICENSE at the project root for full text.
 
+use super::pdb_connectivity::{self, find};
 use crate::atom::Atom;
 use crate::bond::BondOrder;
 use crate::error::CError;
@@ -13,12 +14,11 @@ use crate::property::Property;
 use crate::property::PropertyKind;
 use crate::residue::{FullResidueId, Residue};
 use crate::unit_cell::UnitCell;
+use log::warn;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
-
-use super::pdb_connectivity::{self, find};
 
 /// Maximum value for a width 4 number
 const MAX_HYBRID36_W4_NUMBER: i64 = 2_436_111;
@@ -289,12 +289,12 @@ impl<'a> PDBFormat<'a> {
         if self.atom_offsets.borrow().is_empty() {
             let initial_offset = decode_hybrid36(5, &line[6..11]);
             if initial_offset.is_err() {
-                eprintln!("initial offset was err");
+                warn!("initial offset was err");
             }
 
             let unwrapped = initial_offset.unwrap();
             if unwrapped <= 0 {
-                eprintln!("warning: '{unwrapped}' is too small, assuming id is '1'",);
+                warn!("'{unwrapped}' is too small, assuming id is '1'",);
                 self.atom_offsets.borrow_mut().push(0);
             } else {
                 self.atom_offsets.borrow_mut().push(
@@ -504,9 +504,7 @@ impl<'a> PDBFormat<'a> {
             let space_group_slice = &line[55..std::cmp::min(line.len(), 65)];
             // TODO: handle this as a warning (somehow)?
             if !space_group_slice.contains("P 1") && !space_group_slice.contains("P1") {
-                eprintln!(
-                    "warning: ignoring custom space group ({space_group_slice}), using P1 instead"
-                );
+                warn!("ignoring custom space group ({space_group_slice}), using P1 instead");
             }
         }
 
@@ -532,8 +530,8 @@ impl<'a> PDBFormat<'a> {
 
     fn add_bond(frame: &mut Frame, line: &str, i: usize, j: usize) {
         if i >= frame.size() || j >= frame.size() {
-            eprintln!(
-                "warning: PDB reader: ignoring CONECT ('{}') with atomic indexes bigger than frame size ({})",
+            warn!(
+                "ignoring CONECT ('{}') with atomic indexes bigger than frame size ({})",
                 line.trim(),
                 frame.size()
             );
@@ -576,7 +574,7 @@ impl<'a> PDBFormat<'a> {
 
     fn parse_helix(&self, line: &str) -> Result<(), CError> {
         if line.len() < 33 + 5 {
-            eprintln!("warning: HELIX record too short: {line}");
+            warn!("HELIX record too short: {line}");
         }
 
         let chain_start = line.as_bytes()[19] as char;
@@ -612,7 +610,7 @@ impl<'a> PDBFormat<'a> {
         let helix_type = &line[38..40]
             .trim()
             .parse::<usize>()
-            .inspect_err(|e| eprintln!("failed to parse helix type: {e}"))
+            .inspect_err(|e| warn!("failed to parse helix type: {e}"))
             .unwrap();
 
         if *helix_type <= 10 {
@@ -630,7 +628,7 @@ impl<'a> PDBFormat<'a> {
 
     fn parse_secondary(&self, line: &str, start: usize, end: usize) -> Result<(), CError> {
         if line.len() < end + 10 {
-            eprintln!("warning: secondary structure record too short: '{line}'");
+            warn!("secondary structure record too short: '{line}'");
         }
 
         let resname_start = &line[start..start + 3].trim();
@@ -720,7 +718,7 @@ impl<'a> PDBFormat<'a> {
 
             // Check if the residue has an ID
             let Some(resid) = residue.id else {
-                eprintln!("warning: got a residue without id, this should not happen");
+                warn!("got a residue without id, this should not happen");
                 return;
             };
 
@@ -783,8 +781,8 @@ impl<'a> PDBFormat<'a> {
                         && first_char != 'O'
                         && second_char != Some(&b'P')
                     {
-                        eprintln!(
-                            "warning: could not find standard atom '{first_name}' in residue '{}' (resid {resid})",
+                        warn!(
+                            "could not find standard atom '{first_name}' in residue '{}' (resid {resid})",
                             residue.name
                         );
                     }
@@ -802,8 +800,8 @@ impl<'a> PDBFormat<'a> {
                         && first_char != 'O'
                         && second_char != Some(&b'P')
                     {
-                        eprintln!(
-                            "warning: could not find standard atom '{second_name}' in residue '{}' (resid {resid})",
+                        warn!(
+                            "could not find standard atom '{second_name}' in residue '{}' (resid {resid})",
                             residue.name
                         );
                     }
@@ -851,9 +849,7 @@ impl<'a> PDBFormat<'a> {
             && (value == MAX_HYBRID36_W4_NUMBER || value == MAX_HYBRID36_W5_NUMBER)
         {
             let t = if width == 5 { "atom" } else { "residue" };
-            eprintln!(
-                "warning: the value for a {t} serial/id is too large, using '{encoded}' instead"
-            );
+            warn!("the value for a {t} serial/id is too large, using '{encoded}' instead");
         }
 
         encoded
@@ -901,8 +897,8 @@ impl<'a> PDBFormat<'a> {
             .unwrap_or(" ")
             .to_string();
         if info.chainid.len() > 1 {
-            eprintln!(
-                "warning: residues's chain id '{}' is too long, it will be trunctated",
+            warn!(
+                "residues's chain id '{}' is too long, it will be trunctated",
                 info.chainid
             );
             info.chainid = info.chainid.chars().nth(0).unwrap().to_string();
@@ -914,8 +910,8 @@ impl<'a> PDBFormat<'a> {
             .unwrap_or("")
             .to_string();
         if info.insertion_code.len() > 1 {
-            eprintln!(
-                "warning: residue's insertion code '{}' is too long, it will be truncated",
+            warn!(
+                "residue's insertion code '{}' is too long, it will be truncated",
                 info.insertion_code
             );
             info.insertion_code = info.insertion_code.chars().nth(0).unwrap().to_string();
@@ -927,7 +923,7 @@ impl<'a> PDBFormat<'a> {
             .unwrap_or("")
             .to_string();
         if info.segment.len() > 4 {
-            eprintln!(
+            warn!(
                 "residue's segment name '{}' is too long, it will be truncated",
                 info.segment
             );
@@ -1054,14 +1050,14 @@ impl FileFormat for PDBFormat<'_> {
                 Record::END => got_end = true,
                 Record::IGNORED_ => {}
                 Record::UNKNOWN_ => {
-                    eprintln!("ignoring unknown record: {line}");
+                    warn!("ignoring unknown record: {line}");
                 }
             }
             line.clear();
         }
 
         if !got_end {
-            eprintln!("warning: missing END record in file");
+            warn!("missing END record in file");
         }
 
         self.chain_ended(&mut frame);
@@ -1145,7 +1141,7 @@ impl FileFormat for PDBFormat<'_> {
                 .unwrap_or(" ")
                 .to_string();
             if altloc.len() > 1 {
-                eprintln!("warning: altloc '{altloc}' is too long, it will be truncated");
+                warn!("altloc '{altloc}' is too long, it will be truncated");
                 altloc = altloc.chars().next().unwrap().to_string();
             }
 
@@ -1220,8 +1216,8 @@ impl FileFormat for PDBFormat<'_> {
             if bond[0] > MAX_HYBRID36_W5_NUMBER as usize
                 || bond[1] > MAX_HYBRID36_W5_NUMBER as usize
             {
-                eprintln!(
-                    "warning: atomic index is too big for CONNECT, removing the bond between {} and {}",
+                warn!(
+                    "atomic index is too big for CONNECT, removing the bond between {} and {}",
                     bond[0], bond[1]
                 );
             }
