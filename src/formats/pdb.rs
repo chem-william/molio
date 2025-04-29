@@ -472,17 +472,29 @@ impl<'a> PDBFormat<'a> {
             });
         }
 
-        let a = fast_float::parse(line[6..15].trim())
+        let a = line[6..15]
+            .trim()
+            .parse::<f64>()
             .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let b = fast_float::parse(line[15..24].trim())
+        let b = line[15..24]
+            .trim()
+            .parse::<f64>()
             .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let c = fast_float::parse(line[24..33].trim())
+        let c = line[24..33]
+            .trim()
+            .parse::<f64>()
             .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let alpha = fast_float::parse(line[33..40].trim())
+        let alpha = line[33..40]
+            .trim()
+            .parse::<f64>()
             .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let beta = fast_float::parse(line[40..47].trim())
+        let beta = line[40..47]
+            .trim()
+            .parse::<f64>()
             .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let gamma = fast_float::parse(line[47..54].trim())
+        let gamma = line[47..54]
+            .trim()
+            .parse::<f64>()
             .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
 
         let unit_cell = UnitCell::new_from_lengths_angles([a, b, c], &mut [alpha, beta, gamma])?;

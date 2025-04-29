@@ -28,7 +28,7 @@ impl XYZFormat {
 
         matrix.iter_mut().zip(lattice.split_whitespace()).for_each(
             |(matrix_entry, lattice_item)| {
-                *matrix_entry = fast_float::parse(lattice_item).expect("expected float");
+                *matrix_entry = lattice_item.parse::<f64>().expect("expected float");
             },
         );
 
