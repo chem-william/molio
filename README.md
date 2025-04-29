@@ -1,4 +1,5 @@
 [![Codecov](https://codecov.io/github/chem-william/molio/coverage.svg?branch=main)](https://codecov.io/gh/chem-william/molio)
+[![dependency status](https://deps.rs/repo/github/chem-william/molio/status.svg)](https://deps.rs/repo/github/chem-william/molio)
 
 # molio
 
