@@ -89,7 +89,7 @@ impl<'a> ExtendedXyzParser<'a> {
         tokens
     }
 
-    /// Parses a single line of KEY=VALUE and standalone flags into a [`HashMap`].
+    /// Parses a single line of KEY=VALUE and standalone flags into a [`ExtendedXyzProperties`].
     pub fn parse(&self) -> ExtendedXyzProperties {
         let mut map = BTreeMap::new();
         for tok in ExtendedXyzParser::split_tokens(self.line) {
