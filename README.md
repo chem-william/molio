@@ -2,7 +2,14 @@
 
 # molio
 
-A Rust library for parsing molecular trajectory files.
+`molio` is a Rust library for reading and writing chemistry files used in computational chemistry simulations. It provides a unified interface to access atomic (positions, velocities, atomic symbols) and trajectory (frames, topology) information and other data across various chemical file formats. Currently supports
+
+| Format         | Extension |
+| ------         | --------- |
+| (Extended) XYZ | .xyz      |
+| PDB            | .pdb      |
+
+This project is a Rust port of [`chemfiles`](https://github.com/chemfiles/chemfiles/), a modern C++ library with the same purpose.
 
 ## Usage
 
@@ -54,3 +61,5 @@ If you use this library in a scientific publication, please cite it using the DO
 ```bibtex
 TODO
 ```
+
+Also, consider citing the original [`chemfiles`](https://github.com/chemfiles/chemfiles/) library.
