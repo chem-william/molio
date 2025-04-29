@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2025 William Bro-Jørgensen
+// Copyright (c) 2020 Guillaume Fraux and contributors
+//
+// See LICENSE at the project root for full text.
+
 use std::ops::Index;
 
 /// Ensures a canonical representation of an angle between

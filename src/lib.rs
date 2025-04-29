@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2025 William Bro-Jørgensen
+//
+// See LICENSE at the project root for full text.
+
 pub mod angle;
 pub mod atom;
 pub mod bond;

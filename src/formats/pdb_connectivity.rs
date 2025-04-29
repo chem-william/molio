@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2025 William Bro-Jørgensen
+// Copyright (c) 2020 Guillaume Fraux and contributors
+//
+// See LICENSE at the project root for full text.
+
 // this file is a translation of an auto-generated C++ file.
 // the C++ file (and the python script used to generate it can be found
 // her: https://github.com/chemfiles/chemfiles/blob/8b70661890636c40472e3303e447d434af6237eb/src/pdb_connectivity.cpp)
