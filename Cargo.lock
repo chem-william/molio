@@ -322,6 +322,7 @@ dependencies = [
  "log",
  "nalgebra",
  "phf",
+ "purr",
  "regex",
  "serde",
  "tempfile",
@@ -499,6 +500,12 @@ checksum = "02b3e5e68a3a1a02aad3ec490a98007cbc13c37cbe84a3cd7b8e406d76e7f778"
 dependencies = [
  "unicode-ident",
 ]
+
+[[package]]
+name = "purr"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f65ecf8f6541cb5191a715bcd065373e1d49dfc64ad39f6a3d2cba4c8c20108a"
 
 [[package]]
 name = "quote"
