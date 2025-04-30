@@ -4,25 +4,92 @@
 //
 // See LICENSE at the project root for full text.
 
+use crate::atom::Atom;
+use crate::bond::BondOrder;
+use crate::property::Property;
+use crate::residue::Residue;
+use crate::topology::Topology;
+use crate::{error::CError, format::FileFormat, frame::Frame};
+use purr::feature::Aromatic;
+use purr::graph::Builder;
+use purr::read::read;
+use std::cell::RefCell;
 use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter, Seek},
 };
 
-use log::warn;
-
-use crate::{error::CError, format::FileFormat, frame::Frame};
-pub struct SMIFormat;
-
-impl SMIFormat {}
+/// Currently, we're not handling 'CurlySMILES'
+#[derive(Default)]
+pub struct SMIFormat {
+    /// Residue information in the current step
+    pub residues: RefCell<Vec<Residue>>,
+}
 
 impl FileFormat for SMIFormat {
     fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
-        todo!()
+        self.residues.borrow_mut().clear();
+
+        let mut frame = Frame::new();
+        let mut topology = Topology::default();
+        let mut groupid = 0;
+        self.residues.borrow_mut().push(Residue {
+            name: format!("group {groupid}"),
+            ..Default::default()
+        });
+
+        let mut line = String::new();
+        reader.read_line(&mut line)?;
+        let mut smiles = line.trim();
+        while smiles.is_empty() {
+            line.clear();
+            reader.read_line(&mut line)?;
+            smiles = line.trim();
+        }
+
+        let mut builder = Builder::new();
+        let _ = read(smiles, &mut builder, None);
+
+        let built_smiles = builder.build().unwrap();
+
+        topology.atoms.reserve(built_smiles.len());
+        for (i, purr) in built_smiles.iter().enumerate() {
+            // Add the atom itself.
+            topology.add_atom(Atom::new(purr.kind.to_string()));
+            match purr.kind {
+                purr::feature::AtomKind::Aromatic(_) => topology[0]
+                    .properties
+                    .insert("is_aromatic".to_string(), Property::Bool(true)),
+                _ => None,
+            };
+
+            // Get a mutable ref to the newly added atom:
+            // let atom = topology.atoms.last_mut();
+
+            // For each neighbor index < i, add a bond.
+            for j in &purr.bonds {
+                if j.tid < i {
+                    // TODO: convert the bond order from Purr
+                    topology.add_bond(j.tid, i, BondOrder::Single)?;
+                }
+            }
+
+            // Record this atom in the current residue.
+            let topo_size = topology.size();
+            self.residues
+                .borrow_mut()
+                .last_mut()
+                .expect("no residue")
+                .add_atom(topo_size - 1);
+        }
+
+        frame.resize(topology.size())?;
+        frame.set_topology(topology)?;
+        Ok(frame)
     }
 
     fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        todo!()
+        Ok(Some(self.read_next(reader).unwrap()))
     }
 
     fn write_next(
@@ -74,7 +141,7 @@ impl FileFormat for SMIFormat {
 
 #[cfg(test)]
 mod tests {
-    use crate::trajectory::Trajectory;
+    use crate::{bond::BondOrder, trajectory::Trajectory};
     use std::path::Path;
 
     #[test]
@@ -89,5 +156,36 @@ mod tests {
         let path = Path::new("./src/tests-data/smi/spaces.smi");
         let trajectory = Trajectory::open(path).unwrap();
         assert_eq!(trajectory.size, 8);
+    }
+
+    #[test]
+    fn read_next_frame() {
+        let path = Path::new("./src/tests-data/smi/test.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+
+        // Check to make sure things aren't exploding
+        // reading: C1CC2C1CC2
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 6);
+        assert_eq!(frame.topology().bonds().len(), 7);
+
+        // reading: c1ccccc1	Benzene
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 6);
+        assert_eq!(frame.topology().bonds().len(), 6);
+
+        // reading: C(Cl)(Cl)(Cl)
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 4);
+        let topology = frame.topology();
+        let bonds = topology.bonds();
+        assert_eq!(bonds.len(), 3);
+        assert!(bonds[0][0] == 0 && bonds[0][1] == 1);
+        assert!(bonds[1][0] == 0 && bonds[1][1] == 2);
+        assert!(bonds[2][0] == 0 && bonds[2][1] == 3);
+        assert_eq!(frame[0].symbol, "C");
+        assert_eq!(frame[1].symbol, "Cl");
+        assert_eq!(frame[2].symbol, "Cl");
+        assert_eq!(frame[3].symbol, "Cl");
     }
 }

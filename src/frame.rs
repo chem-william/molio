@@ -49,6 +49,20 @@ impl Frame {
         &self.topology
     }
 
+    pub fn set_topology(&mut self, topology: Topology) -> Result<(), CError> {
+        if topology.size() != self.size() {
+            return Err(CError::GenericError(format!(
+                "the topology contains {} atoms, but the frame contains {} atoms",
+                topology.size(),
+                self.size(),
+            )));
+        }
+
+        self.topology = topology;
+
+        Ok(())
+    }
+
     pub fn topology_as_mut(&mut self) -> &mut Topology {
         &mut self.topology
     }

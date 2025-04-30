@@ -10,7 +10,7 @@ use crate::formats::smi::SMIFormat;
 use crate::formats::xyz::XYZFormat;
 use crate::frame::Frame;
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::{BufRead, BufReader, BufWriter};
 use std::path::Path;
 
 /// Supported text-based trajectory file formats for reading and writing.
@@ -53,7 +53,7 @@ impl Format<'_> {
         match ext.to_lowercase().as_str() {
             "xyz" => Ok(Format::XYZ(XYZFormat)),
             "pdb" => Ok(Format::PDB(PDBFormat::new())),
-            "smi" => Ok(Format::SMI(SMIFormat)),
+            "smi" => Ok(Format::SMI(SMIFormat::default())),
             _ => Err(CError::GenericError("unknown file format".to_string())),
         }
     }
@@ -68,7 +68,7 @@ impl Format<'_> {
         match fmt {
             TextFormat::XYZ => Ok(Format::XYZ(XYZFormat)),
             TextFormat::PDB => Ok(Format::PDB(PDBFormat::new())),
-            TextFormat::SMI => Ok(Format::SMI(SMIFormat)),
+            TextFormat::SMI => Ok(Format::SMI(SMIFormat::default())),
             TextFormat::Guess => Self::new(path),
         }
     }

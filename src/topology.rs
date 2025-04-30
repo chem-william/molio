@@ -4,7 +4,10 @@
 //
 // See LICENSE at the project root for full text.
 
-use std::{collections::HashMap, ops::Index};
+use std::{
+    collections::HashMap,
+    ops::{Index, IndexMut},
+};
 
 use crate::{
     angle::Angle,
@@ -37,6 +40,12 @@ impl Index<usize> for Topology {
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.atoms[index]
+    }
+}
+
+impl IndexMut<usize> for Topology {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.atoms[index]
     }
 }
 
@@ -83,6 +92,11 @@ impl Topology {
     /// Returns a vector of all improper torsions present in the topology.
     pub fn impropers(&mut self) -> Vec<Improper> {
         self.connect.impropers().iter().copied().collect()
+    }
+
+    /// Adds an [`Atom`] to the end of this topology.
+    pub fn add_atom(&mut self, atom: Atom) {
+        self.atoms.push(atom);
     }
 
     /// Adds a residue to this topology.
