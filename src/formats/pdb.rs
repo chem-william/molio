@@ -1264,12 +1264,9 @@ impl FileFormat for PDBFormat<'_> {
     }
 
     fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
-            Ok(Some(self.read_next(reader).unwrap()))
-        } else {
-            Ok(None)
-        }
+        Ok(Some(self.read_next(reader).unwrap()))
     }
+
     /// Finalize the PDB file by writing the END record if needed
     ///
     /// This should be called when done writing to a PDB file to ensure it's properly closed

@@ -389,12 +389,7 @@ impl FileFormat for XYZFormat {
     }
 
     fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        // TODO: replace with has_data_left when stabilized
-        if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
-            Ok(Some(self.read_next(reader).unwrap()))
-        } else {
-            Ok(None)
-        }
+        Ok(Some(self.read_next(reader).unwrap()))
     }
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
