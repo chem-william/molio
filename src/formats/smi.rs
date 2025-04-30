@@ -198,4 +198,60 @@ mod tests {
         assert_eq!(frame[2].symbol, "Cl");
         assert_eq!(frame[3].symbol, "Cl");
     }
+
+    #[test]
+    fn read_specific_step() {
+        let path = Path::new("./src/tests-data/smi/test.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        let frame = trajectory.read_at(1).unwrap().unwrap();
+        assert_eq!(frame.size(), 6);
+        let topology = frame.topology();
+        assert_eq!(topology.bonds().len(), 6);
+
+        // TODO: requires correct parsing of dative bonds (<- and ->)
+        // let frame = trajectory.read_at(7).unwrap().unwrap();
+        // assert_eq!(frame.size(), 9);
+        // let topology = frame.topology();
+        // assert_eq!(topology.bonds().len(), 6);
+
+        let frame = trajectory.read_at(5).unwrap().unwrap();
+        assert_eq!(frame.size(), 6);
+    }
+
+    #[test]
+    fn read_specific_step_with_whitespace() {
+        let path = Path::new("./src/tests-data/smi/spaces.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        let frame = trajectory.read_at(1).unwrap().unwrap();
+        assert_eq!(frame.size(), 6);
+        let topology = frame.topology();
+        assert_eq!(topology.bonds().len(), 6);
+
+        // TODO: requires correct parsing of dative bonds (<- and ->)
+        // let frame = trajectory.read_at(7).unwrap().unwrap();
+        // assert_eq!(frame.size(), 9);
+        // let topology = frame.topology();
+        // assert_eq!(topology.bonds().len(), 6);
+
+        let frame = trajectory.read_at(5).unwrap().unwrap();
+        assert_eq!(frame.size(), 6);
+        let topology = frame.topology();
+        assert_eq!(topology.bonds().len(), 6);
+
+        // Check that calling trajectory.read() repeatedly is the same as frame.read_at()
+        let path = Path::new("./src/tests-data/smi/spaces.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+
+        trajectory.read().unwrap().unwrap();
+        trajectory.read().unwrap().unwrap();
+        trajectory.read().unwrap().unwrap();
+        trajectory.read().unwrap().unwrap();
+        trajectory.read().unwrap().unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+
+        dbg!(&frame);
+        assert_eq!(frame.size(), 6);
+        let topology = frame.topology();
+        assert_eq!(topology.bonds().len(), 6);
+    }
 }

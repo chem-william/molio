@@ -4,3 +4,5 @@ C(Cl)(Cl)(Cl)
 [Ru]$[Ru]
 C#N
 c1:c:c:c:c:c:1
+N->Co(<-N)(<-N)(<-N)
+CCl.[O-]>C(Cl)Cl>CO.[Cl-]
