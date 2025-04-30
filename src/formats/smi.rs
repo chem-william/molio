@@ -10,6 +10,7 @@ use crate::property::Property;
 use crate::residue::Residue;
 use crate::topology::Topology;
 use crate::{error::CError, format::FileFormat, frame::Frame};
+use log::warn;
 use purr::feature::Aromatic;
 use purr::graph::Builder;
 use purr::read::read;
@@ -95,7 +96,7 @@ impl FileFormat for SMIFormat {
     }
 
     fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        Ok(Some(self.read_next(reader).unwrap()))
+        Ok(Some(self.read_next(reader)?))
     }
 
     fn write_next(
@@ -149,6 +150,7 @@ impl FileFormat for SMIFormat {
 mod tests {
     use crate::{
         bond::BondOrder,
+        frame::Frame,
         topology,
         trajectory::{self, Trajectory},
     };
@@ -249,9 +251,26 @@ mod tests {
         trajectory.read().unwrap().unwrap();
         let frame = trajectory.read().unwrap().unwrap();
 
-        dbg!(&frame);
         assert_eq!(frame.size(), 6);
         let topology = frame.topology();
         assert_eq!(topology.bonds().len(), 6);
+    }
+
+    #[test]
+    fn read_entire_file() {
+        let path = Path::new("./src/tests-data/smi/rdkit_problems.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        assert_eq!(trajectory.size, 70);
+
+        let mut frame = Frame::new();
+        while let Some(next_frame) = trajectory.read().unwrap() {
+            frame = next_frame;
+        }
+        // TODO: until we have good support for SMILES, we rewind to the latest SMILES'
+        // in the test file
+        let frame = trajectory.read_at(67).unwrap().unwrap();
+        assert_eq!(frame.size(), 14);
+        assert_eq!(frame[0].symbol, "[Db]");
+        assert_eq!(frame[13].symbol, "[Og]");
     }
 }
