@@ -57,10 +57,18 @@ impl FileFormat for SMIFormat {
         let mut builder = Builder::new();
         let _ = read(smiles, &mut builder, None);
 
-        let built_smiles = builder.build().unwrap();
+        dbg!(&line);
+        let built_smiles = builder.build();
+        if built_smiles.is_err() {
+            let e = line.trim();
+            warn!("could not parse '{e}'. skipping for now");
+            eprintln!("could not parse '{e}'. skipping for now");
+            return Ok(Frame::new());
+        }
+        let parsed_smiles = built_smiles.unwrap();
 
-        topology.atoms.reserve(built_smiles.len());
-        for (i, purr) in built_smiles.iter().enumerate() {
+        topology.atoms.reserve(parsed_smiles.len());
+        for (i, purr) in parsed_smiles.iter().enumerate() {
             // Add the atom itself.
             topology.add_atom(Atom::new(purr.kind.to_string()));
             match purr.kind {
@@ -90,6 +98,7 @@ impl FileFormat for SMIFormat {
                 .add_atom(topo_size - 1);
         }
 
+        // dbg!(&line);
         frame.resize(topology.size())?;
         frame.set_topology(topology)?;
         Ok(frame)
