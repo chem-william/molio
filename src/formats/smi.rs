@@ -26,6 +26,12 @@ pub struct SMIFormat {
     pub residues: RefCell<Vec<Residue>>,
 }
 
+// TODO: support dative bonds (<- and ->)
+// otherwise, we can't parse something like
+// N->Co(<-N)(<-N)(<-N)
+// CCl.[O-]>C(Cl)Cl>CO.[Cl-]
+// probably requires upstream changes to Purr/Balsa unless we roll our own or
+// find another lib for parsing SMILES
 impl FileFormat for SMIFormat {
     fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         self.residues.borrow_mut().clear();
@@ -141,7 +147,11 @@ impl FileFormat for SMIFormat {
 
 #[cfg(test)]
 mod tests {
-    use crate::{bond::BondOrder, trajectory::Trajectory};
+    use crate::{
+        bond::BondOrder,
+        topology,
+        trajectory::{self, Trajectory},
+    };
     use std::path::Path;
 
     #[test]
