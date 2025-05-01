@@ -249,7 +249,8 @@ impl FileFormat for SDFFormat {
     }
 
     fn finalize(&self, writer: &mut BufWriter<File>) -> Result<(), CError> {
-        todo!();
+        // SDF format doesn't need any special finalization
+        Ok(())
     }
 }
 
