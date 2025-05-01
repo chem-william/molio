@@ -5,18 +5,160 @@
 // See LICENSE at the project root for full text.
 //
 
+use std::fmt::Write;
 use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter, Seek},
 };
 
+use crate::{atom::Atom, bond::BondOrder, property::Property};
 use crate::{error::CError, format::FileFormat, frame::Frame};
+use log::warn;
 
 pub struct SDFFormat;
 
 impl FileFormat for SDFFormat {
     fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
-        todo!();
+        let mut line = String::new();
+        let mut frame = Frame::new();
+        let _ = reader.read_line(&mut line)?;
+
+        if !line.is_empty() {
+            frame
+                .properties
+                .insert("name".to_string(), Property::String(line.to_string()));
+        }
+        reader.read_line(&mut line)?; // Program line - skip it
+        reader.read_line(&mut line)?; // Comment line - skip it
+
+        line.clear();
+        reader.read_line(&mut line)?;
+        let natoms = line[..3].trim().parse::<usize>().map_err(|_| {
+            CError::GenericError(format!(
+                "could not parse atom count in SDF file: '{}'",
+                &line[..3]
+            ))
+        })?;
+
+        let nbonds = line[3..6].trim().parse::<usize>().map_err(|_| {
+            CError::GenericError(format!(
+                "could not parse bond count in SDF file: '{}'",
+                &line[3..6]
+            ))
+        })?;
+
+        frame.reserve(natoms);
+        for _ in 0..natoms {
+            line.clear();
+            let _ = reader.read_line(&mut line)?;
+
+            if line.len() < 34 {
+                return Err(CError::GenericError(format!(
+                    "atom line is too small for SDF: '{line}'"
+                )));
+            }
+
+            let x = line[..10].trim().parse::<f64>()?;
+            let y = line[10..20].trim().parse::<f64>()?;
+            let z = line[20..30].trim().parse::<f64>()?;
+            let name = line[31..34].trim();
+            let mut atom = Atom::new(name.to_string());
+
+            if line.len() >= 40 {
+                let charge_code = line[36..39].trim().parse::<i64>().map_err(|_| {
+                    CError::GenericError(format!("charge code is not numeric: {}", &line[36..39]))
+                })?;
+                match charge_code {
+                    0 => {}
+                    1 => atom.charge = 3.0,
+                    2 => atom.charge = 2.0,
+                    3 => atom.charge = 1.0,
+                    5 => atom.charge = -1.0,
+                    6 => atom.charge = -2.0,
+                    7 => atom.charge = -3.0,
+                    _ => warn!("unknown charge code: {charge_code}"),
+                }
+            }
+            frame.add_atom(atom, [x, y, z]);
+        }
+
+        for _ in 0..nbonds {
+            line.clear();
+            let _ = reader.read_line(&mut line)?;
+            let atom1 = line[..3].trim().parse::<usize>()?;
+            let atom2 = line[3..6].trim().parse::<usize>()?;
+            let order = line[6..9].trim().parse::<usize>()?;
+
+            let bond_order = match order {
+                1 => BondOrder::Single,
+                2 => BondOrder::Double,
+                3 => BondOrder::Triple,
+                4 => BondOrder::Aromatic,
+
+                // 8 specifically means unspecified
+                8 => BondOrder::Unknown,
+                _ => BondOrder::Unknown,
+            };
+            frame.add_bond(atom1 - 1, atom2 - 1, bond_order)?;
+        }
+        // Parsing the file is more or less complete now, but atom properties can
+        // still be read (until 'M  END' is reached).
+        // This loop breaks when the property block ends or returns on an error
+
+        line.clear();
+        while reader.read_line(&mut line)? > 0 {
+            if line.is_empty() {
+                continue;
+            } else if line.starts_with("$$$$") {
+                // Ending block, technically wrong - but we can exit safely
+                return Ok(frame);
+            } else if line.starts_with("M  END") {
+                // Proper end of block
+                break;
+            } // TODO: add actual ATOM property parsing here
+
+            line.clear();
+        }
+        // This portion of the file is for molecule wide properties.
+        // We're done parsing, so just quit if any errors occur
+        let mut property_name = String::new();
+        let mut property_value = String::new();
+        line.clear();
+        while reader.read_line(&mut line)? > 0 {
+            if line.trim().is_empty() {
+                // This breaks a property group - so store now
+                if property_name.is_empty() {
+                    warn!("missing property name");
+                }
+                frame.properties.insert(
+                    property_name.clone(),
+                    Property::String(property_value.clone()),
+                );
+                line.clear();
+            } else if line.starts_with("$$$$") {
+                // Molecule ending block
+                return Ok(frame);
+            } else if line.starts_with("> <") {
+                // Get the property name which is formatted like:
+                // > <NAMEGOESHERE>
+                if let Some(npos) = line.rfind('>') {
+                    property_name = line[3..npos].to_string();
+                    line.clear();
+                    reader.read_line(&mut line)?;
+                    property_value = line.trim().to_string();
+                } else {
+                    warn!("no closing delimiter found for property name: {line}");
+                }
+            } else {
+                // Continuation of a property value
+                writeln!(property_value).expect("write to string we control(?)");
+                write!(property_value, "{}", line).expect("write to string we control(?)");
+            }
+
+            line.clear();
+        }
+
+        Ok(frame)
     }
 
     fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
@@ -113,7 +255,9 @@ impl FileFormat for SDFFormat {
 mod tests {
     use std::path::Path;
 
-    use crate::trajectory::Trajectory;
+    use assert_approx_eq::assert_approx_eq;
+
+    use crate::{atom::Atom, trajectory::Trajectory};
 
     #[test]
     fn check_nsteps_aspirin() {
@@ -129,5 +273,28 @@ mod tests {
         let trajectory = Trajectory::open(path).unwrap();
 
         assert_eq!(trajectory.size, 6);
+    }
+
+    #[test]
+    fn read_next_step() {
+        let path = Path::new("./src/tests-data/sdf/kinases.sdf");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 47);
+
+        // Check positions
+        let positions = frame.positions();
+        assert_approx_eq!(positions[0][0], 4.9955, 1e-3);
+        assert_approx_eq!(positions[0][1], -2.6277, 1e-3);
+        assert_approx_eq!(positions[0][2], 0.2047, 1e-3);
+
+        assert_approx_eq!(positions[46][0], -8.5180, 1e-3);
+        assert_approx_eq!(positions[46][1], 0.2962, 1e-3);
+        assert_approx_eq!(positions[46][2], 2.1406, 1e-3);
+
+        // Check topology
+        let topology = frame.topology();
+        assert_eq!(topology.size(), 47);
+        assert_eq!(topology[0], Atom::new("O".to_string()));
     }
 }
