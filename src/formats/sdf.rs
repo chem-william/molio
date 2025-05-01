@@ -347,4 +347,17 @@ mod tests {
         assert_approx_eq!(positions[49][1], -0.0147);
         assert_approx_eq!(positions[49][2], -2.1114);
     }
+
+    #[test]
+    fn read_various_file_properties() {
+        let path = Path::new("./src/tests-data/sdf/aspirin.sdf");
+        let mut trajectory = Trajectory::open(path).unwrap();
+
+        let frame = trajectory.read().unwrap().unwrap();
+        let prop = frame.properties.get("PUBCHEM_COMPOUND_CID").unwrap();
+        assert_eq!(prop.expect_string(), "2244".to_string());
+
+        let prop2 = frame.properties.get("PUBCHEM_MOLECULAR_FORMULA").unwrap();
+        assert_eq!(prop2.expect_string(), "C9H8O4");
+    }
 }
