@@ -119,11 +119,13 @@ mod tests {
         let atom1 = Atom {
             symbol: "H".to_string(),
             name: "hydrogen".to_string(),
+            charge: 0.0,
             properties: Properties::new(),
         };
         let atom2 = Atom {
             symbol: "O".to_string(),
             name: "oxygen".to_string(),
+            charge: 0.0,
             properties: Properties::new(),
         };
 

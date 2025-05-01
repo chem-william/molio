@@ -377,6 +377,7 @@ impl FileFormat for XYZFormat {
 
             let mut atom = Atom {
                 symbol,
+                charge: 0.0,
                 name: String::new(),
                 properties: Properties::new(),
             };

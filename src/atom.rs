@@ -11,7 +11,7 @@ pub struct Atom {
     pub name: String,
     pub symbol: String,
     // pub mass: f64,
-    // pub charge: f64,
+    pub charge: f64,
     pub properties: Properties,
 }
 
@@ -20,6 +20,7 @@ impl Atom {
         Self {
             name: name.clone(),
             symbol: name,
+            charge: 0.0,
             properties: Properties::new(),
         }
     }
@@ -28,6 +29,7 @@ impl Atom {
         Self {
             name,
             symbol,
+            charge: 0.0,
             properties: Properties::new(),
         }
     }
