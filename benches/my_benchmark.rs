@@ -19,6 +19,12 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| molio::read_trajectory(pdb_path))
     });
 
+    // Benchmark SDF format
+    let sdf_path = Path::new("./src/tests-data/sdf/kinases.sdf");
+    group.bench_function("read kinases.sdf", |b| {
+        b.iter(|| molio::read_trajectory(sdf_path))
+    });
+
     group.finish();
 }
 

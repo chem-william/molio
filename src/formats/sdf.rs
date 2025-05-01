@@ -29,48 +29,69 @@ impl FileFormat for SDFFormat {
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
         let position = reader.stream_position()?;
-        let mut line = String::new();
-        let mut read_bytes = 0;
+        let mut buf = Vec::with_capacity(256); // Pre-allocate a reasonable size
 
         // Ignore header lines: molecule name, metadata, and general comment line
         for _ in 0..3 {
-            read_bytes = reader.read_line(&mut line)?;
-            line.clear();
+            buf.clear();
+            let bytes_read = reader.read_until(b'\n', &mut buf)?;
+            if bytes_read == 0 {
+                // EOF reached
+                return Ok(None);
+            }
         }
 
-        if read_bytes == 0 && line.trim().is_empty() {
+        // Read counts line
+        buf.clear();
+        let bytes_read = reader.read_until(b'\n', &mut buf)?;
+        if bytes_read == 0 {
             return Ok(None);
         }
-
-        read_bytes = reader.read_line(&mut line)?;
-        if read_bytes < 10 {
-            return Err(CError::GenericError(format!("counts line must have at least 10 characters in SDF file. It has {read_bytes}: '{line}'")));
+        if bytes_read < 10 {
+            return Err(CError::GenericError(format!(
+                "counts line must have at least 10 characters in SDF file. It has {bytes_read} bytes: '{}'", String::from_utf8_lossy(&buf)
+            )));
         }
 
-        let natoms = line[..3].trim().parse::<usize>().map_err(|_| {
-            CError::GenericError(format!("could not parse counts line in SDF file: '{line}'"))
+        // Parse atom and bond counts
+        let counts_line = std::str::from_utf8(&buf)
+            .map_err(|_| CError::GenericError("invalid UTF-8 in counts line".to_string()))?;
+
+        let natoms = counts_line[..3].trim().parse::<usize>().map_err(|_| {
+            CError::GenericError(format!(
+                "could not parse atom count in SDF file: '{}'",
+                &counts_line[..3]
+            ))
         })?;
-        let nbonds = line[3..6].trim().parse::<usize>().map_err(|_| {
-            CError::GenericError(format!("could not parse counts line in SDF file: '{line}'"))
+        let nbonds = counts_line[3..6].trim().parse::<usize>().map_err(|_| {
+            CError::GenericError(format!(
+                "could not parse bond count in SDF file: '{}'",
+                &counts_line[3..6]
+            ))
         })?;
 
         for _ in 0..(natoms + nbonds) {
-            read_bytes = reader.read_line(&mut line)?;
-            if read_bytes == 0 && line.is_empty() {
+            buf.clear();
+            if reader.read_until(b'\n', &mut buf)? == 0 {
                 return Err(CError::GenericError(
-                    "not enough lines in for SDF format".to_string(),
+                    "unexpected EOF in SDF format".to_string(),
                 ));
             }
-            line.clear()
         }
 
         // Search for ending character, updating the cursor in the file for the next
         // call to forward
-        while reader.read_line(&mut line)? > 0 {
-            if line.trim() == "$$$$" {
+        loop {
+            buf.clear();
+            let bytes_read = reader.read_until(b'\n', &mut buf)?;
+            if bytes_read == 0 {
+                break; // EOF reached
+            }
+
+            // Check if the line starts with "$$$$"
+            if buf.starts_with(b"$$$$") {
                 break;
             }
-            line.clear();
         }
 
         // We have enough data to parse an entire molecule.
