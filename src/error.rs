@@ -25,6 +25,8 @@ pub enum CError {
     UnexpectedSymbol,
     #[error("Failed to parse float: {0}")]
     ParseFloatError(#[from] std::num::ParseFloatError),
+    #[error("Failed to parse integer: {0}")]
+    ParseIntegerError(#[from] std::num::ParseIntError),
     #[error("Missing token")]
     MissingToken,
     #[error("{expected_record_type} record '{actual_record_type}': {reason}")]
