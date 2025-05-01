@@ -20,7 +20,12 @@ impl FileFormat for SDFFormat {
     }
 
     fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        todo!();
+        // TODO: replace with has_data_left when stabilized
+        if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
+            Ok(Some(self.read_next(reader).unwrap()))
+        } else {
+            Ok(None)
+        }
     }
 
     fn write_next(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
