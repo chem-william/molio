@@ -93,6 +93,11 @@ impl Topology {
         self.connect.impropers().iter().copied().collect()
     }
 
+    /// Remove all bonding information in the `Topology` (bonds, angles, and dihedrals)
+    pub fn clear_bonds(&mut self) {
+        self.connect = Connectivity::default();
+    }
+
     /// Adds a residue to this topology.
     ///
     /// # Errors
