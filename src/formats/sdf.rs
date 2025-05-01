@@ -381,4 +381,26 @@ mod tests {
         assert_approx_eq!(frame[9].charge, 0.0);
         assert_approx_eq!(frame[10].charge, 0.0);
     }
+
+    #[test]
+    #[should_panic(expected = "atom line is too small for SDF")]
+    fn too_small_atom_line() {
+        let path = Path::new("./src/tests-data/sdf/bad-atom-line.sdf");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        trajectory.read();
+    }
+
+    #[test]
+    #[should_panic(expected = "could not parse bond count")]
+    fn bad_counts_line() {
+        let path = Path::new("./src/tests-data/sdf/count-line-not-numbers.sdf");
+        let _trajectory = Trajectory::open(path).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "counts line must have at least 10 characters")]
+    fn count_line_too_short() {
+        let path = Path::new("./src/tests-data/sdf/count-line-too-short.sdf");
+        let _trajectory = Trajectory::open(path).unwrap();
+    }
 }
