@@ -388,7 +388,7 @@ mod tests {
     fn too_small_atom_line() {
         let path = Path::new("./src/tests-data/sdf/bad-atom-line.sdf");
         let mut trajectory = Trajectory::open(path).unwrap();
-        trajectory.read();
+        trajectory.read().unwrap().unwrap();
     }
 
     #[test]
