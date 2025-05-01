@@ -65,6 +65,14 @@ impl Topology {
         Ok(())
     }
 
+    /// Reserves capacity for at least `size` more atoms.
+    ///
+    /// # Panics
+    /// Panics if the new capacity exceeds `isize::MAX` bytes
+    pub fn reserve(&mut self, size: usize) {
+        self.atoms.reserve(size);
+    }
+
     /// Returns a vector of all bonds present in the topology.
     pub fn bonds(&self) -> Vec<Bond> {
         self.connect.bonds.iter().copied().collect()
