@@ -175,7 +175,6 @@ impl FileFormat for SDFFormat {
     }
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
-        let position = reader.stream_position()?;
         let mut buf = Vec::with_capacity(256); // Pre-allocate a reasonable size
 
         // Ignore header lines: molecule name, metadata, and general comment line
@@ -244,6 +243,7 @@ impl FileFormat for SDFFormat {
         // We have enough data to parse an entire molecule.
         // So, even if the file may not have an ending string,
         // return the start of this step
+        let position = reader.stream_position()?;
         Ok(Some(position))
     }
 
@@ -296,5 +296,35 @@ mod tests {
         let topology = frame.topology();
         assert_eq!(topology.size(), 47);
         assert_eq!(topology[0], Atom::new("O".to_string()));
+    }
+
+    #[test]
+    fn read_specific_step() {
+        let path = Path::new("./src/tests-data/sdf/kinases.sdf");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        let mut frame = trajectory.read_at(3).unwrap().unwrap();
+
+        let mut positions = frame.positions();
+        assert_approx_eq!(positions[0][0], -0.8276, 1e-3);
+        assert_approx_eq!(positions[0][1], 0.2486, 1e-3);
+        assert_approx_eq!(positions[0][2], -1.0418, 1e-3);
+
+        assert_approx_eq!(positions[67][0], -1.1356, 1e-3);
+        assert_approx_eq!(positions[67][1], 5.2260, 1e-3);
+        assert_approx_eq!(positions[67][2], 1.3726, 1e-3);
+
+        let topology = frame.topology();
+        assert_eq!(topology.size(), 68);
+        assert_eq!(topology[0], Atom::new("O".to_string()));
+
+        frame = trajectory.read_at(0).unwrap().unwrap();
+        positions = frame.positions();
+        assert_approx_eq!(positions[0][0], 4.9955);
+        assert_approx_eq!(positions[0][1], -2.6277);
+        assert_approx_eq!(positions[0][2], 0.2047);
+
+        assert_approx_eq!(positions[46][0], -8.5180);
+        assert_approx_eq!(positions[46][1], 0.2962);
+        assert_approx_eq!(positions[46][2], 2.1406);
     }
 }
