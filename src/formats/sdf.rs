@@ -65,9 +65,10 @@ impl FileFormat for SDFFormat {
             let mut atom = Atom::new(name.to_string());
 
             if line.len() >= 40 {
-                let charge_code = line[36..39].trim().parse::<i64>().map_err(|_| {
-                    CError::GenericError(format!("charge code is not numeric: {}", &line[36..39]))
-                })?;
+                let charge_code = line[36..39].trim().parse::<i64>().unwrap_or_else(|e| {
+                    warn!("charge code is not numeric '{}': {e}", &line[36..39]);
+                    0
+                });
                 match charge_code {
                     0 => {}
                     1 => atom.charge = 3.0,
