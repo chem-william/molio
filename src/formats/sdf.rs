@@ -361,4 +361,24 @@ mod tests {
         let prop2 = frame.properties.get("PUBCHEM_MOLECULAR_FORMULA").unwrap();
         assert_eq!(prop2.expect_string(), "C9H8O4");
     }
+
+    #[test]
+    fn read_charges() {
+        let path = Path::new("./src/tests-data/sdf/aspirin_charged.sdf");
+        let mut trajectory = Trajectory::open(path).unwrap();
+
+        let frame = trajectory.read().unwrap().unwrap();
+
+        assert_approx_eq!(frame[0].charge, 0.0);
+        assert_approx_eq!(frame[1].charge, 3.0);
+        assert_approx_eq!(frame[2].charge, 2.0);
+        assert_approx_eq!(frame[3].charge, 1.0);
+        assert_approx_eq!(frame[4].charge, 0.0);
+        assert_approx_eq!(frame[5].charge, -1.0);
+        assert_approx_eq!(frame[6].charge, -2.0);
+        assert_approx_eq!(frame[7].charge, -3.0);
+        assert_approx_eq!(frame[8].charge, 0.0);
+        assert_approx_eq!(frame[9].charge, 0.0);
+        assert_approx_eq!(frame[10].charge, 0.0);
+    }
 }
