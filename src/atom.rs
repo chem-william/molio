@@ -6,7 +6,7 @@
 
 use crate::property::Properties;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Atom {
     pub name: String,
     pub symbol: String,
