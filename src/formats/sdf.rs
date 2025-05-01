@@ -257,7 +257,7 @@ mod tests {
 
     use assert_approx_eq::assert_approx_eq;
 
-    use crate::{atom::Atom, trajectory::Trajectory};
+    use crate::{atom::Atom, frame::Frame, trajectory::Trajectory};
 
     #[test]
     fn check_nsteps_aspirin() {
@@ -326,5 +326,25 @@ mod tests {
         assert_approx_eq!(positions[46][0], -8.5180);
         assert_approx_eq!(positions[46][1], 0.2962);
         assert_approx_eq!(positions[46][2], 2.1406);
+    }
+    #[test]
+    fn read_whole_file() {
+        let path = Path::new("./src/tests-data/sdf/kinases.sdf");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        assert_eq!(trajectory.size, 6);
+
+        let mut frame = Frame::new();
+        while let Some(next_frame) = trajectory.read().unwrap() {
+            frame = next_frame;
+        }
+
+        let positions = frame.positions();
+        assert_approx_eq!(positions[0][0], 3.1149);
+        assert_approx_eq!(positions[0][1], -1.1207);
+        assert_approx_eq!(positions[0][2], 3.0606);
+
+        assert_approx_eq!(positions[49][0], -7.4890);
+        assert_approx_eq!(positions[49][1], -0.0147);
+        assert_approx_eq!(positions[49][2], -2.1114);
     }
 }
