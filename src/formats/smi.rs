@@ -34,7 +34,7 @@ pub struct SMIFormat {
 // probably requires upstream changes to Purr/Balsa unless we roll our own or
 // find another lib for parsing SMILES
 impl FileFormat for SMIFormat {
-    fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
+    fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         self.residues.borrow_mut().clear();
 
         let mut frame = Frame::new();
@@ -104,12 +104,12 @@ impl FileFormat for SMIFormat {
         Ok(frame)
     }
 
-    fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
+    fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
         Ok(Some(self.read_next(reader)?))
     }
 
     fn write_next(
-        &self,
+        &mut self,
         writer: &mut BufWriter<File>,
         frame: &crate::frame::Frame,
     ) -> Result<(), crate::error::CError> {

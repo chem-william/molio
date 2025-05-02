@@ -128,6 +128,7 @@ impl FileFormat for Format<'_> {
             Format::XYZ(format) => format.read_next(reader),
             Format::PDB(format) => format.read_next(reader),
             Format::SMI(format) => format.read_next(reader),
+            Format::SDF(format) => format.read_next(reader),
         }
     }
 
