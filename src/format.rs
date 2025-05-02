@@ -7,6 +7,7 @@
 use crate::error::CError;
 use crate::formats::pdb::PDBFormat;
 use crate::formats::sdf::SDFFormat;
+use crate::formats::xtc::XTCFormat;
 use crate::formats::xyz::XYZFormat;
 use crate::frame::Frame;
 use std::fs::File;
@@ -18,6 +19,7 @@ use std::path::Path;
 /// - `XYZ`: plain-text XYZ coordinate format.
 /// - `PDB`: Protein Data Bank format.
 /// - `SDF`: Structure Data File format.
+/// - `XTC`: GROMACS' portable format for trajectories.
 /// - `Guess`: autodetect format from file extension.
 #[derive(Clone, Copy)]
 pub enum TextFormat {
@@ -27,6 +29,8 @@ pub enum TextFormat {
     PDB,
     /// SDF file format.
     SDF,
+    /// XTC file format.
+    XTC,
     /// Automatically detect format from file extension.
     Guess,
 }
@@ -39,6 +43,8 @@ pub enum Format<'a> {
     PDB(PDBFormat<'a>),
     /// Handler for the SDF format.
     SDF(SDFFormat),
+    /// Handler for the XTC format.
+    XTC(XTCFormat),
 }
 
 impl Format<'_> {
@@ -54,6 +60,7 @@ impl Format<'_> {
             "xyz" => Ok(Format::XYZ(XYZFormat)),
             "pdb" => Ok(Format::PDB(PDBFormat::new())),
             "sdf" => Ok(Format::SDF(SDFFormat)),
+            "xtc" => Ok(Format::XTC(XTCFormat)),
             _ => Err(CError::GenericError("unknown file format".to_string())),
         }
     }
@@ -69,6 +76,7 @@ impl Format<'_> {
             TextFormat::XYZ => Ok(Format::XYZ(XYZFormat)),
             TextFormat::PDB => Ok(Format::PDB(PDBFormat::new())),
             TextFormat::SDF => Ok(Format::SDF(SDFFormat)),
+            TextFormat::XTC => Ok(Format::XTC(XTCFormat)),
             TextFormat::Guess => Self::new(path),
         }
     }
@@ -120,6 +128,7 @@ impl FileFormat for Format<'_> {
             Format::XYZ(format) => format.read_next(reader),
             Format::PDB(format) => format.read_next(reader),
             Format::SDF(format) => format.read_next(reader),
+            Format::XTC(format) => format.read_next(reader),
         }
     }
 
@@ -128,6 +137,7 @@ impl FileFormat for Format<'_> {
             Format::XYZ(format) => format.read(reader),
             Format::PDB(format) => format.read(reader),
             Format::SDF(format) => format.read(reader),
+            Format::XTC(format) => format.read(reader),
         }
     }
 
@@ -136,6 +146,7 @@ impl FileFormat for Format<'_> {
             Format::XYZ(format) => format.write_next(writer, frame),
             Format::PDB(format) => format.write_next(writer, frame),
             Format::SDF(format) => format.write_next(writer, frame),
+            Format::XTC(format) => format.write_next(writer, frame),
         }
     }
 
@@ -144,6 +155,7 @@ impl FileFormat for Format<'_> {
             Format::XYZ(format) => format.forward(reader),
             Format::PDB(format) => format.forward(reader),
             Format::SDF(format) => format.forward(reader),
+            Format::XTC(format) => format.forward(reader),
         }
     }
 
@@ -152,6 +164,7 @@ impl FileFormat for Format<'_> {
             Format::XYZ(format) => format.finalize(writer),
             Format::PDB(format) => format.finalize(writer),
             Format::SDF(format) => format.finalize(writer),
+            Format::XTC(format) => format.finalize(writer),
         }
     }
 }
