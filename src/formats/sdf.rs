@@ -171,9 +171,8 @@ impl FileFormat for SDFFormat {
         }
     }
 
-    fn write_next(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
-        todo!();
-    }
+    fn write_next(&mut self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
+        todo!()
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
         let mut buf = Vec::with_capacity(256); // Pre-allocate a reasonable size
