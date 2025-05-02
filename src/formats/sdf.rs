@@ -6,15 +6,19 @@
 //
 
 use std::fmt::Write;
+use std::io::Write as _;
 use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter, Seek},
 };
 
+use crate::property::PropertyKind;
 use crate::{atom::Atom, bond::BondOrder, property::Property};
 use crate::{error::CError, format::FileFormat, frame::Frame};
 use log::warn;
 
+/// Properties are indiscriminately encoded as strings. This means that you should always
+/// [`Property::expect_string()`] when reading properties from Properties
 pub struct SDFFormat;
 
 impl FileFormat for SDFFormat {
@@ -172,7 +176,109 @@ impl FileFormat for SDFFormat {
     }
 
     fn write_next(&mut self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
-        todo!()
+        let topology = frame.topology();
+        debug_assert!(frame.size() == topology.size());
+
+        let mut frame_name = frame
+            .properties
+            .get("name")
+            .map(|p| p.expect_string())
+            .unwrap_or("");
+        if frame_name.len() > 80 {
+            warn!("the frame 'name' property is too long for the SDF format. It has been truncated to 80 characters");
+            frame_name = &frame_name[..80];
+        }
+        writeln!(writer, "{}", frame_name)?;
+        // // TODO: this line can contain more data (file creation time and energy in particular)
+        writeln!(writer)?;
+        writeln!(writer, "created by molio")?;
+        writeln!(
+            writer,
+            "{:>3}{:>3}  0     0  0  0  0  0  0999 V2000",
+            frame.size(),
+            topology.bonds().len()
+        )?;
+
+        for (atom, pos) in topology.atoms.iter().zip(frame.positions().iter()) {
+            let mut symbol = atom.symbol.clone();
+
+            if symbol.is_empty() || symbol.len() > 3 {
+                symbol = "Xxx".to_string();
+            }
+
+            let charge_int = atom.charge.trunc() as i64;
+            let charge_code = match charge_int {
+                0 => 0, // we don't want to warn so handled explicitly
+                1 => 3,
+                2 => 2,
+                3 => 1,
+                -1 => 5,
+                -2 => 6,
+                -3 => 7,
+                _ => {
+                    warn!("charge code not available for '{charge_int}'");
+                    0
+                }
+            };
+
+            writeln!(
+                writer,
+                "{:>10.4}{:>10.4}{:>10.4} {:3} 0{:3}  0  0  0  0  0  0  0  0  0  0",
+                pos[0],
+                pos[1],
+                pos[2],
+                symbol.to_string(),
+                charge_code
+            )?;
+        }
+
+        for bond in topology.bonds() {
+            let bo = topology
+                .bond_order(bond[0], bond[1])
+                .unwrap_or_else(|_| panic!("a bond between {} and {}", bond[0], bond[1]));
+
+            let bond_order = match bo {
+                BondOrder::Single => "  1".to_string(),
+                BondOrder::Double => "  2".to_string(),
+                BondOrder::Triple => "  3".to_string(),
+                BondOrder::Aromatic => "  4".to_string(),
+                BondOrder::Unknown => "  8".to_string(),
+                _ => "  8".to_string(),
+            };
+
+            writeln!(
+                writer,
+                "{:>3}{:>3}{}  0  0  0  0",
+                bond[0] + 1,
+                bond[1] + 1,
+                bond_order
+            )?;
+        }
+
+        writeln!(writer, "M  END")?;
+
+        for prop in &frame.properties {
+            if prop.0 == "name" {
+                continue;
+            }
+
+            writeln!(writer, "> <{}>", prop.0)?;
+
+            match prop.1.kind() {
+                PropertyKind::String => writeln!(writer, "{}\n", prop.1.expect_string())?,
+                PropertyKind::Double => writeln!(writer, "{:?}\n", prop.1.expect_double())?,
+                PropertyKind::Bool => writeln!(writer, "{}\n", prop.1.expect_bool())?,
+                PropertyKind::Vector3D => {
+                    let v = prop.1.expect_vector3d();
+                    writeln!(writer, "{:?} {:?} {:?}\n", v[0], v[1], v[2])?;
+                }
+                _ => unreachable!("unexpected property"),
+            }
+        }
+
+        writeln!(writer, "$$$$")?;
+
+        Ok(())
     }
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
@@ -248,18 +354,22 @@ impl FileFormat for SDFFormat {
         Ok(Some(position))
     }
 
-    fn finalize(&self, writer: &mut BufWriter<File>) -> Result<(), CError> {
+    fn finalize(&self, _writer: &mut BufWriter<File>) -> Result<(), CError> {
         // SDF format doesn't need any special finalization
         Ok(())
     }
 }
 
+#[cfg(test)]
 mod tests {
     use std::path::Path;
 
     use assert_approx_eq::assert_approx_eq;
+    use tempfile::Builder;
 
-    use crate::{atom::Atom, frame::Frame, trajectory::Trajectory};
+    use crate::{
+        atom::Atom, bond::BondOrder, frame::Frame, property::Property, trajectory::Trajectory,
+    };
 
     #[test]
     fn check_nsteps_aspirin() {
