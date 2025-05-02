@@ -18,7 +18,7 @@ use log::warn;
 pub struct SDFFormat;
 
 impl FileFormat for SDFFormat {
-    fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
+    fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         let mut line = String::new();
         let mut frame = Frame::new();
         let _ = reader.read_line(&mut line)?;
@@ -162,7 +162,7 @@ impl FileFormat for SDFFormat {
         Ok(frame)
     }
 
-    fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
+    fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
         // TODO: replace with has_data_left when stabilized
         if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
             Ok(Some(self.read_next(reader).unwrap()))
