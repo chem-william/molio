@@ -65,6 +65,11 @@ impl Frame {
         self.positions.push(position);
     }
 
+    /// Remove all connectivity information in the frame's topology
+    pub fn clear_bonds(&mut self) {
+        self.topology.clear_bonds()
+    }
+
     pub fn add_residue(&mut self, residue: Residue) -> Result<(), CError> {
         self.topology.add_residue(residue)
     }
@@ -76,6 +81,19 @@ impl Frame {
         //     self.velocities.resize();
         // }
         Ok(())
+    }
+
+    /// Reserves capacity for at least `size` more elements in this frames
+    /// [`Topology`] and [`Self::positions`].
+    ///
+    /// # Panics
+    /// Panics if the new capacity of the underlying `Vec`s exceed `isize::MAX` bytes
+    pub fn reserve(&mut self, size: usize) {
+        self.topology.reserve(size);
+        self.positions.reserve(size);
+        // if self.velocities.is_some() {
+        //     self.velocities.reserve();
+        // }
     }
 
     /// Add a bond in the system, between the atoms at index `i` and
@@ -119,11 +137,13 @@ mod tests {
         let atom1 = Atom {
             symbol: "H".to_string(),
             name: "hydrogen".to_string(),
+            charge: 0.0,
             properties: Properties::new(),
         };
         let atom2 = Atom {
             symbol: "O".to_string(),
             name: "oxygen".to_string(),
+            charge: 0.0,
             properties: Properties::new(),
         };
 

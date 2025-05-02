@@ -350,7 +350,7 @@ impl XYZFormat {
 }
 
 impl FileFormat for XYZFormat {
-    fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
+    fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         let mut line = String::new();
         let _ = reader.read_line(&mut line)?;
 
@@ -377,6 +377,7 @@ impl FileFormat for XYZFormat {
 
             let mut atom = Atom {
                 symbol,
+                charge: 0.0,
                 name: String::new(),
                 properties: Properties::new(),
             };
@@ -388,7 +389,7 @@ impl FileFormat for XYZFormat {
         Ok(frame)
     }
 
-    fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
+    fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
         // TODO: replace with has_data_left when stabilized
         if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
             Ok(Some(self.read_next(reader).unwrap()))
@@ -421,7 +422,7 @@ impl FileFormat for XYZFormat {
         Ok(Some(position))
     }
 
-    fn write_next(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
+    fn write_next(&mut self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
         let positions = frame.positions();
         let properties = XYZFormat::get_atom_properties(frame);
 
