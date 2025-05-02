@@ -1259,6 +1259,7 @@ impl FileFormat for PDBFormat<'_> {
             Ok(None)
         }
     }
+
     /// Finalize the PDB file by writing the END record if needed
     ///
     /// This should be called when done writing to a PDB file to ensure it's properly closed

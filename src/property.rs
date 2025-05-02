@@ -121,15 +121,6 @@ impl DerefMut for Properties {
     }
 }
 
-impl IntoIterator for Properties {
-    type Item = (String, Property);
-    type IntoIter = <HashMap<String, Property> as IntoIterator>::IntoIter;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
 impl<'a> IntoIterator for &'a Properties {
     type Item = (&'a String, &'a Property);
     type IntoIter = <&'a HashMap<String, Property> as IntoIterator>::IntoIter;
