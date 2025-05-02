@@ -18,40 +18,44 @@ This project is a Rust port of [`chemfiles`](https://github.com/chemfiles/chemfi
 
 ```rust
 use std::path::Path;
-use molio::Trajectory;
+use molio::trajectory::Trajectory;
 
 // Open a trajectory file
-let path = Path::new("trajectory.xyz");
-let mut trajectory = Trajectory::open(path)?;
+let path = Path::new("./src/tests-data/xyz/extended.xyz");
+let mut trajectory = Trajectory::open(path).unwrap();
 
 // Read a specific frame
-let frame = trajectory.read_at(0)?;
+let frame = trajectory.read_at(0).unwrap().unwrap();
 
 // Access frame properties
-let energy = frame.properties["Energy"].expect_double();
+let energy = frame.properties["ENERGY"].expect_double();
 
 // Access atomic properties
 let atom = &frame[0];
-let charge = atom.properties["charge"].expect_double();
+let unit_cell = frame.unit_cell;
 ```
 
 ### Writing Trajectories
 
 ```rust
 use std::path::Path;
-use molio::{Trajectory, Frame};
+use molio::{trajectory::Trajectory, frame::Frame, atom::Atom};
 
 // Create a trajectory file for writing
 let path = Path::new("output.pdb");
-let mut writer = Trajectory::create(path)?;
+let mut writer = Trajectory::create(path).unwrap();
+
+// Populate Frame with a single C atom with position [1.0, 2.0, 3.0]
+let mut frame = Frame::new();
+frame.add_atom(Atom::new("C".to_string()), [1.0, 2.0, 3.0]);
+// ..add other properties here
 
 // Write frames
-writer.write(&frame1)?;
-writer.write(&frame2)?;
+writer.write(&frame).unwrap();
 
 // Optionally, explicitly finalize the file (adds END record for PDB)
 // If not called explicitly, finalization happens when writer is dropped
-writer.finish()?;
+writer.finish().unwrap();
 ```
 
 ## Contributions

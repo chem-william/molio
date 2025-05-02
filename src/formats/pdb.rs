@@ -15,7 +15,6 @@ use crate::property::PropertyKind;
 use crate::residue::{FullResidueId, Residue};
 use crate::unit_cell::UnitCell;
 use log::warn;
-use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
@@ -253,29 +252,29 @@ pub(crate) fn encode_hybrid36(width: usize, value: i64) -> String {
 
 pub struct PDBFormat<'a> {
     /// Residue information in the current step
-    pub residues: RefCell<Vec<(FullResidueId, Residue)>>,
+    pub residues: Vec<(FullResidueId, Residue)>,
 
     /// List of all atom offsets. This maybe pushed in `parse_atom` or if a TER
     /// record is found. It is reset every time a frame is read.
-    pub atom_offsets: RefCell<Vec<usize>>,
+    pub atom_offsets: Vec<usize>,
 
     /// This will be None when no secondary structure information should be
     /// read. Else it is set to the final residue of a secondary structure and
     /// the text description which should be set.
-    pub current_secinfo: RefCell<Option<(FullResidueId, &'a str)>>,
+    pub current_secinfo: Option<(FullResidueId, &'a str)>,
 
     /// Store secondary structure information. Keys are the
     /// starting residue of the secondary structure, and values are pairs
     /// containing the ending residue and a string which is a written
     /// description of the secondary structure
-    pub secinfo: RefCell<BTreeMap<FullResidueId, (FullResidueId, &'a str)>>,
+    pub secinfo: BTreeMap<FullResidueId, (FullResidueId, &'a str)>,
 
     /// Number of models read/written to the file
-    models: RefCell<usize>,
+    models: usize,
 }
 
 impl<'a> PDBFormat<'a> {
-    fn parse_atom(&self, frame: &mut Frame, line: &str, is_hetatm: bool) -> Result<(), CError> {
+    fn parse_atom(&mut self, frame: &mut Frame, line: &str, is_hetatm: bool) -> Result<(), CError> {
         debug_assert!(line[..6] == *"ATOM  " || line[..6] == *"HETATM");
 
         if line.len() < 54 {
@@ -286,7 +285,7 @@ impl<'a> PDBFormat<'a> {
             });
         }
 
-        if self.atom_offsets.borrow().is_empty() {
+        if self.atom_offsets.is_empty() {
             let initial_offset = decode_hybrid36(5, &line[6..11]);
             if initial_offset.is_err() {
                 warn!("initial offset was err");
@@ -295,9 +294,9 @@ impl<'a> PDBFormat<'a> {
             let unwrapped = initial_offset.unwrap();
             if unwrapped <= 0 {
                 warn!("'{unwrapped}' is too small, assuming id is '1'",);
-                self.atom_offsets.borrow_mut().push(0);
+                self.atom_offsets.push(0);
             } else {
-                self.atom_offsets.borrow_mut().push(
+                self.atom_offsets.push(
                     usize::try_from(unwrapped).expect("decode_hybrid36 returned a negative number")
                         - 1,
                 );
@@ -343,10 +342,9 @@ impl<'a> PDBFormat<'a> {
             insertion_code,
         };
 
-        let mut residues = self.residues.borrow_mut();
-
         // Find all matching residues
-        let mut matching_positions = residues
+        let mut matching_positions = self
+            .residues
             .iter()
             .enumerate()
             .filter(|(_, (id, _))| *id == full_residue_id)
@@ -356,7 +354,7 @@ impl<'a> PDBFormat<'a> {
         if matching_positions.peek().is_some() {
             let val = matching_positions.next().unwrap();
             // Add atom to the first matching residue
-            residues[val].1.add_atom(atom_id);
+            self.residues[val].1.add_atom(atom_id);
         } else {
             let mut residue = Residue {
                 name: resname,
@@ -402,29 +400,22 @@ impl<'a> PDBFormat<'a> {
             }
 
             // Are we within a secondary information sequence?
-            // we add an extra scope so that the borrow of `self.current_secinfo` is dropped
-            // before we access it further down
-            {
-                let current_secinfo_borrow = self.current_secinfo.borrow();
-                if let Some((end_residue_id, description)) = current_secinfo_borrow.as_ref() {
-                    residue.properties.insert(
-                        "secondary_structure".into(),
-                        Property::String(description.to_string()),
-                    );
+            if let Some((end_residue_id, description)) = self.current_secinfo.as_ref() {
+                residue.properties.insert(
+                    "secondary_structure".into(),
+                    Property::String(description.to_string()),
+                );
 
-                    // Are we at the end of a secondary information sequence?
-                    if *end_residue_id == full_residue_id {
-                        // we drop the current borrow to allow the mutable borrow
-                        drop(current_secinfo_borrow);
-                        *self.current_secinfo.borrow_mut() = None;
-                    }
+                // Are we at the end of a secondary information sequence?
+                if *end_residue_id == full_residue_id {
+                    // we drop the current borrow to allow the mutable borrow
+                    self.current_secinfo = None;
                 }
             }
 
             // Are we at the start of a secondary information sequence?
-            // second borrow of `self.secinfo` happens here
-            if let Some(secinfo_for_residue) = self.secinfo.borrow().get(&full_residue_id) {
-                *self.current_secinfo.borrow_mut() = Some(secinfo_for_residue.clone());
+            if let Some(secinfo_for_residue) = self.secinfo.get(&full_residue_id) {
+                self.current_secinfo = Some(secinfo_for_residue.clone());
                 residue.properties.insert(
                     "secondary_structure".into(),
                     Property::String(secinfo_for_residue.1.to_string()),
@@ -434,13 +425,14 @@ impl<'a> PDBFormat<'a> {
             // Find the first spot where either
             // 1) the existing resid is greater than ours → we should come before it, or
             // 2) we hit our same resid → then we'll want to append after the last equal entry.
-            let insert_pos = match residues
+            let insert_pos = match self
+                .residues
                 .iter()
                 .position(|(id, _)| id.resid >= full_residue_id.resid)
             {
-                Some(pos) if residues[pos].0.resid == full_residue_id.resid => {
+                Some(pos) if self.residues[pos].0.resid == full_residue_id.resid => {
                     // we found an existing block of equal IDs; extend to its end
-                    residues
+                    self.residues
                         .iter()
                         .rposition(|(id, _)| id.resid == full_residue_id.resid)
                         .unwrap()
@@ -452,11 +444,11 @@ impl<'a> PDBFormat<'a> {
                 }
                 None => {
                     // all existing resids are smaller → push to the end
-                    residues.len()
+                    self.residues.len()
                 }
             };
 
-            residues.insert(insert_pos, (full_residue_id, residue));
+            self.residues.insert(insert_pos, (full_residue_id, residue));
         }
 
         Ok(())
@@ -517,7 +509,6 @@ impl<'a> PDBFormat<'a> {
         // Find the lower bound index
         let lower = self
             .atom_offsets
-            .borrow()
             .binary_search(&(pdb_atom_id as usize))
             .unwrap_or_else(|insert_pos| insert_pos)
             - 1;
@@ -525,7 +516,7 @@ impl<'a> PDBFormat<'a> {
 
         // TODO: is this correct?
         pdb_atom_id -= 1;
-        Ok(usize::try_from(pdb_atom_id).unwrap() - self.atom_offsets.borrow().first().unwrap())
+        Ok(usize::try_from(pdb_atom_id).unwrap() - self.atom_offsets.first().unwrap())
     }
 
     fn add_bond(frame: &mut Frame, line: &str, i: usize, j: usize) {
@@ -572,7 +563,7 @@ impl<'a> PDBFormat<'a> {
         }
     }
 
-    fn parse_helix(&self, line: &str) -> Result<(), CError> {
+    fn parse_helix(&mut self, line: &str) -> Result<(), CError> {
         if line.len() < 33 + 5 {
             warn!("HELIX record too short: {line}");
         }
@@ -614,7 +605,7 @@ impl<'a> PDBFormat<'a> {
             .unwrap();
 
         if *helix_type <= 10 {
-            self.secinfo.borrow_mut().insert(
+            self.secinfo.insert(
                 start,
                 (
                     end,
@@ -626,7 +617,7 @@ impl<'a> PDBFormat<'a> {
         Ok(())
     }
 
-    fn parse_secondary(&self, line: &str, start: usize, end: usize) -> Result<(), CError> {
+    fn parse_secondary(&mut self, line: &str, start: usize, end: usize) -> Result<(), CError> {
         if line.len() < end + 10 {
             warn!("secondary structure record too short: '{line}'");
         }
@@ -661,28 +652,27 @@ impl<'a> PDBFormat<'a> {
             insertion_code: inscode_end,
         };
 
-        self.secinfo.borrow_mut().insert(start, (end, "extended"));
+        self.secinfo.insert(start, (end, "extended"));
 
         Ok(())
     }
 
     pub fn new() -> Self {
         PDBFormat {
-            residues: RefCell::new(Vec::new()),
-            atom_offsets: RefCell::new(Vec::new()),
-            current_secinfo: RefCell::new(None),
-            secinfo: RefCell::new(BTreeMap::new()),
-            models: RefCell::new(0),
+            residues: Vec::new(),
+            atom_offsets: Vec::new(),
+            current_secinfo: None,
+            secinfo: BTreeMap::new(),
+            models: 0,
         }
     }
 
-    fn chain_ended(&self, frame: &mut Frame) {
+    fn chain_ended(&mut self, frame: &mut Frame) {
         // We drain as a 'hack' to allow for badly formatted PDB files which restart
         // the residue ID after a TER residue in cases where they should not.
         // IE a metal Ion given the chain ID of A and residue ID of 1 even though
         // this residue already exists.
-        let mut residues = self.residues.borrow_mut();
-        for (_, residue) in residues.drain(..) {
+        for (_, residue) in self.residues.drain(..) {
             let _ = frame.add_residue(residue);
         }
     }
@@ -958,9 +948,9 @@ impl<'a> PDBFormat<'a> {
 }
 
 impl FileFormat for PDBFormat<'_> {
-    fn read_next(&self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
-        self.residues.borrow_mut().clear();
-        self.atom_offsets.borrow_mut().clear();
+    fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
+        self.residues.clear();
+        self.atom_offsets.clear();
 
         let mut frame = Frame::new();
         let mut line = String::new();
@@ -1013,7 +1003,7 @@ impl FileFormat for PDBFormat<'_> {
                 Record::ATOM => self.parse_atom(&mut frame, &line, false).unwrap(),
                 Record::HETATM => self.parse_atom(&mut frame, &line, true).unwrap(),
                 Record::CONECT => self.parse_conect(&mut frame, &line),
-                Record::MODEL => *self.models.borrow_mut() += 1,
+                Record::MODEL => self.models += 1,
                 Record::ENDMDL => {
                     // look one line ahead to see if the next Record is an `END`
                     let mut line = String::new();
@@ -1039,7 +1029,7 @@ impl FileFormat for PDBFormat<'_> {
                             decode_hybrid36(5, &line[6..11]).expect("TER record not numeric");
                         if ter_serial != 0 {
                             // This happens if the TER serial number is blank
-                            self.atom_offsets.borrow_mut().push(
+                            self.atom_offsets.push(
                                 usize::try_from(ter_serial)
                                     .expect("could not parse ter_serial to usize"),
                             );
@@ -1097,8 +1087,8 @@ impl FileFormat for PDBFormat<'_> {
         }
     }
 
-    fn write_next(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
-        writeln!(writer, "MODEL {:>4}", *self.models.borrow() + 1)?;
+    fn write_next(&mut self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
+        writeln!(writer, "MODEL {:>4}", self.models + 1)?;
 
         let lengths = frame.unit_cell.lengths();
         let angles = frame.unit_cell.angles();
@@ -1257,21 +1247,24 @@ impl FileFormat for PDBFormat<'_> {
         }
 
         writeln!(writer, "ENDMDL")?;
-        let current_models = *self.models.borrow();
-        *self.models.borrow_mut() = current_models + 1;
+        self.models += 1;
 
         Ok(())
     }
 
-    fn read(&self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        Ok(Some(self.read_next(reader).unwrap()))
+    fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
+        if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
+            Ok(Some(self.read_next(reader).unwrap()))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Finalize the PDB file by writing the END record if needed
     ///
     /// This should be called when done writing to a PDB file to ensure it's properly closed
     fn finalize(&self, writer: &mut BufWriter<File>) -> Result<(), CError> {
-        if *self.models.borrow() > 0 {
+        if self.models > 0 {
             writeln!(writer, "END")?;
         }
         Ok(())
@@ -1325,8 +1318,6 @@ mod tests {
         trajectory::Trajectory,
         unit_cell::{CellShape, UnitCell},
     };
-
-    use std::borrow::ToOwned;
 
     #[test]
     fn check_nsteps() {

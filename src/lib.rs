@@ -3,6 +3,7 @@
 //
 // See LICENSE at the project root for full text.
 
+#![doc = include_str!("../README.md")]
 pub mod angle;
 pub mod atom;
 pub mod bond;

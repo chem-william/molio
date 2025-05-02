@@ -74,6 +74,14 @@ impl Topology {
         Ok(())
     }
 
+    /// Reserves capacity for at least `size` more atoms.
+    ///
+    /// # Panics
+    /// Panics if the new capacity exceeds `isize::MAX` bytes
+    pub fn reserve(&mut self, size: usize) {
+        self.atoms.reserve(size);
+    }
+
     /// Returns a vector of all bonds present in the topology.
     pub fn bonds(&self) -> Vec<Bond> {
         self.connect.bonds.iter().copied().collect()
@@ -97,6 +105,11 @@ impl Topology {
     /// Adds an [`Atom`] to the end of this topology.
     pub fn add_atom(&mut self, atom: Atom) {
         self.atoms.push(atom);
+    }
+
+    /// Remove all bonding information in the `Topology` (bonds, angles, and dihedrals)
+    pub fn clear_bonds(&mut self) {
+        self.connect = Connectivity::default();
     }
 
     /// Adds a residue to this topology.
