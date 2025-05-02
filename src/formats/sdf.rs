@@ -514,4 +514,184 @@ mod tests {
         let path = Path::new("./src/tests-data/sdf/count-line-too-short.sdf");
         let _trajectory = Trajectory::open(path).unwrap();
     }
+
+    #[test]
+    fn write_files() {
+        const EXPECTED: &str = r#"
+
+created by molio
+  4  3  0     0  0  0  0  0  0999 V2000
+    1.0000    2.0000    3.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+    1.0000    2.0000    3.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+    1.0000    2.0000    3.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    1.0000    2.0000    3.0000 F   0  0  0  0  0  0  0  0  0  0  0  0
+  1  3  1  0  0  0  0
+  2  3  2  0  0  0  0
+  3  4  3  0  0  0  0
+M  END
+> <string-property>
+prop1
+
+$$$$
+TEST
+
+created by molio
+ 11  5  0     0  0  0  0  0  0999 V2000
+    1.0000    2.0000    3.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+    1.0000    2.0000    3.0000 N   0  3  0  0  0  0  0  0  0  0  0  0
+    1.0000    2.0000    3.0000 C   0  2  0  0  0  0  0  0  0  0  0  0
+    1.0000    2.0000    3.0000 F   0  1  0  0  0  0  0  0  0  0  0  0
+    4.0000    5.0000    6.0000 E   0  0  0  0  0  0  0  0  0  0  0  0
+    4.0000    5.0000    6.0000 D   0  5  0  0  0  0  0  0  0  0  0  0
+    0.0000    0.0000    0.0000 G   0  6  0  0  0  0  0  0  0  0  0  0
+    0.0000    0.0000    0.0000 H   0  7  0  0  0  0  0  0  0  0  0  0
+    0.0000    0.0000    0.0000 I   0  0  0  0  0  0  0  0  0  0  0  0
+    0.0000    0.0000    0.0000 J   0  0  0  0  0  0  0  0  0  0  0  0
+    0.0000    0.0000    0.0000 Xxx 0  0  0  0  0  0  0  0  0  0  0  0
+  1  3  1  0  0  0  0
+  2  3  2  0  0  0  0
+  3  4  3  0  0  0  0
+  9 10  8  0  0  0  0
+ 10 11  4  0  0  0  0
+M  END
+> <string-property>
+prop1
+
+$$$$
+TEST
+
+created by molio
+  1  0  0     0  0  0  0  0  0999 V2000
+    1.0000    2.0000    3.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+M  END
+> <string-property>
+prop1
+
+$$$$
+TEST
+
+created by molio
+  1  0  0     0  0  0  0  0  0999 V2000
+    1.0000    2.0000    3.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+M  END
+> <string-property>
+prop1
+
+$$$$
+abc dfe ghi jkl mno pqr stu vwx yz 123 456 789 ABC DFE GHI JKL MNO PQR STU VWX Y
+
+created by molio
+  0  0  0     0  0  0  0  0  0999 V2000
+M  END
+$$$$
+"#;
+        let named_tmpfile = Builder::new()
+            .prefix("test-sdf")
+            .suffix(".sdf")
+            .tempfile()
+            .unwrap();
+
+        // Write the expected content into the temp file
+        let mut trajectory = Trajectory::create(named_tmpfile.path()).unwrap();
+
+        let mut frame = Frame::new();
+        frame.add_atom(
+            Atom::with_symbol("A".to_string(), "O".to_string()),
+            [1.0, 2.0, 3.0],
+        );
+        frame.add_atom(
+            Atom::with_symbol("B".to_string(), "N".to_string()),
+            [1.0, 2.0, 3.0],
+        );
+        frame.add_atom(Atom::new("C".to_string()), [1.0, 2.0, 3.0]);
+        frame.add_atom(Atom::new("F".to_string()), [1.0, 2.0, 3.0]);
+        frame.add_bond(0, 2, BondOrder::Single).unwrap();
+        frame.add_bond(1, 2, BondOrder::Double).unwrap();
+        frame.add_bond(2, 3, BondOrder::Triple).unwrap();
+        frame.properties.insert(
+            "string-property".to_string(),
+            Property::String("prop1".to_string()),
+        );
+        trajectory.write(&frame).unwrap();
+
+        frame.add_atom(Atom::new("E".to_string()), [4.0, 5.0, 6.0]);
+        frame.add_atom(Atom::new("D".to_string()), [4.0, 5.0, 6.0]);
+        frame.add_atom(Atom::new("G".to_string()), [0.0, 0.0, 0.0]);
+        frame.add_atom(Atom::new("H".to_string()), [0.0, 0.0, 0.0]);
+        frame.add_atom(Atom::new("I".to_string()), [0.0, 0.0, 0.0]);
+        frame.add_atom(Atom::new("J".to_string()), [0.0, 0.0, 0.0]);
+        frame.add_atom(Atom::new("".to_string()), [0.0, 0.0, 0.0]);
+        frame[0].charge = 0.05;
+        frame[1].charge = 1.0;
+        frame[2].charge = 2.0;
+        frame[3].charge = 3.0;
+        frame[4].charge = 4.0;
+        frame[5].charge = -1.0;
+        frame[6].charge = -2.0;
+        frame[7].charge = -3.0;
+
+        frame.add_bond(9, 10, BondOrder::Aromatic).unwrap();
+        frame.add_bond(8, 9, BondOrder::Unknown).unwrap();
+        frame
+            .properties
+            .insert("name".to_string(), Property::String("TEST".to_string()));
+        trajectory.write(&frame).unwrap();
+
+        frame.clear_bonds();
+        frame.resize(1).unwrap();
+
+        trajectory.write(&frame).unwrap();
+
+        trajectory.write(&frame).unwrap();
+
+        // name is too long for SDF specification
+        let mut frame = Frame::new();
+        frame.properties.insert("name".to_string(), Property::String("abc dfe ghi jkl mno pqr stu vwx yz 123 456 789 ABC DFE GHI JKL MNO PQR STU VWX YZ 123 456 789".to_string()));
+        trajectory.write(&frame).unwrap();
+
+        let contents = std::fs::read_to_string(named_tmpfile.path()).unwrap();
+        assert_eq!(contents, EXPECTED);
+
+        frame
+            .properties
+            .insert("float property".to_string(), Property::Double(1.23));
+        frame
+            .properties
+            .insert("bool property".to_string(), Property::Bool(false));
+        frame.properties.insert(
+            "vector property".to_string(),
+            Property::Vector3D([1.0, 2.0, 3.0]),
+        );
+        trajectory.write(&frame).unwrap();
+
+        // we have to check the properties separately as Properties is a HashMap thus
+        // unordered
+        let mut read_trajectory = Trajectory::open(named_tmpfile.path()).unwrap();
+        let last_frame = read_trajectory.read_at(5).unwrap().unwrap();
+        // properties are indiscriminately encoded as strings
+        assert_eq!(
+            last_frame
+                .properties
+                .get("float property")
+                .unwrap()
+                .expect_string(),
+            "1.23"
+        );
+        assert_eq!(
+            last_frame
+                .properties
+                .get("bool property")
+                .unwrap()
+                .expect_string(),
+            "false"
+        );
+        let v = last_frame
+            .properties
+            .get("vector property")
+            .unwrap()
+            .expect_string();
+        assert_eq!(v, "1.0 2.0 3.0");
+
+        trajectory.finish().unwrap();
+    }
 }
