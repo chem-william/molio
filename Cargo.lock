@@ -314,6 +314,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
+name = "mendeleev"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f4cefcffb9afe2069e74baae496420299bf2a18a7d48b61cfc7482d7355db28"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "molio"
 version = "0.1.0"
 dependencies = [
@@ -322,11 +331,11 @@ dependencies = [
  "log",
  "nalgebra",
  "phf",
- "purr",
  "regex",
  "serde",
  "tempfile",
  "thiserror",
+ "yowl",
 ]
 
 [[package]]
@@ -500,12 +509,6 @@ checksum = "02b3e5e68a3a1a02aad3ec490a98007cbc13c37cbe84a3cd7b8e406d76e7f778"
 dependencies = [
  "unicode-ident",
 ]
-
-[[package]]
-name = "purr"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f65ecf8f6541cb5191a715bcd065373e1d49dfc64ad39f6a3d2cba4c8c20108a"
 
 [[package]]
 name = "quote"
@@ -938,4 +941,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "yowl"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f9eee6348443a1c0d723576d4964716b73888f3a81493675a80d1c6ff316243"
+dependencies = [
+ "mendeleev",
+ "thiserror",
 ]

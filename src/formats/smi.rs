@@ -11,14 +11,14 @@ use crate::residue::Residue;
 use crate::topology::Topology;
 use crate::{error::CError, format::FileFormat, frame::Frame};
 use log::warn;
-use purr::feature::Aromatic;
-use purr::graph::Builder;
-use purr::read::read;
 use std::cell::RefCell;
 use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter, Seek},
 };
+use yowl::feature::AtomKind;
+use yowl::graph::Builder;
+use yowl::read::read;
 
 /// Currently, we're not handling 'CurlySMILES'
 #[derive(Default)]
@@ -54,7 +54,7 @@ impl FileFormat for SMIFormat {
             smiles = line.trim();
         }
 
-        let mut builder = Builder::new();
+        let mut builder = Builder::default();
         let _ = read(smiles, &mut builder, None);
 
         dbg!(&line);
@@ -72,7 +72,7 @@ impl FileFormat for SMIFormat {
             // Add the atom itself.
             topology.add_atom(Atom::new(purr.kind.to_string()));
             match purr.kind {
-                purr::feature::AtomKind::Aromatic(_) => topology[0]
+                AtomKind::Aromatic(_) => topology[0]
                     .properties
                     .insert("is_aromatic".to_string(), Property::Bool(true)),
                 _ => None,
