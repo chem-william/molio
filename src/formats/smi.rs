@@ -77,8 +77,6 @@ impl SMIFormat {
 // otherwise, we can't parse something like
 // N->Co(<-N)(<-N)(<-N)
 // CCl.[O-]>C(Cl)Cl>CO.[Cl-]
-// probably requires upstream changes to Purr/Balsa unless we roll our own or
-// find another lib for parsing SMILES
 impl FileFormat for SMIFormat {
     fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         self.residues.borrow_mut().clear();
