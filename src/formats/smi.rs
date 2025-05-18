@@ -15,10 +15,11 @@ use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter, Seek},
 };
-use yowl::feature::AtomKind;
+use yowl::feature::BondKind;
+use yowl::feature::{AtomKind, Symbol};
 use yowl::graph::Builder;
 use yowl::read::read;
-use yowl::{Element, Isotope};
+use yowl::read::Trace;
 
 /// Currently, we're not handling 'CurlySMILES'
 #[derive(Default)]
