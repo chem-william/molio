@@ -187,11 +187,10 @@ impl Topology {
             return true;
         }
 
-        let bonds = self.connect.bonds.clone();
         for &bond_i in first {
             for &bond_j in second {
                 let check_bond = Bond::new(bond_i, bond_j);
-                if bonds.contains(&check_bond) {
+                if self.connect.bonds.contains(&check_bond) {
                     return true;
                 }
             }
