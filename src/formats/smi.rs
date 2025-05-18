@@ -11,7 +11,6 @@ use crate::residue::Residue;
 use crate::topology::Topology;
 use crate::{error::CError, format::FileFormat, frame::Frame};
 use log::warn;
-use std::cell::RefCell;
 use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter, Seek},
@@ -25,7 +24,52 @@ use yowl::{Element, Isotope};
 #[derive(Default)]
 pub struct SMIFormat {
     /// Residue information in the current step
-    pub residues: RefCell<Vec<Residue>>,
+    pub residues: Vec<Residue>,
+
+    first_atom: bool,
+    previous_atom: usize,
+    current_atom: usize,
+    current_bond_order: BondOrder,
+}
+
+impl From<BondKind> for BondOrder {
+    fn from(value: BondKind) -> Self {
+        match value {
+            BondKind::Elided => BondOrder::Unknown,
+            BondKind::Single => BondOrder::Single,
+            BondKind::Double => BondOrder::Double,
+            BondKind::Triple => BondOrder::Triple,
+            BondKind::Quadruple => BondOrder::Quintuplet,
+            BondKind::Aromatic => BondOrder::Aromatic,
+            BondKind::Up => BondOrder::Up,
+            BondKind::Down => BondOrder::Down,
+        }
+    }
+}
+
+impl SMIFormat {
+    fn add_atom<'a>(&'a mut self, topology: &'a mut Topology, atom_name: &'a str) -> &'a mut Atom {
+        topology.add_atom(Atom::new(atom_name.to_string()));
+
+        if !self.first_atom {
+            self.current_atom += 1;
+        }
+
+        self.first_atom = false;
+        self.previous_atom = self.current_atom;
+        self.current_bond_order = BondOrder::Single;
+        self.residues
+            .last_mut()
+            .expect("at least one residue")
+            .add_atom(topology.size() - 1);
+        let new_atom_idx = topology.size() - 1;
+        let new_atom = topology
+            .atoms
+            .get_mut(new_atom_idx)
+            .expect("we just added the atom");
+
+        new_atom
+    }
 }
 
 // TODO: support dative bonds (<- and ->)
