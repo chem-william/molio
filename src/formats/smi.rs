@@ -36,7 +36,7 @@ pub struct SMIFormat {
 impl From<BondKind> for BondOrder {
     fn from(value: BondKind) -> Self {
         match value {
-            BondKind::Elided => BondOrder::Unknown,
+            BondKind::Elided => BondOrder::Single,
             BondKind::Single => BondOrder::Single,
             BondKind::Double => BondOrder::Double,
             BondKind::Triple => BondOrder::Triple,
@@ -257,7 +257,7 @@ impl FileFormat for SMIFormat {
 
 #[cfg(test)]
 mod tests {
-    use crate::{frame::Frame, trajectory::Trajectory};
+    use crate::{bond::BondOrder, frame::Frame, property::Property, trajectory::Trajectory};
     use std::path::Path;
 
     #[test]
@@ -439,5 +439,50 @@ mod tests {
         assert!((bonds[3][0] == 2 && bonds[3][1] == 3));
         assert!((bonds[4][0] == 2 && bonds[4][1] == 4));
         assert!((bonds[5][0] == 3 && bonds[5][1] == 4));
+    }
+
+    #[test]
+    fn rdkit_problems() {
+        let path = Path::new("./src/tests-data/smi/rdkit_problems.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        assert_eq!(trajectory.size, 69);
+
+        // C1CC2C1CC2
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 6);
+        let bonds = frame.topology().bonds();
+        assert_eq!(bonds.len(), 7);
+        assert!((bonds[0][0] == 0 && bonds[0][1] == 1));
+        assert!((bonds[1][0] == 0 && bonds[1][1] == 3));
+        assert!((bonds[2][0] == 1 && bonds[2][1] == 2));
+        assert!((bonds[3][0] == 2 && bonds[3][1] == 3));
+        assert!((bonds[4][0] == 2 && bonds[4][1] == 5));
+        assert!((bonds[5][0] == 3 && bonds[5][1] == 4));
+        assert!((bonds[6][0] == 4 && bonds[6][1] == 5));
+
+        // [CH2+]C[CH+2]
+        let frame = trajectory.read_at(6).unwrap().unwrap();
+        assert_eq!(
+            *frame[0].properties.get("hydrogen_count").unwrap(),
+            Property::Double(2.0)
+        );
+        assert_eq!(frame[0].charge, 1.0);
+        assert_eq!(
+            *frame[2].properties.get("hydrogen_count").unwrap(),
+            Property::Double(1.0)
+        );
+        assert_eq!(frame[2].charge, 2.0);
+
+        // C1CC=1
+        let frame = trajectory.read_at(8).unwrap().unwrap();
+        let bond_orders = frame.topology().bond_orders();
+        assert_eq!(bond_orders[0], BondOrder::Single);
+        assert_eq!(bond_orders[1], BondOrder::Double);
+
+        // C=1CC1
+        let frame = trajectory.read_at(9).unwrap().unwrap();
+        let bond_orders = frame.topology().bond_orders();
+        assert_eq!(bond_orders[0], BondOrder::Single);
+        assert_eq!(bond_orders[1], BondOrder::Double);
     }
 }

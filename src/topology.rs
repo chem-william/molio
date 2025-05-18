@@ -197,6 +197,10 @@ impl Topology {
         }
         false
     }
+
+    pub fn bond_orders(&self) -> &Vec<BondOrder> {
+        &self.connect.bond_orders
+    }
 }
 
 #[cfg(test)]
