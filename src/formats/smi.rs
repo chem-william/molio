@@ -485,4 +485,41 @@ mod tests {
         assert_eq!(bond_orders[0], BondOrder::Single);
         assert_eq!(bond_orders[1], BondOrder::Double);
     }
+
+    #[test]
+    fn chirality() {
+        let path = Path::new("./src/tests-data/smi/chiral.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(
+            *frame[1].properties.get("chirality").unwrap(),
+            Property::String("@TB1".to_string())
+        );
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(
+            *frame[1].properties.get("chirality").unwrap(),
+            Property::String("@TB15".to_string())
+        );
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(
+            *frame[1].properties.get("chirality").unwrap(),
+            Property::String("@@".to_string())
+        );
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(
+            *frame[1].properties.get("chirality").unwrap(),
+            Property::String("@OH15".to_string())
+        );
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(
+            *frame[1].properties.get("chirality").unwrap(),
+            Property::String("@".to_string())
+        );
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(
+            *frame[1].properties.get("chirality").unwrap(),
+            Property::String("@@".to_string())
+        );
+    }
 }
