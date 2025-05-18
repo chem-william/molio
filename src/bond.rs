@@ -7,9 +7,10 @@
 use std::ops::Index;
 
 /// Stores the type of bond
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum BondOrder {
     /// Bond order is unknown or unspecified
+    #[default]
     Unknown,
 
     /// Single bond
