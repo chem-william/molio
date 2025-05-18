@@ -134,19 +134,6 @@ impl FileFormat for SMIFormat {
 
         Ok(Some(pos))
     }
-    // optional<uint64_t> SMIFormat::forward() {
-    //     auto position = file_.tellpos();
-
-    //     auto line = file_.readline();
-    //     while (trim(line).empty()) {
-    //         if (file_.eof()) {
-    //             return nullopt;
-    //         }
-    //         line = file_.readline();
-    //     }
-
-    //     return position;
-    // }
 
     fn finalize(
         &self,
