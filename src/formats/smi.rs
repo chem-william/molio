@@ -83,6 +83,7 @@ impl FileFormat for SMIFormat {
 
         let mut frame = Frame::new();
         let mut topology = Topology::default();
+        // TODO: this only needs to be mutable if we handle "<" and ">"
         let mut groupid = 1;
         self.current_atom = 0;
         self.previous_atom = 0;
