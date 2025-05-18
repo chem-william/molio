@@ -79,12 +79,16 @@ impl SMIFormat {
 // CCl.[O-]>C(Cl)Cl>CO.[Cl-]
 impl FileFormat for SMIFormat {
     fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
-        self.residues.borrow_mut().clear();
+        self.residues.clear();
 
         let mut frame = Frame::new();
         let mut topology = Topology::default();
-        let mut groupid = 0;
-        self.residues.borrow_mut().push(Residue {
+        let mut groupid = 1;
+        self.current_atom = 0;
+        self.previous_atom = 0;
+        self.first_atom = true;
+        self.current_bond_order = BondOrder::Single;
+        self.residues.push(Residue {
             name: format!("group {groupid}"),
             ..Default::default()
         });
@@ -99,9 +103,9 @@ impl FileFormat for SMIFormat {
         }
 
         let mut builder = Builder::default();
-        let _ = read(smiles, &mut builder, None);
+        let mut trace = Trace::default();
+        let _ = read(smiles, &mut builder, Some(&mut trace));
 
-        dbg!(&line);
         let built_smiles = builder.build();
         if built_smiles.is_err() {
             let e = line.trim();
@@ -112,37 +116,102 @@ impl FileFormat for SMIFormat {
         let parsed_smiles = built_smiles.unwrap();
 
         topology.atoms.reserve(parsed_smiles.len());
-        for (i, purr) in parsed_smiles.iter().enumerate() {
-            // Add the atom itself.
-            topology.add_atom(Atom::new(purr.kind.to_string()));
-            match purr.kind {
-                AtomKind::Aromatic(_) => topology[0]
-                    .properties
-                    .insert("is_aromatic".to_string(), Property::Bool(true)),
-                _ => None,
-            };
+        for (i, yowl_atom) in parsed_smiles.iter().enumerate() {
+            if !self.first_atom {
+                // XXX: `yowl` does not emit information about '.' (that is, splits), we
+                // manually parse part of the SMILES to add the residues
+                let prev_range_end = trace.atom(i - 1).unwrap().end;
+                let curr_range_start = trace.atom(i).unwrap().start;
+                if curr_range_start - prev_range_end > 1 {
+                    let check_hole = &smiles[prev_range_end + 1..curr_range_start];
+                    if check_hole == "." {
+                        self.residues.push(Residue {
+                            name: format!("group {groupid}"),
+                            ..Default::default()
+                        });
+                    }
+                }
+            }
+            match yowl_atom.kind {
+                AtomKind::Symbol(Symbol::Star) => {
+                    self.add_atom(&mut topology, "*");
+                }
+                AtomKind::Symbol(Symbol::Aliphatic(element)) => {
+                    self.add_atom(&mut topology, element.symbol());
+                }
+                AtomKind::Symbol(Symbol::Aromatic(element)) => {
+                    let new_atom = self.add_atom(&mut topology, element.symbol());
+                    new_atom
+                        .properties
+                        .insert("is_aromatic".to_string(), Property::Bool(true));
+                }
+                AtomKind::Bracket {
+                    isotope,
+                    symbol,
+                    configuration,
+                    hcount,
+                    charge,
+                    map,
+                } => {
+                    let new_atom = match symbol {
+                        Symbol::Star => self.add_atom(&mut topology, "*"),
+                        Symbol::Aliphatic(element) => {
+                            self.add_atom(&mut topology, element.symbol())
+                        }
+                        Symbol::Aromatic(element) => {
+                            let new_atom = self.add_atom(&mut topology, element.symbol());
+                            new_atom
+                                .properties
+                                .insert("is_aromatic".to_string(), Property::Bool(true));
+                            new_atom
+                        }
+                    };
 
-            // Get a mutable ref to the newly added atom:
-            // let atom = topology.atoms.last_mut();
+                    if let Some(isotope) = isotope {
+                        new_atom.mass = f64::from(isotope.mass_number());
+                    }
 
-            // For each neighbor index < i, add a bond.
-            for j in &purr.bonds {
-                if j.tid < i {
-                    // TODO: convert the bond order from Purr
-                    topology.add_bond(j.tid, i, BondOrder::Single)?;
+                    if let Some(hcount) = hcount {
+                        new_atom.properties.insert(
+                            "hydrogen_count".to_string(),
+                            Property::Double(f64::from(u8::from(&hcount))),
+                        );
+                    }
+
+                    if let Some(charge) = charge {
+                        new_atom.charge = f64::from(i8::from(charge));
+                    }
+
+                    if let Some(map) = map {
+                        new_atom.properties.insert(
+                            "smiles_class".to_string(),
+                            Property::String(map.to_string()),
+                        );
+                    }
+
+                    if let Some(configuration) = configuration {
+                        new_atom.properties.insert(
+                            "chirality".to_string(),
+                            Property::String(configuration.to_string()),
+                        );
+                    }
                 }
             }
 
-            // Record this atom in the current residue.
-            let topo_size = topology.size();
-            self.residues
-                .borrow_mut()
-                .last_mut()
-                .expect("no residue")
-                .add_atom(topo_size - 1);
+            // For each neighbor index < i, add a bond.
+            for j in &yowl_atom.bonds {
+                if j.tid < i {
+                    topology.add_bond(j.tid, i, j.kind.into())?;
+                }
+            }
         }
 
-        // dbg!(&line);
+        for residue in &mut self.residues {
+            topology
+                .add_residue(residue.clone())
+                .expect("able to add residues to topology");
+        }
+
         frame.resize(topology.size())?;
         frame.set_topology(topology)?;
         Ok(frame)
@@ -188,12 +257,7 @@ impl FileFormat for SMIFormat {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        bond::BondOrder,
-        frame::Frame,
-        topology,
-        trajectory::{self, Trajectory},
-    };
+    use crate::{frame::Frame, trajectory::Trajectory};
     use std::path::Path;
 
     #[test]
@@ -296,21 +360,84 @@ mod tests {
         assert_eq!(topology.bonds().len(), 6);
     }
 
+    // we've removed the following test case as `yowl` does not support single-quotation
+    // marks in the SMILES string
+    // ['Db']['Sg']['Bh']['Hs']['Mt']['Ds']['Rg']['Cn']['Nh']['Fl']['Mc']['Lv']['Ts']['Og']
     #[test]
     fn read_entire_file() {
         let path = Path::new("./src/tests-data/smi/rdkit_problems.smi");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 70);
+        assert_eq!(trajectory.size, 69);
 
         let mut frame = Frame::new();
         while let Some(next_frame) = trajectory.read().unwrap() {
             frame = next_frame;
         }
-        // TODO: until we have good support for SMILES, we rewind to the latest SMILES'
-        // in the test file
-        let frame = trajectory.read_at(67).unwrap().unwrap();
         assert_eq!(frame.size(), 14);
-        assert_eq!(frame[0].symbol, "[Db]");
-        assert_eq!(frame[13].symbol, "[Og]");
+        assert_eq!(frame[0].symbol, "Db");
+        assert_eq!(frame[13].symbol, "Og");
+    }
+
+    #[test]
+    fn check_parsing_results() {
+        let path = Path::new("./src/tests-data/smi/details.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        assert_eq!(trajectory.size, 1);
+
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 5);
+        assert_eq!(frame[0].charge, 0.0);
+        assert_eq!(frame[0].symbol, "O");
+        assert_eq!(frame[4].charge, -1.0);
+        assert_eq!(frame[4].symbol, "O");
+    }
+
+    #[test]
+    fn ugly_smiles_strings() {
+        let path = Path::new("./src/tests-data/smi/ugly.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        assert_eq!(trajectory.size, 3);
+
+        // C1(CC1CC1CC1)
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 7);
+        let bonds = frame.topology().bonds();
+        assert_eq!(bonds.len(), 8);
+        assert!((bonds[0][0] == 0 && bonds[0][1] == 1));
+        assert!((bonds[1][0] == 0 && bonds[1][1] == 2));
+        assert!((bonds[2][0] == 1 && bonds[2][1] == 2));
+        assert!((bonds[3][0] == 2 && bonds[3][1] == 3));
+        assert!((bonds[4][0] == 3 && bonds[4][1] == 4));
+        assert!((bonds[5][0] == 4 && bonds[5][1] == 5));
+        assert!((bonds[6][0] == 4 && bonds[6][1] == 6));
+        assert!((bonds[7][0] == 5 && bonds[7][1] == 6));
+
+        // C1.C1CC1CC1
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 6);
+        let bonds = frame.topology().bonds();
+        assert_eq!(bonds.len(), 6);
+        assert!((bonds[0][0] == 0 && bonds[0][1] == 1));
+        assert!((bonds[1][0] == 1 && bonds[1][1] == 2));
+        assert!((bonds[2][0] == 2 && bonds[2][1] == 3));
+        assert!((bonds[3][0] == 3 && bonds[3][1] == 4));
+        assert!((bonds[4][0] == 3 && bonds[4][1] == 5));
+        assert!((bonds[5][0] == 4 && bonds[5][1] == 5));
+        let topology = frame.topology();
+        assert_eq!(topology.residues.len(), 2);
+        assert!(topology.are_linked(&topology.residues[0], &topology.residues[1]));
+
+        // C1CC11CC1
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 5);
+        let bonds = frame.topology().bonds();
+        assert_eq!(bonds.len(), 6);
+
+        assert!((bonds[0][0] == 0 && bonds[0][1] == 1));
+        assert!((bonds[1][0] == 0 && bonds[1][1] == 2));
+        assert!((bonds[2][0] == 1 && bonds[2][1] == 2));
+        assert!((bonds[3][0] == 2 && bonds[3][1] == 3));
+        assert!((bonds[4][0] == 2 && bonds[4][1] == 4));
+        assert!((bonds[5][0] == 3 && bonds[5][1] == 4));
     }
 }
