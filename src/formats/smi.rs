@@ -19,6 +19,7 @@ use std::{
 use yowl::feature::AtomKind;
 use yowl::graph::Builder;
 use yowl::read::read;
+use yowl::{Element, Isotope};
 
 /// Currently, we're not handling 'CurlySMILES'
 #[derive(Default)]
