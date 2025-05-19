@@ -103,6 +103,18 @@ impl FileFormat for SMIFormat {
             smiles = line.trim();
         }
 
+        let mut parts = smiles.split_whitespace();
+        let smiles_part = parts.next().unwrap_or("");
+        let name_part = parts.collect::<Vec<_>>().join(" ");
+
+        if !name_part.is_empty() {
+            frame
+                .properties
+                .insert("name".to_string(), Property::String(name_part));
+        }
+
+        let smiles = smiles_part;
+
         let mut builder = Builder::default();
         let mut trace = Trace::default();
         read(smiles, &mut builder, Some(&mut trace)).expect("Failed to parse SMILES");
@@ -217,17 +229,6 @@ impl FileFormat for SMIFormat {
             topology
                 .add_residue(residue.clone())
                 .expect("able to add residues to topology");
-        }
-
-        if smiles.split_whitespace().count() > 1 {
-            let name = smiles
-                .split_whitespace()
-                .skip(1)
-                .collect::<Vec<_>>()
-                .join(" ");
-            frame
-                .properties
-                .insert("name".to_string(), Property::String(name.to_string()));
         }
 
         frame.resize(topology.size())?;
