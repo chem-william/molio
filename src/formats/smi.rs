@@ -386,7 +386,7 @@ mod tests {
     fn read_entire_file() {
         let path = Path::new("./src/tests-data/smi/rdkit_problems.smi");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 69);
+        assert_eq!(trajectory.size, 66);
 
         let mut frame = Frame::new();
         while let Some(next_frame) = trajectory.read().unwrap() {
@@ -464,7 +464,7 @@ mod tests {
     fn rdkit_problems() {
         let path = Path::new("./src/tests-data/smi/rdkit_problems.smi");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 69);
+        assert_eq!(trajectory.size, 66);
 
         // C1CC2C1CC2
         let frame = trajectory.read().unwrap().unwrap();

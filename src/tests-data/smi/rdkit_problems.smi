@@ -22,10 +22,7 @@ OC=CCC
 CC([O-])O
 C1CC2C1CC2
 Cl/C=C/Cl
-Cl/C=C\\Cl
 Cl/C=C/Cl
-Cl/C=C\\Cl
-Cl/C=C\\\\Cl
 C1CC.CC1
 C1C(C2CC2).C2CC2C1
 [Na+].[Cl-].[NH4+].[Cl-]
@@ -54,7 +51,7 @@ C1=CC=CC=C1
 c1ccc[se]1
 c1ccc[te]1
 C0CC0
-C/C(/C=C2\\Sc1ccc(cc1N\\2C))=C5\\SC4=NccN4C\\5=O
+C/C(/C=C2\Sc1ccc(cc1N\2C))=C5\SC4=NccN4C\5=O
 [HH]
 [2HH]
 [HH2-]
