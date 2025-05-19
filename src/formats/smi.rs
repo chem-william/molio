@@ -105,9 +105,9 @@ impl FileFormat for SMIFormat {
 
         let mut builder = Builder::default();
         let mut trace = Trace::default();
-        let _ = read(smiles, &mut builder, Some(&mut trace));
-
+        read(smiles, &mut builder, Some(&mut trace)).expect("Failed to parse SMILES");
         let built_smiles = builder.build();
+
         if built_smiles.is_err() {
             let e = line.trim();
             warn!("could not parse '{e}'. skipping for now");
@@ -589,5 +589,53 @@ mod tests {
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.topology().bonds().len(), 171);
+    }
+
+    #[test]
+    #[should_panic(expected = "Character(2)")]
+    fn bad_element() {
+        let path = Path::new("./src/tests-data/smi/bad_element.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        trajectory.read().unwrap().unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "Character(2)")]
+    fn bad_paren() {
+        let path = Path::new("./src/tests-data/smi/bad_paren.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        trajectory.read().unwrap().unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "EndOfLine")]
+    fn bad_percentage() {
+        let path = Path::new("./src/tests-data/smi/bad_percentage_sign.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        trajectory.read().unwrap().unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "Character(2)")]
+    fn bad_ring() {
+        let path = Path::new("./src/tests-data/smi/bad_ring.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        trajectory.read().unwrap().unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "Character(3)")]
+    fn bad_symbol() {
+        let path = Path::new("./src/tests-data/smi/bad_symbol.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        trajectory.read().unwrap().unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "Character(2)")]
+    fn misplaced_property() {
+        let path = Path::new("./src/tests-data/smi/misplaced_property.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        trajectory.read().unwrap().unwrap();
     }
 }
