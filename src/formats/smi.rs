@@ -219,6 +219,17 @@ impl FileFormat for SMIFormat {
                 .expect("able to add residues to topology");
         }
 
+        if smiles.split_whitespace().count() > 1 {
+            let name = smiles
+                .split_whitespace()
+                .skip(1)
+                .collect::<Vec<_>>()
+                .join(" ");
+            frame
+                .properties
+                .insert("name".to_string(), Property::String(name.to_string()));
+        }
+
         frame.resize(topology.size())?;
         frame.set_topology(topology)?;
         Ok(frame)
@@ -265,7 +276,7 @@ impl FileFormat for SMIFormat {
 #[cfg(test)]
 mod tests {
     use crate::{bond::BondOrder, frame::Frame, property::Property, trajectory::Trajectory};
-    use std::path::Path;
+    use std::{hint::black_box, path::Path};
 
     #[test]
     fn check_nsteps() {
@@ -528,5 +539,28 @@ mod tests {
             *frame[1].properties.get("chirality").unwrap(),
             Property::String("@".to_string())
         );
+    }
+
+    #[test]
+    fn other_tests() {
+        let path = Path::new("./src/tests-data/smi/test.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        trajectory.read().unwrap().unwrap();
+        let mut frame = trajectory.read().unwrap().unwrap();
+
+        assert_eq!(
+            *frame[0].properties.get("is_aromatic").unwrap(),
+            Property::Bool(true)
+        );
+        assert_eq!(
+            *frame.properties.get("name").unwrap(),
+            Property::String("Benzene".to_string())
+        );
+
+        while let Some(next_frame) = trajectory.read().unwrap() {
+            frame = next_frame;
+        }
+
+        black_box(frame);
     }
 }
