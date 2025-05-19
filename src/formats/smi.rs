@@ -114,10 +114,16 @@ impl FileFormat for SMIFormat {
             eprintln!("could not parse '{e}'. skipping for now");
             return Ok(Frame::new());
         }
-        let parsed_smiles = built_smiles.unwrap();
+        let mut parsed_smiles = built_smiles.unwrap();
 
         topology.atoms.reserve(parsed_smiles.len());
-        for (i, yowl_atom) in parsed_smiles.iter().enumerate() {
+        for (i, yowl_atom) in parsed_smiles.iter_mut().enumerate() {
+            // we need to invert the configuration on each atom to match the SMILES
+            // instead of how the graph was built.
+            // The internal viewpoint of the graph in `yowl` is child -> parent which
+            // is the mirror of the SMILES' parent -> child
+            yowl_atom.kind.invert_configuration();
+
             if !self.first_atom {
                 // XXX: `yowl` does not emit information about '.' (that is, splits), we
                 // manually parse part of the SMILES to add the residues
@@ -515,12 +521,12 @@ mod tests {
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(
             *frame[1].properties.get("chirality").unwrap(),
-            Property::String("@".to_string())
+            Property::String("@@".to_string())
         );
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(
             *frame[1].properties.get("chirality").unwrap(),
-            Property::String("@@".to_string())
+            Property::String("@".to_string())
         );
     }
 }
