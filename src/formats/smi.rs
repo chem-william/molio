@@ -563,4 +563,31 @@ mod tests {
 
         black_box(frame);
     }
+
+    #[test]
+    fn issue_303() {
+        let path = Path::new("./src/tests-data/smi/issue_303.smi");
+        let mut trajectory = Trajectory::open(path).unwrap();
+
+        // In issue 303 (from the original c++ chemfiles lib), this failed due to the "%11" marker
+        trajectory.read().unwrap().unwrap();
+
+        // No explicit hydrogens, so the size should be 26 atoms
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 26);
+
+        // Converting the original SDF file using MarvinSketch preverses the explicit hydrogens
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 30);
+
+        // For the next test, too many bonds were parsed
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.topology().bonds().len(), 34);
+
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.topology().bonds().len(), 182);
+
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.topology().bonds().len(), 171);
+    }
 }
