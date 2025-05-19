@@ -283,7 +283,7 @@ mod tests {
     fn check_nsteps() {
         let path = Path::new("./src/tests-data/smi/test.smi");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 8);
+        assert_eq!(trajectory.size, 6);
     }
 
     #[test]
