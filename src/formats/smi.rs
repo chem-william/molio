@@ -27,16 +27,16 @@ impl fmt::Display for BondOrder {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             BondOrder::Unknown => "~",
-            BondOrder::Single => "",
             BondOrder::Double => "=",
             BondOrder::Triple => "#",
             BondOrder::Quadruple => "$",
-            BondOrder::Quintuplet => "",
             BondOrder::Down => "\\",
             BondOrder::Up => "/",
-            BondOrder::DativeR => "",
-            BondOrder::DativeL => "",
-            BondOrder::Amide => "",
+            BondOrder::Single
+            | BondOrder::DativeR
+            | BondOrder::DativeL
+            | BondOrder::Amide
+            | BondOrder::Quintuplet => "",
             BondOrder::Aromatic => ":",
         };
         write!(f, "{s}")
@@ -58,8 +58,7 @@ pub struct SMIFormat {
 impl From<BondKind> for BondOrder {
     fn from(value: BondKind) -> Self {
         match value {
-            BondKind::Elided => BondOrder::Single,
-            BondKind::Single => BondOrder::Single,
+            BondKind::Elided | BondKind::Single => BondOrder::Single,
             BondKind::Double => BondOrder::Double,
             BondKind::Triple => BondOrder::Triple,
             BondKind::Quadruple => BondOrder::Quintuplet,
@@ -224,7 +223,7 @@ impl SMIFormat {
             .properties
             .get("chirality")
             .cloned()
-            .unwrap_or(Property::String("".to_string()));
+            .unwrap_or(Property::String(String::new()));
         if !chirality.expect_string().is_empty() {
             needs_brackets = true;
         }
@@ -335,8 +334,7 @@ impl SMIFormat {
                     && chirality_string
                         .as_bytes()
                         .get(6)
-                        .map(|b| b.is_ascii_digit())
-                        .unwrap_or(false)
+                        .is_some_and(u8::is_ascii_digit)
                 {
                     is_good_tag = true;
                     write!(writer, "@{}", &chirality_string[4..])?;
@@ -348,8 +346,7 @@ impl SMIFormat {
                     && chirality_string
                         .as_bytes()
                         .get(6..8)
-                        .map(|b| b[0].is_ascii_digit() && b[1].is_ascii_digit())
-                        .unwrap_or(false)
+                        .is_some_and(|b| b[0].is_ascii_digit() && b[1].is_ascii_digit())
                 {
                     is_good_tag = true;
                     write!(writer, "@{}", &chirality_string[4..])?;
@@ -730,8 +727,8 @@ impl FileFormat for SMIFormat {
         let mut line = String::new();
         loop {
             match reader.read_line(&mut line)? {
-                0 => return Ok(None),                    // EOF
-                _ if line.trim().is_empty() => continue, // skip blank
+                0 => return Ok(None),             // EOF
+                _ if line.trim().is_empty() => {} // skip blank
                 _ => {
                     pos = reader.stream_position()?; // position after this line
                     break;
