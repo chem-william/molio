@@ -11,7 +11,7 @@ fn main() {
     for arg in &args[1..] {
         if arg == "--profile" || arg == "-p" {
             profiling_mode = true;
-        } else if !arg.starts_with("-") {
+        } else if !arg.starts_with('-') {
             // Assume this is a file path
             file_path = arg;
         }
