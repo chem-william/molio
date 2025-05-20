@@ -49,6 +49,20 @@ impl Frame {
         &self.topology
     }
 
+    pub fn set_topology(&mut self, topology: Topology) -> Result<(), CError> {
+        if topology.size() != self.size() {
+            return Err(CError::GenericError(format!(
+                "the topology contains {} atoms, but the frame contains {} atoms",
+                topology.size(),
+                self.size(),
+            )));
+        }
+
+        self.topology = topology;
+
+        Ok(())
+    }
+
     pub fn topology_as_mut(&mut self) -> &mut Topology {
         &mut self.topology
     }
@@ -138,12 +152,14 @@ mod tests {
             symbol: "H".to_string(),
             name: "hydrogen".to_string(),
             charge: 0.0,
+            mass: 0.0,
             properties: Properties::new(),
         };
         let atom2 = Atom {
             symbol: "O".to_string(),
             name: "oxygen".to_string(),
             charge: 0.0,
+            mass: 0.0,
             properties: Properties::new(),
         };
 

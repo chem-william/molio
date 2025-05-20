@@ -4,7 +4,10 @@
 //
 // See LICENSE at the project root for full text.
 
-use std::{collections::HashMap, ops::Index};
+use std::{
+    collections::HashMap,
+    ops::{Index, IndexMut},
+};
 
 use crate::{
     angle::Angle,
@@ -37,6 +40,12 @@ impl Index<usize> for Topology {
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.atoms[index]
+    }
+}
+
+impl IndexMut<usize> for Topology {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.atoms[index]
     }
 }
 
@@ -91,6 +100,11 @@ impl Topology {
     /// Returns a vector of all improper torsions present in the topology.
     pub fn impropers(&mut self) -> Vec<Improper> {
         self.connect.impropers().iter().copied().collect()
+    }
+
+    /// Adds an [`Atom`] to the end of this topology.
+    pub fn add_atom(&mut self, atom: Atom) {
+        self.atoms.push(atom);
     }
 
     /// Remove all bonding information in the `Topology` (bonds, angles, and dihedrals)
@@ -173,16 +187,19 @@ impl Topology {
             return true;
         }
 
-        let bonds = self.connect.bonds.clone();
         for &bond_i in first {
             for &bond_j in second {
                 let check_bond = Bond::new(bond_i, bond_j);
-                if bonds.contains(&check_bond) {
+                if self.connect.bonds.contains(&check_bond) {
                     return true;
                 }
             }
         }
         false
+    }
+
+    pub fn bond_orders(&self) -> &Vec<BondOrder> {
+        &self.connect.bond_orders
     }
 }
 

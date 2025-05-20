@@ -114,7 +114,9 @@ impl FileFormat for SDFFormat {
         while reader.read_line(&mut line)? > 0 {
             if line.is_empty() {
                 continue;
-            } else if line.starts_with("$$$$") {
+            }
+
+            if line.starts_with("$$$$") {
                 // Ending block, technically wrong - but we can exit safely
                 return Ok(frame);
             } else if line.starts_with("M  END") {
@@ -157,7 +159,7 @@ impl FileFormat for SDFFormat {
             } else {
                 // Continuation of a property value
                 writeln!(property_value).expect("write to string we control(?)");
-                write!(property_value, "{}", line).expect("write to string we control(?)");
+                write!(property_value, "{line}").expect("write to string we control(?)");
             }
 
             line.clear();
@@ -182,13 +184,12 @@ impl FileFormat for SDFFormat {
         let mut frame_name = frame
             .properties
             .get("name")
-            .map(|p| p.expect_string())
-            .unwrap_or("");
+            .map_or("", Property::expect_string);
         if frame_name.len() > 80 {
             warn!("the frame 'name' property is too long for the SDF format. It has been truncated to 80 characters");
             frame_name = &frame_name[..80];
         }
-        writeln!(writer, "{}", frame_name)?;
+        writeln!(writer, "{frame_name}")?;
         // // TODO: this line can contain more data (file creation time and energy in particular)
         writeln!(writer)?;
         writeln!(writer, "created by molio")?;

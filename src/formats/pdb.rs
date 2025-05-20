@@ -311,7 +311,7 @@ impl<'a> PDBFormat<'a> {
             Atom::with_symbol(name, symbol)
         } else {
             // Read just the atom name and hope for the best
-            let name = name.to_string();
+            let name = (*name).to_string();
             Atom::new(name)
         };
 
@@ -403,7 +403,7 @@ impl<'a> PDBFormat<'a> {
             if let Some((end_residue_id, description)) = self.current_secinfo.as_ref() {
                 residue.properties.insert(
                     "secondary_structure".into(),
-                    Property::String(description.to_string()),
+                    Property::String((*description).to_string()),
                 );
 
                 // Are we at the end of a secondary information sequence?
@@ -868,7 +868,7 @@ impl<'a> PDBFormat<'a> {
             info.atom_hetatm = "ATOM  ".to_string();
         }
 
-        info.resname = residue.name.clone();
+        info.resname.clone_from(&residue.name);
         if info.resname.len() > 3 {
             eprint!(
                 "warning: residue '{}' name is too long, it will be truncated",
@@ -1259,6 +1259,7 @@ impl FileFormat for PDBFormat<'_> {
             Ok(None)
         }
     }
+
     /// Finalize the PDB file by writing the END record if needed
     ///
     /// This should be called when done writing to a PDB file to ensure it's properly closed

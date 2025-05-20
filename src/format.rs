@@ -7,16 +7,18 @@
 use crate::error::CError;
 use crate::formats::pdb::PDBFormat;
 use crate::formats::sdf::SDFFormat;
+use crate::formats::smi::SMIFormat;
 use crate::formats::xyz::XYZFormat;
 use crate::frame::Frame;
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::{BufRead, BufReader, BufWriter};
 use std::path::Path;
 
 /// Supported text-based trajectory file formats for reading and writing.
 ///
 /// - `XYZ`: plain-text XYZ coordinate format.
 /// - `PDB`: Protein Data Bank format.
+/// - `SMI`: SMILES string format.
 /// - `SDF`: Structure Data File format.
 /// - `Guess`: autodetect format from file extension.
 #[derive(Clone, Copy)]
@@ -25,6 +27,8 @@ pub enum TextFormat {
     XYZ,
     /// PDB file format.
     PDB,
+    /// SMILES file format.
+    SMI,
     /// SDF file format.
     SDF,
     /// Automatically detect format from file extension.
@@ -37,6 +41,8 @@ pub enum Format<'a> {
     XYZ(XYZFormat),
     /// Handler for the PDB format.
     PDB(PDBFormat<'a>),
+    /// Handler for the SMILES format.
+    SMI(SMIFormat),
     /// Handler for the SDF format.
     SDF(SDFFormat),
 }
@@ -53,6 +59,7 @@ impl Format<'_> {
         match ext.to_lowercase().as_str() {
             "xyz" => Ok(Format::XYZ(XYZFormat)),
             "pdb" => Ok(Format::PDB(PDBFormat::new())),
+            "smi" => Ok(Format::SMI(SMIFormat::default())),
             "sdf" => Ok(Format::SDF(SDFFormat)),
             _ => Err(CError::GenericError("unknown file format".to_string())),
         }
@@ -68,6 +75,7 @@ impl Format<'_> {
         match fmt {
             TextFormat::XYZ => Ok(Format::XYZ(XYZFormat)),
             TextFormat::PDB => Ok(Format::PDB(PDBFormat::new())),
+            TextFormat::SMI => Ok(Format::SMI(SMIFormat::default())),
             TextFormat::SDF => Ok(Format::SDF(SDFFormat)),
             TextFormat::Guess => Self::new(path),
         }
@@ -119,15 +127,22 @@ impl FileFormat for Format<'_> {
         match self {
             Format::XYZ(format) => format.read_next(reader),
             Format::PDB(format) => format.read_next(reader),
+            Format::SMI(format) => format.read_next(reader),
             Format::SDF(format) => format.read_next(reader),
         }
     }
 
     fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        match self {
-            Format::XYZ(format) => format.read(reader),
-            Format::PDB(format) => format.read(reader),
-            Format::SDF(format) => format.read(reader),
+        // TODO: replace with has_data_left when stabilized
+        if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
+            match self {
+                Format::XYZ(format) => format.read(reader),
+                Format::PDB(format) => format.read(reader),
+                Format::SMI(format) => format.read(reader),
+                Format::SDF(format) => format.read(reader),
+            }
+        } else {
+            Ok(None)
         }
     }
 
@@ -135,6 +150,7 @@ impl FileFormat for Format<'_> {
         match self {
             Format::XYZ(format) => format.write_next(writer, frame),
             Format::PDB(format) => format.write_next(writer, frame),
+            Format::SMI(format) => format.write_next(writer, frame),
             Format::SDF(format) => format.write_next(writer, frame),
         }
     }
@@ -143,6 +159,7 @@ impl FileFormat for Format<'_> {
         match self {
             Format::XYZ(format) => format.forward(reader),
             Format::PDB(format) => format.forward(reader),
+            Format::SMI(format) => format.forward(reader),
             Format::SDF(format) => format.forward(reader),
         }
     }
@@ -151,6 +168,7 @@ impl FileFormat for Format<'_> {
         match self {
             Format::XYZ(format) => format.finalize(writer),
             Format::PDB(format) => format.finalize(writer),
+            Format::SMI(format) => format.finalize(writer),
             Format::SDF(format) => format.finalize(writer),
         }
     }
