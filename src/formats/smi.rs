@@ -39,7 +39,7 @@ impl fmt::Display for BondOrder {
             BondOrder::Amide => "",
             BondOrder::Aromatic => ":",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -629,9 +629,9 @@ impl FileFormat for SMIFormat {
                         ring_start += 1;
 
                         if ring_count >= 10 {
-                            write!(writer, "%{}", ring_count)?;
+                            write!(writer, "%{ring_count}")?;
                         } else {
-                            write!(writer, "{}", ring_count)?;
+                            write!(writer, "{ring_count}")?;
                         }
 
                         ring_stack.entry(current_atom).or_default().push(ring_count);
@@ -663,9 +663,9 @@ impl FileFormat for SMIFormat {
 
                                 // Print the ring index (with "%" if ≥10)
                                 if ring_num >= 10 {
-                                    write!(writer, "%{}", ring_num)?;
+                                    write!(writer, "%{ring_num}")?;
                                 } else {
-                                    write!(writer, "{}", ring_num)?;
+                                    write!(writer, "{ring_num}")?;
                                 }
 
                                 // If that Vec is now empty, drop the key entirely
