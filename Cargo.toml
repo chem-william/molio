@@ -39,3 +39,4 @@ strip = "symbols"
 
 [lints.clippy]
 single_char_pattern = "warn"
+uninlined_format_args = "warn"
