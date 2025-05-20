@@ -40,3 +40,5 @@ strip = "symbols"
 [lints.clippy]
 single_char_pattern = "warn"
 uninlined_format_args = "warn"
+map_unwrap_or = "warn"
+inefficient_to_string = "warn"
