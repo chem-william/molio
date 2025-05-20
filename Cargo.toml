@@ -36,3 +36,6 @@ codegen-units = 1
 panic = "abort"
 # debug = false
 strip = "symbols"
+
+[lints.clippy]
+single_char_pattern = "warn"
