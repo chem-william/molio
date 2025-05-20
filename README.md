@@ -10,6 +10,7 @@
 | (Extended) XYZ | .xyz      |
 | PDB            | .pdb      |
 | SDF            | .sdf      |
+| SMILES         | .smi      |
 
 This project is a Rust port of [`chemfiles`](https://github.com/chemfiles/chemfiles/), a modern C++ library with the same purpose.
 
