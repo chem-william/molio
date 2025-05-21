@@ -1,6 +1,6 @@
 /target
 *.svg
-src/chem-files-tests-data/*
+chem-files-tests-data/
 benchmark_chem/read*
 benchmark_chem/cpp/read_chem
 benchmark_chem/output.md
