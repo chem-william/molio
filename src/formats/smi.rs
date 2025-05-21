@@ -138,14 +138,10 @@ impl SMIFormat {
 
             // As long as there are atoms to process in this connected component...
             while let Some((cur, prev)) = stack.pop() {
-                // If you want to mirror naming: `current_atom` ← `cur`, `previous_atom` ← `prev`.
                 let current = cur;
                 let previous = prev;
 
                 // For each neighbor of `current`, in reverse order to match C++'s use of a reverse‐iterator:
-                //   C++ did `for (auto neighbor_iter = current_atom_bonds.rbegin(); ...)`.
-                //
-                // Rust's `Vec` has `iter().rev()` to iterate in reverse.
                 for &neighbor in adj_list[current].iter().rev() {
                     // Skip backtracking to the immediate parent.
                     if neighbor == previous {
