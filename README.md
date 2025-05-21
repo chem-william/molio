@@ -3,7 +3,9 @@
 
 # molio
 
-`molio` is a Rust library for reading and writing chemistry files used in computational chemistry simulations. It provides a unified interface to access atomic (positions, velocities, atomic symbols) and trajectory (frames, topology) information and other data across various chemical file formats. Currently supports
+`molio` is a Rust library for reading and writing chemistry files used in computational chemistry simulations. It provides a unified interface to access atomic (positions, velocities, atomic symbols) and trajectory (frames, topology) information and other data across various chemical file formats.
+
+Currently supports
 
 | Format         | Extension |
 | ------         | --------- |
