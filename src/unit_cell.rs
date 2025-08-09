@@ -92,7 +92,7 @@ mod utils {
 }
 
 mod validation {
-    use super::{utils, CError, Vec3D};
+    use super::{CError, Vec3D, utils};
 
     /// Validate cell angles
     ///
@@ -138,7 +138,7 @@ mod validation {
 }
 
 mod matrix {
-    use super::{utils, validation, CError, Matrix3, Vec3D};
+    use super::{CError, Matrix3, Vec3D, utils, validation};
 
     /// Create a cell matrix from lengths and angles
     ///

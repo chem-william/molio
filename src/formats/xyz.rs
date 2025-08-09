@@ -207,13 +207,13 @@ impl XYZFormat {
                     continue;
                 }
 
-                if let Some(string_prop) = property.as_string() {
-                    if XYZFormat::should_be_quoted(string_prop) {
-                        warn!(
-                            "string value for property '{name}' on atom 0 cannot be saved as an atomic property"
-                        );
-                        continue;
-                    }
+                if let Some(string_prop) = property.as_string()
+                    && XYZFormat::should_be_quoted(string_prop)
+                {
+                    warn!(
+                        "string value for property '{name}' on atom 0 cannot be saved as an atomic property"
+                    );
+                    continue;
                 }
                 all_properties.insert(name.clone(), property.kind());
             }

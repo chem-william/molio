@@ -5,7 +5,7 @@
 // See LICENSE at the project root for full text.
 
 use crate::property::{Properties, Property};
-use std::collections::{btree_set::Iter, BTreeSet};
+use std::collections::{BTreeSet, btree_set::Iter};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 // the specific order of the struct matters in the following when deriving `[Ord]`
