@@ -1107,9 +1107,10 @@ impl FileFormat for PDBFormat<'_> {
         // atoms without associated residue.
         let mut max_resid = 0;
         for residue in &frame.topology().residues {
-            let resid = residue.id;
-            if resid.is_some() && resid.unwrap() > max_resid {
-                max_resid = resid.unwrap();
+            if let Some(resid) = residue.id {
+                if resid > max_resid {
+                    max_resid = resid;
+                }
             }
         }
 
