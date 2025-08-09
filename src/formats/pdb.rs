@@ -1145,26 +1145,24 @@ impl FileFormat for PDBFormat<'_> {
 
             debug_assert!(resinfo.resname.len() <= 3);
 
-            if last_residue.is_some()
-                && last_residue.as_ref().unwrap().chainid != resinfo.chainid
-                && last_residue.as_ref().unwrap().needs_ter_record()
-            {
-                let pdb_index = PDBFormat::to_pdb_index(
-                    i64::try_from(idx + ter_count).expect("idx + ter_count fits in i64"),
-                    5,
-                );
-                let unwrapped = last_residue.as_ref().unwrap();
-                writeln!(
-                    writer,
-                    "TER   {:>5}      {:3} {}{:>4}{}",
-                    pdb_index,
-                    unwrapped.resname,
-                    unwrapped.chainid,
-                    unwrapped.resid,
-                    unwrapped.insertion_code
-                )?;
-                ter_serial_numbers.push(idx + ter_count);
-                ter_count += 1;
+            if let Some(last_residue) = last_residue {
+                if last_residue.chainid != resinfo.chainid && last_residue.needs_ter_record() {
+                    let pdb_index = PDBFormat::to_pdb_index(
+                        i64::try_from(idx + ter_count).expect("idx + ter_count fits in i64"),
+                        5,
+                    );
+                    writeln!(
+                        writer,
+                        "TER   {:>5}      {:3} {}{:>4}{}",
+                        pdb_index,
+                        last_residue.resname,
+                        last_residue.chainid,
+                        last_residue.resid,
+                        last_residue.insertion_code
+                    )?;
+                    ter_serial_numbers.push(idx + ter_count);
+                    ter_count += 1;
+                }
             }
 
             PDBFormat::check_values_size(*pos, 8, "atomic position")?;
