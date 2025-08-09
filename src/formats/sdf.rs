@@ -186,7 +186,9 @@ impl FileFormat for SDFFormat {
             .get("name")
             .map_or("", Property::expect_string);
         if frame_name.len() > 80 {
-            warn!("the frame 'name' property is too long for the SDF format. It has been truncated to 80 characters");
+            warn!(
+                "the frame 'name' property is too long for the SDF format. It has been truncated to 80 characters"
+            );
             frame_name = &frame_name[..80];
         }
         writeln!(writer, "{frame_name}")?;
@@ -303,7 +305,8 @@ impl FileFormat for SDFFormat {
         }
         if bytes_read < 10 {
             return Err(CError::GenericError(format!(
-                "counts line must have at least 10 characters in SDF file. It has {bytes_read} bytes: '{}'", String::from_utf8_lossy(&buf)
+                "counts line must have at least 10 characters in SDF file. It has {bytes_read} bytes: '{}'",
+                String::from_utf8_lossy(&buf)
             )));
         }
 

@@ -20,8 +20,8 @@ use std::{
 use yowl::feature::BondKind;
 use yowl::feature::{AtomKind, Symbol};
 use yowl::graph::Builder;
-use yowl::read::read;
 use yowl::read::Trace;
+use yowl::read::read;
 
 impl fmt::Display for BondOrder {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -96,12 +96,10 @@ impl SMIFormat {
             .expect("at least one residue")
             .add_atom(topology.size() - 1);
         let new_atom_idx = topology.size() - 1;
-        let new_atom = topology
+        topology
             .atoms
             .get_mut(new_atom_idx)
-            .expect("we just added the atom");
-
-        new_atom
+            .expect("we just added the atom")
     }
 
     // Helper to check if all atoms have been hit/processed.
@@ -642,33 +640,32 @@ impl FileFormat for SMIFormat {
                     }
 
                     // We must have a ring to terminate
-                    if written[neighbor] {
-                        if let Some(rings) = ring_stack.get_mut(&neighbor) {
-                            if !rings.is_empty() {
-                                // Remove the first element
-                                let ring_num = rings.remove(0);
+                    if written[neighbor]
+                        && let Some(rings) = ring_stack.get_mut(&neighbor)
+                        && !rings.is_empty()
+                    {
+                        // Remove the first element
+                        let ring_num = rings.remove(0);
 
-                                write!(
-                                    writer,
-                                    "{}",
-                                    frame.topology().bond_order(current_atom, neighbor)?
-                                )?;
+                        write!(
+                            writer,
+                            "{}",
+                            frame.topology().bond_order(current_atom, neighbor)?
+                        )?;
 
-                                // Print the ring index (with "%" if ≥10)
-                                if ring_num >= 10 {
-                                    write!(writer, "%{ring_num}")?;
-                                } else {
-                                    write!(writer, "{ring_num}")?;
-                                }
-
-                                // If that Vec is now empty, drop the key entirely
-                                if rings.is_empty() {
-                                    ring_stack.remove(&neighbor);
-                                }
-
-                                ring_end += 1;
-                            }
+                        // Print the ring index (with "%" if ≥10)
+                        if ring_num >= 10 {
+                            write!(writer, "%{ring_num}")?;
+                        } else {
+                            write!(writer, "{ring_num}")?;
                         }
+
+                        // If that Vec is now empty, drop the key entirely
+                        if rings.is_empty() {
+                            ring_stack.remove(&neighbor);
+                        }
+
+                        ring_end += 1;
                     }
                 }
 

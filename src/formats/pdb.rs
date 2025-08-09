@@ -712,13 +712,12 @@ impl<'a> PDBFormat<'a> {
                 return;
             };
 
-            if link_previous_peptide {
-                if let Some(&n_index) = amide_nitrogen {
-                    if resid == previous_residue_id + 1 {
-                        link_previous_peptide = false;
-                        bonds_to_add.push((previous_carboxylic_id, n_index));
-                    }
-                }
+            if link_previous_peptide
+                && let Some(&n_index) = amide_nitrogen
+                && resid == previous_residue_id + 1
+            {
+                link_previous_peptide = false;
+                bonds_to_add.push((previous_carboxylic_id, n_index));
             }
 
             if let Some(&ac_index) = amide_carbon {
@@ -729,17 +728,15 @@ impl<'a> PDBFormat<'a> {
 
             let three_prime_oxygen = atom_name_to_index.get("O3'");
             let five_prime_phosphorus = atom_name_to_index.get("P");
-            if link_previous_nucleic {
-                if let Some(&_) = five_prime_phosphorus {
-                    if resid == previous_residue_id + 1 {
-                        link_previous_nucleic = false;
-                        if let Some(&o_index) = three_prime_oxygen {
-                            bonds_to_add.push((previous_carboxylic_id, o_index));
-                        }
-                    }
+            if link_previous_nucleic
+                && let Some(&_) = five_prime_phosphorus
+                && resid == previous_residue_id + 1
+            {
+                link_previous_nucleic = false;
+                if let Some(&o_index) = three_prime_oxygen {
+                    bonds_to_add.push((previous_carboxylic_id, o_index));
                 }
             }
-
             if let Some(&o_index) = three_prime_oxygen {
                 link_previous_nucleic = true;
                 previous_carboxylic_id = o_index;
@@ -747,13 +744,13 @@ impl<'a> PDBFormat<'a> {
             }
 
             // A special case missed by the standards committee??
-            if atom_name_to_index.contains_key("HO5'") {
-                if let (Some(&ho5), Some(&o5)) = (
+            if atom_name_to_index.contains_key("HO5'")
+                && let (Some(&ho5), Some(&o5)) = (
                     atom_name_to_index.get("HO5'"),
                     atom_name_to_index.get("O5'"),
-                ) {
-                    bonds_to_add.push((ho5, o5));
-                }
+                )
+            {
+                bonds_to_add.push((ho5, o5));
             }
 
             for link in residue_table.unwrap() {
@@ -1107,9 +1104,10 @@ impl FileFormat for PDBFormat<'_> {
         // atoms without associated residue.
         let mut max_resid = 0;
         for residue in &frame.topology().residues {
-            let resid = residue.id;
-            if resid.is_some() && resid.unwrap() > max_resid {
-                max_resid = resid.unwrap();
+            if let Some(resid) = residue.id
+                && resid > max_resid
+            {
+                max_resid = resid;
             }
         }
 
@@ -1144,23 +1142,22 @@ impl FileFormat for PDBFormat<'_> {
 
             debug_assert!(resinfo.resname.len() <= 3);
 
-            if last_residue.is_some()
-                && last_residue.as_ref().unwrap().chainid != resinfo.chainid
-                && last_residue.as_ref().unwrap().needs_ter_record()
+            if let Some(last_residue) = last_residue
+                && last_residue.chainid != resinfo.chainid
+                && last_residue.needs_ter_record()
             {
                 let pdb_index = PDBFormat::to_pdb_index(
                     i64::try_from(idx + ter_count).expect("idx + ter_count fits in i64"),
                     5,
                 );
-                let unwrapped = last_residue.as_ref().unwrap();
                 writeln!(
                     writer,
                     "TER   {:>5}      {:3} {}{:>4}{}",
                     pdb_index,
-                    unwrapped.resname,
-                    unwrapped.chainid,
-                    unwrapped.resid,
-                    unwrapped.insertion_code
+                    last_residue.resname,
+                    last_residue.chainid,
+                    last_residue.resid,
+                    last_residue.insertion_code
                 )?;
                 ter_serial_numbers.push(idx + ter_count);
                 ter_count += 1;
@@ -1394,12 +1391,16 @@ mod tests {
         assert!(topology.angles().contains(&Angle::new(20, 21, 23)));
         assert!(topology.angles().contains(&Angle::new(9, 38, 44)));
 
-        assert!(topology
-            .dihedrals()
-            .contains(&Dihedral::new(64, 62, 58, 53)));
-        assert!(topology
-            .dihedrals()
-            .contains(&Dihedral::new(22, 21, 23, 33)));
+        assert!(
+            topology
+                .dihedrals()
+                .contains(&Dihedral::new(64, 62, 58, 53))
+        );
+        assert!(
+            topology
+                .dihedrals()
+                .contains(&Dihedral::new(22, 21, 23, 33))
+        );
     }
 
     macro_rules! recycle_check {
@@ -1635,11 +1636,13 @@ mod tests {
                 .expect_string(),
             "A"
         );
-        assert!(topology
-            .residue_for_atom(13)
-            .unwrap()
-            .get("insertion_code")
-            .is_none(),);
+        assert!(
+            topology
+                .residue_for_atom(13)
+                .unwrap()
+                .get("insertion_code")
+                .is_none(),
+        );
 
         // // Check secondary structure, no insertion code
         assert_eq!(

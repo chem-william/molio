@@ -56,12 +56,12 @@ pub struct Trajectory;
 
 impl Trajectory {
     /// Opens a trajectory file for reading, using format autodetection
-    pub fn open(path: &Path) -> Result<TrajectoryReader, CError> {
+    pub fn open(path: &Path) -> Result<TrajectoryReader<'_>, CError> {
         Self::open_with_format(path, TextFormat::Guess)
     }
 
     /// Opens a trajectory file for reading with an explicit format
-    pub fn open_with_format(path: &Path, fmt: TextFormat) -> Result<TrajectoryReader, CError> {
+    pub fn open_with_format(path: &Path, fmt: TextFormat) -> Result<TrajectoryReader<'_>, CError> {
         let strategy = Format::new_from_format(&fmt, path)?;
         let file = File::open(path).map_err(CError::IoError)?;
         let mut reader = BufReader::new(file);
@@ -78,12 +78,15 @@ impl Trajectory {
     }
 
     /// Creates a new trajectory file for writing, using format autodetection
-    pub fn create(path: &Path) -> Result<TrajectoryWriter, CError> {
+    pub fn create(path: &Path) -> Result<TrajectoryWriter<'_>, CError> {
         Self::create_with_format(path, TextFormat::Guess)
     }
 
     /// Creates a new trajectory file for writing with an explicit format
-    pub fn create_with_format(path: &Path, fmt: TextFormat) -> Result<TrajectoryWriter, CError> {
+    pub fn create_with_format(
+        path: &Path,
+        fmt: TextFormat,
+    ) -> Result<TrajectoryWriter<'_>, CError> {
         let strategy = Format::new_from_format(&fmt, path)?;
         let file = File::create(path).map_err(CError::IoError)?;
         let writer = BufWriter::new(file);
