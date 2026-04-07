@@ -21,10 +21,8 @@ pub mod topology;
 pub mod trajectory;
 pub mod unit_cell;
 
-use std::{fs::File, io::BufReader};
-use std::{hint::black_box, path::Path};
-
-use format::{FileFormat, Format};
+use std::path::Path;
+use trajectory::Trajectory;
 
 /// Read a trajectory file and return the total number of atoms processed
 pub fn read_trajectory(path: &Path) -> usize {
@@ -35,5 +33,5 @@ pub fn read_trajectory(path: &Path) -> usize {
     while let Some(next_frame) = format.read(&mut reader).unwrap() {
         total_atoms += next_frame.size();
     }
-    black_box(total_atoms)
+    total_atoms
 }
