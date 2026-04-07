@@ -355,7 +355,7 @@ impl XYZFormat {
 
 impl FileFormat for XYZFormat {
     fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
-        let mut line = String::new();
+        let mut line = String::with_capacity(64);
         let _ = reader.read_line(&mut line)?;
 
         let n_atoms = line
@@ -405,7 +405,7 @@ impl FileFormat for XYZFormat {
     }
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
-        let mut line = String::new();
+        let mut line = String::with_capacity(64);
 
         let bytes = reader.read_line(&mut line)?;
         if bytes == 0 || line.trim().is_empty() {
