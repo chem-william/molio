@@ -359,7 +359,7 @@ impl FileFormat for XYZFormat {
         let _ = reader.read_line(&mut line)?;
 
         let n_atoms = line
-            .trim_end()
+            .trim()
             .parse::<usize>()
             .expect("expected number of atoms");
 
