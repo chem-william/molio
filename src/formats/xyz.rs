@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
-use std::str::SplitWhitespace;
+use std::str::SplitAsciiWhitespace;
 
 pub struct XYZFormat;
 type PropertiesList = BTreeMap<String, PropertyKind>;
@@ -37,7 +37,7 @@ impl XYZFormat {
 
     fn read_atomic_properties(
         properties: &PropertiesList,
-        tokens: &mut SplitWhitespace,
+        tokens: &mut SplitAsciiWhitespace<'_>,
         atom: &mut Atom,
     ) -> Result<(), CError> {
         for (name, kind) in properties {
@@ -362,12 +362,13 @@ impl FileFormat for XYZFormat {
         line.clear();
         let _ = reader.read_line(&mut line)?;
         let mut frame = Frame::new();
+        frame.reserve(n_atoms);
         let properties = XYZFormat::read_extended_comment_line(&line, &mut frame)?;
 
         for _ in 0..n_atoms {
             line.clear();
             let _ = reader.read_line(&mut line)?;
-            let mut tokens = line.split_whitespace();
+            let mut tokens = line.split_ascii_whitespace();
 
             let symbol = tokens.next().ok_or(CError::UnexpectedSymbol)?.to_string();
 
@@ -393,7 +394,7 @@ impl FileFormat for XYZFormat {
     fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
         // TODO: replace with has_data_left when stabilized
         if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
-            Ok(Some(self.read_next(reader).unwrap()))
+            self.read_next(reader).map(Some)
         } else {
             Ok(None)
         }
