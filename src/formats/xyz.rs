@@ -142,6 +142,10 @@ impl XYZFormat {
     }
 
     fn read_extended_comment_line(line: &str, frame: &mut Frame) -> Result<PropertiesList, CError> {
+        if !line.contains('=') && !line.contains("Lattice") {
+            return Ok(PropertiesList::new());
+        }
+
         if !(line.contains("species:S:1:pos:R:3") || line.contains("Lattice")) {
             return Ok(PropertiesList::new());
         }

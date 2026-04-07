@@ -21,7 +21,10 @@ pub mod topology;
 pub mod trajectory;
 pub mod unit_cell;
 
-use std::{fs::File, io::BufReader};
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+};
 use std::{hint::black_box, path::Path};
 
 use format::{FileFormat, Format};
@@ -32,8 +35,8 @@ pub fn read_trajectory(path: &Path) -> usize {
     let file = File::open(path).unwrap();
     let mut reader = BufReader::new(file);
     let mut total_atoms = 0;
-    while let Some(next_frame) = format.read(&mut reader).unwrap() {
-        total_atoms += next_frame.size();
+    while !reader.fill_buf().unwrap().is_empty() {
+        total_atoms += format.read_next(&mut reader).unwrap().size();
     }
     black_box(total_atoms)
 }
