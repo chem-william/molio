@@ -70,7 +70,7 @@ impl XYZFormat {
 
         let fields: Vec<&str> = rest.split(':').collect();
 
-        if fields.len() % 3 != 0 {
+        if !fields.len().is_multiple_of(3) {
             return Err(CError::GenericError(
                 "Invalid property list format: property definitions must be in groups of 3 (name:type:count)".to_string(),
             ));

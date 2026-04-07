@@ -21,8 +21,9 @@ pub mod topology;
 pub mod trajectory;
 pub mod unit_cell;
 
-use std::path::Path;
-use trajectory::Trajectory;
+use std::{fs::File, io::BufReader, path::Path};
+
+use crate::format::{FileFormat, Format};
 
 /// Read a trajectory file and return the total number of atoms processed
 pub fn read_trajectory(path: &Path) -> usize {
