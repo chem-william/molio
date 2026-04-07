@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
-use std::str::SplitWhitespace;
+use std::str::SplitAsciiWhitespace;
 
 pub struct XYZFormat;
 type PropertiesList = BTreeMap<String, PropertyKind>;
@@ -37,7 +37,7 @@ impl XYZFormat {
 
     fn read_atomic_properties(
         properties: &PropertiesList,
-        tokens: &mut SplitWhitespace,
+        tokens: &mut SplitAsciiWhitespace<'_>,
         atom: &mut Atom,
     ) -> Result<(), CError> {
         for (name, kind) in properties {
@@ -70,7 +70,7 @@ impl XYZFormat {
 
         let fields: Vec<&str> = rest.split(':').collect();
 
-        if fields.len() % 3 != 0 {
+        if !fields.len().is_multiple_of(3) {
             return Err(CError::GenericError(
                 "Invalid property list format: property definitions must be in groups of 3 (name:type:count)".to_string(),
             ));
@@ -142,6 +142,10 @@ impl XYZFormat {
     }
 
     fn read_extended_comment_line(line: &str, frame: &mut Frame) -> Result<PropertiesList, CError> {
+        if !line.contains('=') && !line.contains("Lattice") {
+            return Ok(PropertiesList::new());
+        }
+
         if !(line.contains("species:S:1:pos:R:3") || line.contains("Lattice")) {
             return Ok(PropertiesList::new());
         }
@@ -264,7 +268,7 @@ impl XYZFormat {
         results
     }
 
-    fn write_extended_comment_line(&self, frame: &Frame, properties: &PropertiesList) -> String {
+    fn write_extended_comment_line(frame: &Frame, properties: &PropertiesList) -> String {
         let mut result = "Properties=species:S:1:pos:R:3".to_string();
 
         for property in properties {
@@ -362,12 +366,13 @@ impl FileFormat for XYZFormat {
         line.clear();
         let _ = reader.read_line(&mut line)?;
         let mut frame = Frame::new();
+        frame.reserve(n_atoms);
         let properties = XYZFormat::read_extended_comment_line(&line, &mut frame)?;
 
         for _ in 0..n_atoms {
             line.clear();
             let _ = reader.read_line(&mut line)?;
-            let mut tokens = line.split_whitespace();
+            let mut tokens = line.split_ascii_whitespace();
 
             let symbol = tokens.next().ok_or(CError::UnexpectedSymbol)?.to_string();
 
@@ -393,7 +398,7 @@ impl FileFormat for XYZFormat {
     fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
         // TODO: replace with has_data_left when stabilized
         if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
-            Ok(Some(self.read_next(reader).unwrap()))
+            self.read_next(reader).map(Some)
         } else {
             Ok(None)
         }
@@ -431,7 +436,7 @@ impl FileFormat for XYZFormat {
         writeln!(
             writer,
             "{}",
-            self.write_extended_comment_line(frame, &properties)
+            XYZFormat::write_extended_comment_line(frame, &properties)
         )?;
 
         for (atom, pos) in frame.iter().zip(positions) {

@@ -133,16 +133,18 @@ impl FileFormat for Format<'_> {
     }
 
     fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        // TODO: replace with has_data_left when stabilized
-        if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
-            match self {
-                Format::XYZ(format) => format.read(reader),
-                Format::PDB(format) => format.read(reader),
-                Format::SMI(format) => format.read(reader),
-                Format::SDF(format) => format.read(reader),
+        match self {
+            Format::XYZ(format) => format.read(reader),
+            Format::PDB(format) => format.read(reader),
+            Format::SDF(format) => format.read(reader),
+            Format::SMI(format) => {
+                // SMIFormat::read_next does not detect EOF on its own.
+                if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
+                    format.read(reader)
+                } else {
+                    Ok(None)
+                }
             }
-        } else {
-            Ok(None)
         }
     }
 

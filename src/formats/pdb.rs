@@ -273,6 +273,12 @@ pub struct PDBFormat<'a> {
     models: usize,
 }
 
+impl Default for PDBFormat<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> PDBFormat<'a> {
     fn parse_atom(&mut self, frame: &mut Frame, line: &str, is_hetatm: bool) -> Result<(), CError> {
         debug_assert!(line[..6] == *"ATOM  " || line[..6] == *"HETATM");
@@ -700,7 +706,7 @@ impl<'a> PDBFormat<'a> {
 
             let mut atom_name_to_index = HashMap::<String, usize>::new();
             for &atom in residue {
-                atom_name_to_index.insert(frame[atom].name.to_string(), atom);
+                atom_name_to_index.insert(frame[atom].name.clone(), atom);
             }
 
             let amide_nitrogen = atom_name_to_index.get("N");
@@ -874,8 +880,8 @@ impl<'a> PDBFormat<'a> {
             info.resname = info.resname.chars().take(3).collect();
         }
 
-        if residue.id.is_some() {
-            info.resid = PDBFormat::to_pdb_index(residue.id.unwrap() - 1, 4);
+        if let Some(residue_id) = residue.id {
+            info.resid = PDBFormat::to_pdb_index(residue_id - 1, 4);
         }
 
         info.chainid = residue
@@ -2146,7 +2152,7 @@ mod tests {
 
     #[test]
     fn write_file() {
-        const EXPECTED: &str = r#"MODEL    1
+        const EXPECTED: &str = r"MODEL    1
 CRYST1   22.000   22.000   22.000  90.00  90.00  90.00 P 1           1
 HETATM    1 A   A        1       1.000   2.000   3.000  1.00  0.00           A
 HETATM    2 B   B        2       1.000   2.000   3.000  1.00  0.00           B
@@ -2175,7 +2181,7 @@ CONECT    8    1    2    3    5
 CONECT    8    6    7
 ENDMDL
 END
-"#;
+";
         let named_tmpfile = Builder::new()
             .prefix("test-pdb")
             .suffix(".pdb")

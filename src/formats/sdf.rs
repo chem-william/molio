@@ -230,7 +230,7 @@ impl FileFormat for SDFFormat {
                 pos[0],
                 pos[1],
                 pos[2],
-                symbol.to_string(),
+                symbol.clone(),
                 charge_code
             )?;
         }
@@ -521,7 +521,7 @@ mod tests {
 
     #[test]
     fn write_files() {
-        const EXPECTED: &str = r#"
+        const EXPECTED: &str = r"
 
 created by molio
   4  3  0     0  0  0  0  0  0999 V2000
@@ -588,7 +588,7 @@ created by molio
   0  0  0     0  0  0  0  0  0999 V2000
 M  END
 $$$$
-"#;
+";
         let named_tmpfile = Builder::new()
             .prefix("test-sdf")
             .suffix(".sdf")
@@ -624,7 +624,7 @@ $$$$
         frame.add_atom(Atom::new("H".to_string()), [0.0, 0.0, 0.0]);
         frame.add_atom(Atom::new("I".to_string()), [0.0, 0.0, 0.0]);
         frame.add_atom(Atom::new("J".to_string()), [0.0, 0.0, 0.0]);
-        frame.add_atom(Atom::new("".to_string()), [0.0, 0.0, 0.0]);
+        frame.add_atom(Atom::new(String::new()), [0.0, 0.0, 0.0]);
         frame[0].charge = 0.05;
         frame[1].charge = 1.0;
         frame[2].charge = 2.0;

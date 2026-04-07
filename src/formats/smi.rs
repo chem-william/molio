@@ -296,14 +296,14 @@ impl SMIFormat {
         }
 
         // Mass must be first, before the element is printed
-        if mass_int.is_some() {
-            write!(writer, "{}", mass_int.unwrap())?;
+        if let Some(mass_int) = mass_int {
+            write!(writer, "{mass_int}")?;
         }
 
         write!(writer, "{symbol}")?;
 
-        if smi_class.is_some() {
-            write!(writer, ":{}", smi_class.unwrap().expect_double())?;
+        if let Some(smi_class) = smi_class {
+            write!(writer, ":{}", smi_class.expect_double())?;
         }
 
         let mut is_good_tag = false;
@@ -552,7 +552,7 @@ impl FileFormat for SMIFormat {
     fn write_next(&mut self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
         if frame.size() == 0 {
             writeln!(writer)?;
-        };
+        }
 
         let mut adj_list: Vec<Vec<usize>> = Vec::with_capacity(frame.size());
         adj_list.extend((0..frame.size()).map(|_| Vec::new()));
@@ -706,8 +706,10 @@ impl FileFormat for SMIFormat {
         }
 
         let name = frame.properties.get("name");
-        if name.is_some() && name.unwrap().as_string().is_some() {
-            write!(writer, "\t{}", name.unwrap().expect_string())?;
+        if let Some(name) = name
+            && name.as_string().is_some()
+        {
+            write!(writer, "\t{}", name.expect_string())?;
         }
 
         writeln!(writer)?;
@@ -1107,7 +1109,7 @@ mod tests {
 
     #[test]
     fn write_smi_file() {
-        const EXPECTED_CONTENT: &str = r#"C(C)(C)(C)C
+        const EXPECTED_CONTENT: &str = r"C(C)(C)(C)C
 C
 C~N
 C~N(P)=O
@@ -1118,7 +1120,7 @@ C12(~N(P(#F:1)$B/2)=O)~I	test
 C12(~N(P(#F:1)$B/2)(=O)~S)~I	test
 [WH5+3].[35Cl-][c:1@H][te@SP3]\[C@@]
 O.O.O
-"#;
+";
         let named_tmpfile = tempfile::Builder::new()
             .prefix("test-smi")
             .suffix(".smi")
