@@ -24,7 +24,7 @@ pub mod unit_cell;
 use std::{fs::File, io::BufReader};
 use std::{hint::black_box, path::Path};
 
-use format::Format;
+use format::{FileFormat, Format};
 
 /// Read a trajectory file and return the total number of atoms processed
 pub fn read_trajectory(path: &Path) -> usize {
