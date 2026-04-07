@@ -30,7 +30,7 @@ use format::{FileFormat, Format};
 pub fn read_trajectory(path: &Path) -> usize {
     let mut format = Format::new(path).unwrap();
     let file = File::open(path).unwrap();
-    let mut reader = BufReader::with_capacity(256 * 1024, file);
+    let mut reader = BufReader::with_capacity(64 * 1024, file);
     let mut total_atoms = 0;
     while let Some(next_frame) = format.read(&mut reader).unwrap() {
         total_atoms += next_frame.size();
