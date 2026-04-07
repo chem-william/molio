@@ -21,7 +21,7 @@ pub mod topology;
 pub mod trajectory;
 pub mod unit_cell;
 
-use std::{hint::black_box, path::Path};
+use std::path::Path;
 use trajectory::Trajectory;
 
 /// Read a trajectory file and return the total number of atoms processed
@@ -31,5 +31,5 @@ pub fn read_trajectory(path: &Path) -> usize {
     while let Some(next_frame) = trajectory.read().unwrap() {
         total_atoms += next_frame.size();
     }
-    black_box(total_atoms)
+    total_atoms
 }
