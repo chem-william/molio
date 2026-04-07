@@ -81,7 +81,7 @@ impl Frame {
 
     /// Remove all connectivity information in the frame's topology
     pub fn clear_bonds(&mut self) {
-        self.topology.clear_bonds()
+        self.topology.clear_bonds();
     }
 
     pub fn add_residue(&mut self, residue: Residue) -> Result<(), CError> {

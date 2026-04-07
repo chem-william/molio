@@ -154,7 +154,9 @@ mod matrix {
 
         // Normalize angles to 90 degrees if they're close enough
         if angles.iter().all(|&x| utils::is_roughly_90(x)) {
-            angles.iter_mut().for_each(|x| *x = 90.0);
+            for x in angles.iter_mut() {
+                *x = 90.0;
+            }
         }
 
         let mut cell_matrix = Matrix3::zeros();

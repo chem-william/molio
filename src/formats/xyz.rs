@@ -268,7 +268,7 @@ impl XYZFormat {
         results
     }
 
-    fn write_extended_comment_line(&self, frame: &Frame, properties: &PropertiesList) -> String {
+    fn write_extended_comment_line(frame: &Frame, properties: &PropertiesList) -> String {
         let mut result = "Properties=species:S:1:pos:R:3".to_string();
 
         for property in properties {
@@ -436,7 +436,7 @@ impl FileFormat for XYZFormat {
         writeln!(
             writer,
             "{}",
-            self.write_extended_comment_line(frame, &properties)
+            XYZFormat::write_extended_comment_line(frame, &properties)
         )?;
 
         for (atom, pos) in frame.iter().zip(positions) {
