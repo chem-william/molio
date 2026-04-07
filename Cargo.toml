@@ -13,13 +13,13 @@ categories = ["text-processing", "science", "parser-implementations"]
 thiserror = "2.0.12"
 nalgebra = "0.34.0"
 assert_approx_eq = "1.1.0"
-phf = { version = "0.12.1", features = ["macros"]}
+phf = { version = "0.13.1", features = ["macros"]}
 tempfile = "3.20.0"
 log = "0.4.27"
 yowl = "0.4.0"
 
 [dev-dependencies]
-criterion = { version = "0.7.0", features = ["html_reports"]}
+criterion = { version = "0.8.0", features = ["html_reports"]}
 
 [[bench]]
 name = "my_benchmark"
