@@ -8,7 +8,7 @@ use super::pdb_connectivity::{self, find};
 use crate::atom::Atom;
 use crate::bond::BondOrder;
 use crate::error::CError;
-use crate::format::FileFormat;
+use crate::format::Codec;
 use crate::frame::Frame;
 use crate::property::Property;
 use crate::property::PropertyKind;
@@ -250,7 +250,7 @@ pub(crate) fn encode_hybrid36(width: usize, value: i64) -> String {
     "*".repeat(width)
 }
 
-pub struct PDBFormat<'a> {
+pub struct PDBFormat {
     /// Residue information in the current step
     pub residues: Vec<(FullResidueId, Residue)>,
 
@@ -261,25 +261,25 @@ pub struct PDBFormat<'a> {
     /// This will be None when no secondary structure information should be
     /// read. Else it is set to the final residue of a secondary structure and
     /// the text description which should be set.
-    pub current_secinfo: Option<(FullResidueId, &'a str)>,
+    pub current_secinfo: Option<(FullResidueId, &'static str)>,
 
     /// Store secondary structure information. Keys are the
     /// starting residue of the secondary structure, and values are pairs
     /// containing the ending residue and a string which is a written
     /// description of the secondary structure
-    pub secinfo: BTreeMap<FullResidueId, (FullResidueId, &'a str)>,
+    pub secinfo: BTreeMap<FullResidueId, (FullResidueId, &'static str)>,
 
     /// Number of models read/written to the file
     models: usize,
 }
 
-impl Default for PDBFormat<'_> {
+impl Default for PDBFormat {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> PDBFormat<'a> {
+impl PDBFormat {
     fn parse_atom(&mut self, frame: &mut Frame, line: &str, is_hetatm: bool) -> Result<(), CError> {
         debug_assert!(line[..6] == *"ATOM  " || line[..6] == *"HETATM");
 
@@ -683,8 +683,8 @@ impl<'a> PDBFormat<'a> {
         }
     }
 
-    const END_RECORD: &'a str = "END";
-    const ENDMDL_RECORD: &'a str = "ENDMDL";
+    const END_RECORD: &str = "END";
+    const ENDMDL_RECORD: &str = "ENDMDL";
 
     fn link_standard_residue_bonds(frame: &mut Frame) {
         let mut link_previous_peptide = false;
@@ -950,7 +950,7 @@ impl<'a> PDBFormat<'a> {
     }
 }
 
-impl FileFormat for PDBFormat<'_> {
+impl Codec for PDBFormat {
     fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         self.residues.clear();
         self.atom_offsets.clear();
@@ -1060,7 +1060,7 @@ impl FileFormat for PDBFormat<'_> {
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
         let mut line = String::new();
-        let position = reader.stream_position()?;
+        let start = reader.stream_position()?;
 
         while reader.read_line(&mut line)? > 0 {
             if line.starts_with(Self::ENDMDL_RECORD) {
@@ -1077,14 +1077,14 @@ impl FileFormat for PDBFormat<'_> {
             }
 
             if line.starts_with(Self::END_RECORD) {
-                return Ok(Some(position));
+                return Ok(Some(reader.stream_position()?));
             }
 
             line.clear();
         }
 
-        if position == 0 {
-            Ok(Some(position))
+        if start == 0 {
+            Ok(Some(reader.stream_position()?))
         } else {
             Ok(None)
         }
@@ -1253,14 +1253,6 @@ impl FileFormat for PDBFormat<'_> {
         self.models += 1;
 
         Ok(())
-    }
-
-    fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
-            Ok(Some(self.read_next(reader).unwrap()))
-        } else {
-            Ok(None)
-        }
     }
 
     /// Finalize the PDB file by writing the END record if needed

@@ -5,23 +5,20 @@
 // See LICENSE at the project root for full text.
 //
 
-use std::fmt::Write;
-use std::io::Write as _;
-use std::{
-    fs::File,
-    io::{BufRead, BufReader, BufWriter, Seek},
-};
+use std::fmt::Write as _;
+use std::fs::File;
+use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
 
 use crate::property::PropertyKind;
 use crate::{atom::Atom, bond::BondOrder, property::Property};
-use crate::{error::CError, format::FileFormat, frame::Frame};
+use crate::{error::CError, format::Codec, frame::Frame};
 use log::warn;
 
 /// Properties are indiscriminately encoded as strings. This means that you should always
 /// [`Property::expect_string()`] when reading properties from Properties
 pub struct SDFFormat;
 
-impl FileFormat for SDFFormat {
+impl Codec for SDFFormat {
     fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         let mut line = String::new();
         let mut frame = Frame::new();
@@ -166,15 +163,6 @@ impl FileFormat for SDFFormat {
         }
 
         Ok(frame)
-    }
-
-    fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        // TODO: replace with has_data_left when stabilized
-        if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
-            Ok(Some(self.read_next(reader).unwrap()))
-        } else {
-            Ok(None)
-        }
     }
 
     fn write_next(&mut self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {

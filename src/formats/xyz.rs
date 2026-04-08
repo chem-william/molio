@@ -7,7 +7,7 @@
 use crate::atom::Atom;
 use crate::error::CError;
 use crate::extendedxyzparser::ExtendedXyzParser;
-use crate::format::FileFormat;
+use crate::format::Codec;
 use crate::frame::Frame;
 use crate::property::{Properties, Property, PropertyKind};
 use crate::unit_cell::{self, UnitCell};
@@ -353,7 +353,7 @@ impl XYZFormat {
     }
 }
 
-impl FileFormat for XYZFormat {
+impl Codec for XYZFormat {
     fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         let mut line = String::new();
         let _ = reader.read_line(&mut line)?;
@@ -393,15 +393,6 @@ impl FileFormat for XYZFormat {
         }
 
         Ok(frame)
-    }
-
-    fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        // TODO: replace with has_data_left when stabilized
-        if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
-            self.read_next(reader).map(Some)
-        } else {
-            Ok(None)
-        }
     }
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
