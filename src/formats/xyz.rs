@@ -60,13 +60,25 @@ impl XYZFormat {
     }
 
     fn parse_property_list(line: &str) -> Result<PropertiesList, CError> {
-        const PREFIX: &str = "species:S:1:pos:R:3:";
+        const PREFIX: &str = "species:S:1:pos:R:3";
 
         let rest = line.strip_prefix(PREFIX).ok_or_else(|| {
             CError::GenericError(
                 "Invalid property list format: missing expected prefix".to_string(),
             )
         })?;
+        let rest = if rest.is_empty() {
+            // there was just a default definition of which properties to expect.
+            // we return early as we already handle those properties
+            return Ok(PropertiesList::new());
+        } else {
+            rest.strip_prefix(':').ok_or_else(|| {
+                CError::GenericError(
+                    "Invalid property list format: expected ':' before property definitions"
+                        .to_string(),
+                )
+            })?
+        };
 
         let fields: Vec<&str> = rest.split(':').collect();
 
