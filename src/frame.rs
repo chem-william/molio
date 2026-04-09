@@ -23,6 +23,9 @@ pub struct Frame {
     /// Positions of the particles
     positions: Vec<[f64; 3]>,
 
+    /// Velocities of the particles.
+    velocities: Option<Vec<[f64; 3]>>,
+
     /// Topology of the described system
     topology: Topology,
 }
@@ -34,6 +37,7 @@ impl Frame {
             unit_cell: UnitCell::new(),
             properties: Properties::new(),
             positions: vec![],
+            velocities: None,
             topology: Topology::default(),
         }
     }
@@ -84,6 +88,14 @@ impl Frame {
         &mut self.positions
     }
 
+    pub fn velocities(&self) -> Option<&Vec<[f64; 3]>> {
+        self.velocities.as_ref()
+    }
+
+    pub fn velocities_mut(&mut self) -> Option<&mut Vec<[f64; 3]>> {
+        self.velocities.as_mut()
+    }
+
     pub fn add_atom(&mut self, atom: Atom, position: [f64; 3]) {
         self.topology.atoms.push(atom);
         self.positions.push(position);
@@ -100,10 +112,10 @@ impl Frame {
 
     pub fn resize(&mut self, size: usize) -> Result<(), CError> {
         self.topology.resize(size)?;
-        self.positions.resize(size, [0.0, 0.0, 0.0]);
-        // if self.velocities.is_some() {
-        //     self.velocities.resize();
-        // }
+        self.positions.resize(size, [0.0; 3]);
+        if let Some(velocities) = self.velocities.as_mut() {
+            velocities.resize(size, [0.0; 3]);
+        }
         Ok(())
     }
 

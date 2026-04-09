@@ -4,7 +4,7 @@
 //
 // See LICENSE at the project root for full text.
 
-use crate::{error::CError, frame::Frame, unit_cell::UnitCell};
+use crate::{error::CError, frame::Frame, property::Property, unit_cell::UnitCell};
 use core::f64;
 use log::{debug, warn};
 use netcdf3::{DataSet, DataType, FileReader, Variable};
@@ -174,10 +174,10 @@ fn scale_for_time(units: &str) -> f64 {
     match units.to_lowercase().as_str() {
         // nothing to do for picoseconds
         "picoseconds" | "picosecond" | "ps" => 1.0,
-        "femtoseconds" | "femtosecond" | "fs" => 1e3,
-        "nanoseconds" | "nanosecond" | "ns" => 1e-3,
-        "microseconds" | "microsecond" | "ms" => 1e-6,
-        "seconds" | "second" | "s" => 1e-12,
+        "femtoseconds" | "femtosecond" | "fs" => 1e-3,
+        "nanoseconds" | "nanosecond" | "ns" => 1e3,
+        "microseconds" | "microsecond" | "ms" => 1e6,
+        "seconds" | "second" | "s" => 1e12,
         unknown => {
             warn!("unknown unit ({unknown}) for time");
             1.0
@@ -445,6 +445,43 @@ impl AMBERTrajFormat {
             )?;
         }
 
+        if let Some(velocities) = self.variables.velocities.as_ref() {
+            read_array(
+                &mut self.file_reader,
+                self.index,
+                &velocities,
+                frame.velocities_mut().expect("just resized velocities"),
+            )?;
+        }
+
+        if let Some(time) = self.variables.time.as_ref() {
+            let time_value;
+            match time.var.data_type() {
+                DataType::I8 | DataType::U8 | DataType::I16 | DataType::I32 => {
+                    return Err(CError::GenericError(
+                        "invalid type for time variable".to_string(),
+                    ));
+                }
+                DataType::F32 => {
+                    let value = self
+                        .file_reader
+                        .read_record_f32("time", 0)
+                        .map_err(|e| CError::GenericError(e.to_string()))?;
+                    time_value = time.scale * f64::from(value[0]);
+                }
+                DataType::F64 => {
+                    let value = self
+                        .file_reader
+                        .read_record_f64("time", 0)
+                        .map_err(|e| CError::GenericError(e.to_string()))?;
+                    time_value = time.scale * value[0];
+                }
+            }
+            frame
+                .properties
+                .insert("time".to_string(), Property::Double(time_value));
+        }
+
         Ok(frame)
     }
 
@@ -496,5 +533,10 @@ mod tests {
         assert_approx_eq!(positions[296][0], 6.664049, 1e-4);
         assert_approx_eq!(positions[296][1], 11.61418, 1e-4);
         assert_approx_eq!(positions[296][2], 12.96149, 1e-4);
+
+        assert_approx_eq!(
+            frame.properties.get("time").unwrap().as_double().unwrap(),
+            2.02
+        );
     }
 }
