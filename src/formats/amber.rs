@@ -479,7 +479,7 @@ impl AMBERTrajFormat {
         }
 
         if let Some(velocities) = self.variables.velocities.as_ref() {
-            frame.velocities = Some(Vec::with_capacity(self.n_atoms));
+            frame.velocities = Some(vec![[0.0; 3]; self.n_atoms]);
             read_array(
                 &mut self.file_reader,
                 self.index,
@@ -649,5 +649,22 @@ mod tests {
         assert_approx_eq!(cell.lengths()[0], 1.765 * 60.9682, 1e-4);
         assert_approx_eq!(cell.lengths()[1], 1.765 * 60.9682, 1e-4);
         assert_approx_eq!(cell.lengths()[2], 1.765 * 0.0, 1e-4);
+
+        let positions = frame.positions();
+        assert_approx_eq!(positions[0][0], 1.39 * 0.455, 1e-4);
+        assert_approx_eq!(positions[0][1], 1.39 * 0.455, 1e-4);
+        assert_approx_eq!(positions[0][2], 0.0 * 0.455, 1e-4);
+        assert_approx_eq!(positions[296][0], 29.1 * 0.455, 1e-4);
+        assert_approx_eq!(positions[296][1], 37.41 * 0.455, 1e-4);
+        assert_approx_eq!(positions[296][2], 0.0 * 0.455, 1e-4);
+
+        let velocities = frame.velocities().unwrap();
+        assert_approx_eq!(velocities[1400][0], 0.6854072 * -0.856, 1e-4);
+        assert_approx_eq!(velocities[1400][1], 0.09196011 * -0.856, 1e-4);
+        assert_approx_eq!(velocities[1400][2], 2.260214 * -0.856, 1e-4);
+
+        assert_approx_eq!(velocities[1600][0], -0.3342645 * -0.856, 1e-4);
+        assert_approx_eq!(velocities[1600][1], 0.322594 * -0.856, 1e-4);
+        assert_approx_eq!(velocities[1600][2], -2.446901 * -0.856, 1e-4);
     }
 }
