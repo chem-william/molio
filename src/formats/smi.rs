@@ -9,14 +9,12 @@ use crate::bond::BondOrder;
 use crate::property::{Property, PropertyKind};
 use crate::residue::Residue;
 use crate::topology::Topology;
-use crate::{error::CError, format::FileFormat, frame::Frame};
+use crate::{error::CError, format::Codec, frame::Frame};
 use log::warn;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
-use std::{
-    fs::File,
-    io::{BufRead, BufReader, BufWriter, Seek, Write},
-};
+use std::fs::File;
+use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
 use yowl::feature::BondKind;
 use yowl::feature::{AtomKind, Symbol};
 use yowl::graph::Builder;
@@ -386,7 +384,7 @@ impl SMIFormat {
 // otherwise, we can't parse something like
 // N->Co(<-N)(<-N)(<-N)
 // CCl.[O-]>C(Cl)Cl>CO.[Cl-]
-impl FileFormat for SMIFormat {
+impl Codec for SMIFormat {
     fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
         self.residues.clear();
 
@@ -543,10 +541,6 @@ impl FileFormat for SMIFormat {
         frame.resize(topology.size())?;
         frame.set_topology(topology)?;
         Ok(frame)
-    }
-
-    fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        Ok(Some(self.read_next(reader)?))
     }
 
     fn write_next(&mut self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {

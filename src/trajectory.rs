@@ -5,175 +5,185 @@
 // See LICENSE at the project root for full text.
 
 use crate::error::CError;
-use crate::format::FileFormat;
-use crate::format::Format;
-use crate::format::TextFormat;
+use crate::format::{FormatKind, TextReader, TextWriter};
 use crate::frame::Frame;
 use log::error;
-use std::fs::File;
-use std::io::BufWriter;
-use std::io::Write;
-use std::io::{BufReader, Seek};
 use std::path::Path;
 
-/// A handle to a trajectory file for reading
-pub struct TrajectoryReader<'a> {
+/// A handle to a trajectory file for reading.
+pub struct TrajectoryReader {
     pub size: usize,
-    strategy: Format<'a>,
-    reader: BufReader<File>,
-    frame_positions: Vec<u64>,
+    strategy: TextReader,
+    current_index: usize,
 }
 
-/// A handle to a trajectory file for writing
-pub struct TrajectoryWriter<'a> {
-    strategy: Format<'a>,
-    writer: BufWriter<File>,
+/// A handle to a trajectory file for writing.
+pub struct TrajectoryWriter {
+    strategy: TextWriter,
     frame_count: usize,
 }
 
-/// Index type that guarantees the frame exists in a trajectory
+/// Index type that guarantees the frame exists in a trajectory.
 #[derive(Debug, Clone, Copy)]
 pub struct FrameIndex(usize);
 
 impl FrameIndex {
-    /// Creates a new frame index if it's within the valid range for the trajectory
+    /// Creates a new frame index if it is within the valid range.
     pub fn new(index: usize, max: usize) -> Option<Self> {
-        if index < max {
-            Some(FrameIndex(index))
-        } else {
-            None
-        }
+        if index < max { Some(Self(index)) } else { None }
     }
 
-    /// Get the underlying index value
-    pub fn value(&self) -> usize {
+    /// Get the underlying index value.
+    pub fn value(self) -> usize {
         self.0
     }
 }
 
-/// Factory functions for creating trajectory readers and writers
+/// Factory functions for creating trajectory readers and writers.
 pub struct Trajectory;
 
 impl Trajectory {
-    /// Opens a trajectory file for reading, using format autodetection
-    pub fn open(path: &Path) -> Result<TrajectoryReader<'_>, CError> {
-        Self::open_with_format(path, TextFormat::Guess)
+    /// Opens a trajectory file for reading, using format autodetection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be opened or the format is unknown.
+    pub fn open(path: &Path) -> Result<TrajectoryReader, CError> {
+        Self::open_with_format(path, FormatKind::Guess)
     }
 
-    /// Opens a trajectory file for reading with an explicit format
-    pub fn open_with_format(path: &Path, fmt: TextFormat) -> Result<TrajectoryReader<'_>, CError> {
-        let strategy = Format::new_from_format(&fmt, path)?;
-        let file = File::open(path).map_err(CError::IoError)?;
-        let mut reader = BufReader::new(file);
+    /// Opens a trajectory file for reading with an explicit format.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be opened or the format fails to
+    /// initialize.
+    pub fn open_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryReader, CError> {
+        let kind = format.resolve(path)?;
 
-        let frame_positions = TrajectoryReader::scan_all(&mut reader, &strategy);
-        let size = frame_positions.len() - 1;
+        let strategy = TextReader::open(path, kind)?;
+        let size = strategy.len();
 
         Ok(TrajectoryReader {
             size,
             strategy,
-            reader,
-            frame_positions,
+            current_index: 0,
         })
     }
 
-    /// Creates a new trajectory file for writing, using format autodetection
-    pub fn create(path: &Path) -> Result<TrajectoryWriter<'_>, CError> {
-        Self::create_with_format(path, TextFormat::Guess)
+    /// Creates a new trajectory file for writing, using format autodetection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output file cannot be created or the format is
+    /// unknown.
+    pub fn create(path: &Path) -> Result<TrajectoryWriter, CError> {
+        Self::create_with_format(path, FormatKind::Guess)
     }
 
-    /// Creates a new trajectory file for writing with an explicit format
-    pub fn create_with_format(
-        path: &Path,
-        fmt: TextFormat,
-    ) -> Result<TrajectoryWriter<'_>, CError> {
-        let strategy = Format::new_from_format(&fmt, path)?;
-        let file = File::create(path).map_err(CError::IoError)?;
-        let writer = BufWriter::new(file);
+    /// Creates a new trajectory file for writing with an explicit format.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output file cannot be created or the format
+    /// fails to initialize.
+    pub fn create_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryWriter, CError> {
+        let kind = format.resolve(path)?;
+
+        let strategy = TextWriter::create(path, kind)?;
 
         Ok(TrajectoryWriter {
             strategy,
-            writer,
             frame_count: 0,
         })
     }
 }
 
-impl<'a> TrajectoryReader<'a> {
-    /// Reads the next frame from the trajectory
+impl TrajectoryReader {
+    /// Reads the next frame from the trajectory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the format fails while reading.
     pub fn read(&mut self) -> Result<Option<Frame>, CError> {
-        self.strategy.read(&mut self.reader)
+        if self.current_index >= self.size {
+            return Ok(None);
+        }
+
+        let frame = self.strategy.read()?;
+        self.current_index += 1;
+        Ok(Some(frame))
     }
 
-    /// Reads a specific frame from the trajectory
+    /// Reads a specific frame from the trajectory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frame cannot be read.
     pub fn read_frame(&mut self, index: FrameIndex) -> Result<Frame, CError> {
-        let position = self.frame_positions[index.value()];
-        self.reader.seek(std::io::SeekFrom::Start(position))?;
-        self.strategy.read_next(&mut self.reader)
+        let index = index.value();
+        let frame = self.strategy.read_at(index)?;
+        self.current_index = index + 1;
+        Ok(frame)
     }
 
-    /// Reads a specific frame from the trajectory by index
-    /// Returns None if the index is out of bounds
+    /// Reads a specific frame by index.
+    ///
+    /// Returns `Ok(None)` when the index is out of bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frame cannot be read.
     pub fn read_at(&mut self, index: usize) -> Result<Option<Frame>, CError> {
         match self.frame_index(index) {
-            Some(idx) => self.read_frame(idx).map(Some),
+            Some(index) => self.read_frame(index).map(Some),
             None => Ok(None),
         }
     }
 
-    /// Gets a frame index if it's valid for this trajectory
+    /// Gets a frame index if it is valid for this trajectory.
     pub fn frame_index(&self, index: usize) -> Option<FrameIndex> {
         FrameIndex::new(index, self.size)
     }
 
-    /// Returns an iterator over all frames in the trajectory
-    pub fn frames(&'a mut self) -> impl Iterator<Item = Result<Frame, CError>> + 'a {
+    /// Returns an iterator over all frames in the trajectory.
+    pub fn frames(&mut self) -> impl Iterator<Item = Result<Frame, CError>> + '_ {
         let indices = 0..self.size;
-        indices.filter_map(move |i| self.frame_index(i).map(|idx| self.read_frame(idx)))
-    }
-
-    /// Scans the file to find the position of each frame
-    fn scan_all(reader: &mut BufReader<File>, strategy: &Format) -> Vec<u64> {
-        let mut frame_positions = vec![0];
-        while let Some(pos) = strategy.forward(reader).unwrap() {
-            frame_positions.push(pos);
-        }
-        reader.rewind().unwrap();
-        frame_positions
+        indices.filter_map(move |i| self.frame_index(i).map(|index| self.read_frame(index)))
     }
 }
 
-impl TrajectoryWriter<'_> {
-    /// Writes a frame to the trajectory
+impl TrajectoryWriter {
+    /// Writes a frame to the trajectory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing fails.
     pub fn write(&mut self, frame: &Frame) -> Result<(), CError> {
-        self.strategy.write_next(&mut self.writer, frame)?;
-        self.writer.flush()?;
+        self.strategy.write(frame)?;
         self.frame_count += 1;
         Ok(())
     }
 
-    /// Finalizes the trajectory file by writing any necessary closing records
+    /// Finalizes the trajectory file.
     ///
-    /// This should be called when done writing to ensure the file is properly finalized.
-    /// If not called explicitly, the file will be finalized when the writer is dropped.
+    /// # Errors
+    ///
+    /// Returns an error if finalization fails.
     pub fn finish(&mut self) -> Result<(), CError> {
-        self.strategy.finalize(&mut self.writer)?;
-        self.writer.flush()?;
-        Ok(())
+        self.strategy.finish()
     }
 
-    /// Returns the number of frames written so far
+    /// Returns the number of frames written so far.
     pub fn frame_count(&self) -> usize {
         self.frame_count
     }
 }
 
-impl Drop for TrajectoryWriter<'_> {
+impl Drop for TrajectoryWriter {
     fn drop(&mut self) {
-        // Attempt to finalize the file when the writer is dropped.
-        // Ignore errors since we can't return them from drop().
-        if let Err(e) = self.finish() {
-            error!("warning: Failed to finalize trajectory file: {e}");
+        if let Err(error) = self.finish() {
+            error!("warning: Failed to finalize trajectory file: {error}");
         }
     }
 }
@@ -195,7 +205,7 @@ mod tests {
     #[test]
     fn test_trajectory_with_format() {
         let path = PathBuf::from(TEST_XYZ_PATH);
-        let reader = Trajectory::open_with_format(&path, TextFormat::XYZ).unwrap();
+        let reader = Trajectory::open_with_format(&path, FormatKind::XYZ).unwrap();
         assert_eq!(reader.size, 3);
     }
 
@@ -219,10 +229,7 @@ mod tests {
     fn test_invalid_frame_index() {
         let path = PathBuf::from(TEST_XYZ_PATH);
         let reader = Trajectory::open(&path).unwrap();
-
-        // Try to get a frame index that's too large
-        let invalid_idx = reader.frame_index(4);
-        assert!(invalid_idx.is_none());
+        assert!(reader.frame_index(4).is_none());
     }
 
     #[test]

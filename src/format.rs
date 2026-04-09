@@ -11,18 +11,15 @@ use crate::formats::smi::SMIFormat;
 use crate::formats::xyz::XYZFormat;
 use crate::frame::Frame;
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter};
+use std::io::{BufReader, BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
 
-/// Supported text-based trajectory file formats for reading and writing.
+/// Supported trajectory file formats.
 ///
-/// - `XYZ`: plain-text XYZ coordinate format.
-/// - `PDB`: Protein Data Bank format.
-/// - `SMI`: SMILES string format.
-/// - `SDF`: Structure Data File format.
-/// - `Guess`: autodetect format from file extension.
-#[derive(Clone, Copy)]
-pub enum TextFormat {
+/// `FormatKind` is only responsible for format selection and guessing. The
+/// actual text-format machinery lives in [`TextReader`] and [`TextWriter`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FormatKind {
     /// XYZ file format.
     XYZ,
     /// PDB file format.
@@ -35,69 +32,54 @@ pub enum TextFormat {
     Guess,
 }
 
-/// Concrete file format strategy for reading and writing trajectory data.
-pub enum Format<'a> {
-    /// Handler for the XYZ format.
-    XYZ(XYZFormat),
-    /// Handler for the PDB format.
-    PDB(PDBFormat<'a>),
-    /// Handler for the SMILES format.
-    SMI(SMIFormat),
-    /// Handler for the SDF format.
-    SDF(SDFFormat),
-}
-
-impl Format<'_> {
-    /// Creates a new [`Format`] by inferring the format from the provided file `path`.
+impl FormatKind {
+    /// Guess a format from a file extension.
     ///
     /// # Errors
     ///
-    /// Returns an error if the file extension is unrecognized.
-    pub fn new(path: &Path) -> Result<Self, CError> {
-        let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+    /// Returns an error if the extension is unknown.
+    pub fn from_path(path: &Path) -> Result<Self, CError> {
+        let ext = path
+            .extension()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| CError::UnknownFormat(path.display().to_string()))?;
 
-        match ext.to_lowercase().as_str() {
-            "xyz" => Ok(Format::XYZ(XYZFormat)),
-            "pdb" => Ok(Format::PDB(PDBFormat::new())),
-            "smi" => Ok(Format::SMI(SMIFormat::default())),
-            "sdf" => Ok(Format::SDF(SDFFormat)),
-            _ => Err(CError::GenericError("unknown file format".to_string())),
+        match ext.to_ascii_lowercase().as_str() {
+            "xyz" => Ok(Self::XYZ),
+            "pdb" => Ok(Self::PDB),
+            "smi" => Ok(Self::SMI),
+            "sdf" => Ok(Self::SDF),
+            _ => Err(CError::UnknownFormat(ext.to_string())),
         }
     }
-    /// Creates a new `Format` using the specified `TextFormat` and file `path`.
-    ///
-    /// `TextFormat::Guess` delegates to [`Format::new`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if format initialization fails or guessing cannot detect the format.
-    pub fn new_from_format(fmt: &TextFormat, path: &Path) -> Result<Self, CError> {
-        match fmt {
-            TextFormat::XYZ => Ok(Format::XYZ(XYZFormat)),
-            TextFormat::PDB => Ok(Format::PDB(PDBFormat::new())),
-            TextFormat::SMI => Ok(Format::SMI(SMIFormat::default())),
-            TextFormat::SDF => Ok(Format::SDF(SDFFormat)),
-            TextFormat::Guess => Self::new(path),
+
+    pub(crate) fn resolve(self, path: &Path) -> Result<Self, CError> {
+        match self {
+            Self::Guess => Self::from_path(path),
+            kind => Ok(kind),
         }
     }
 }
 
-/// Common interface for reading and writing trajectory file formats.
-pub trait FileFormat {
+/// Low-level codec trait for text-based formats.
+///
+/// Text formats implement this trait with the minimal hooks needed to
+/// parse/write individual frames. The trajectory reader/writer handles frame
+/// indexing, seeking, and buffered I/O.
+pub trait Codec {
     /// Reads the next [`Frame`] from `reader`.
     ///
     /// # Errors
     /// Returns an error if reading or parsing the frame fails.
     fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError>;
 
-    /// Reads a single [`Frame`], returning `None` at end-of-file.
+    /// Advances past the current frame, returning the byte offset of the next
+    /// frame start. Returns `None` at end-of-file.
     ///
     /// # Errors
     ///
     /// Returns an error if an I/O or parsing error occurs.
-    fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError>;
-    // fn read_at(&mut self, index: usize) -> Result<Frame, CError>;
-    // fn write(&self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError>;
+    fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError>;
 
     /// Writes the next [`Frame`] to `writer`.
     ///
@@ -106,15 +88,7 @@ pub trait FileFormat {
     /// Returns an error if writing fails.
     fn write_next(&mut self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError>;
 
-    /// Advances to the next frame in `reader`, returning its byte offset.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if an I/O or parsing error occurs.
-    fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError>;
-
-    /// Finalizes the file output, performing any necessary cleanup (e.g., writing end records).
-    /// This should be called when done writing to a file to ensure it's properly closed
+    /// Finalizes the file output, performing any necessary cleanup.
     ///
     /// # Errors
     ///
@@ -122,56 +96,129 @@ pub trait FileFormat {
     fn finalize(&self, writer: &mut BufWriter<File>) -> Result<(), CError>;
 }
 
-impl FileFormat for Format<'_> {
-    fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
-        match self {
-            Format::XYZ(format) => format.read_next(reader),
-            Format::PDB(format) => format.read_next(reader),
-            Format::SMI(format) => format.read_next(reader),
-            Format::SDF(format) => format.read_next(reader),
+// Dispatches a method call across all variants of a codec enum.
+macro_rules! dispatch {
+    ($self:expr, $method:ident $(, $arg:expr)*) => {
+        match $self {
+            Self::Xyz(inner) => inner.$method($($arg),*),
+            Self::Pdb(inner) => inner.$method($($arg),*),
+            Self::Smi(inner) => inner.$method($($arg),*),
+            Self::Sdf(inner) => inner.$method($($arg),*),
         }
-    }
+    };
+}
 
-    fn read(&mut self, reader: &mut BufReader<File>) -> Result<Option<Frame>, CError> {
-        match self {
-            Format::XYZ(format) => format.read(reader),
-            Format::PDB(format) => format.read(reader),
-            Format::SDF(format) => format.read(reader),
-            Format::SMI(format) => {
-                // SMIFormat::read_next does not detect EOF on its own.
-                if reader.fill_buf().map(|b| !b.is_empty()).unwrap() {
-                    format.read(reader)
-                } else {
-                    Ok(None)
-                }
+/// Enum wrapping text-based codecs. The I/O state (reader, frame positions)
+/// lives in [`TextReader`] / [`TextWriter`], not here.
+pub(crate) enum CodecImpl {
+    Xyz(XYZFormat),
+    Pdb(PDBFormat),
+    Smi(SMIFormat),
+    Sdf(SDFFormat),
+}
+
+impl CodecImpl {
+    pub(crate) fn from_kind(kind: FormatKind) -> Result<Self, CError> {
+        match kind {
+            FormatKind::XYZ => Ok(Self::Xyz(XYZFormat)),
+            FormatKind::PDB => Ok(Self::Pdb(PDBFormat::new())),
+            FormatKind::SMI => Ok(Self::Smi(SMIFormat::default())),
+            FormatKind::SDF => Ok(Self::Sdf(SDFFormat)),
+            FormatKind::Guess => {
+                unreachable!("Guess should be handled before reaching CodecImpl")
             }
         }
     }
 
-    fn write_next(&mut self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
-        match self {
-            Format::XYZ(format) => format.write_next(writer, frame),
-            Format::PDB(format) => format.write_next(writer, frame),
-            Format::SMI(format) => format.write_next(writer, frame),
-            Format::SDF(format) => format.write_next(writer, frame),
-        }
+    pub(crate) fn read_next(&mut self, reader: &mut BufReader<File>) -> Result<Frame, CError> {
+        dispatch!(self, read_next, reader)
     }
 
-    fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
-        match self {
-            Format::XYZ(format) => format.forward(reader),
-            Format::PDB(format) => format.forward(reader),
-            Format::SMI(format) => format.forward(reader),
-            Format::SDF(format) => format.forward(reader),
-        }
+    pub(crate) fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
+        dispatch!(self, forward, reader)
     }
 
-    fn finalize(&self, writer: &mut BufWriter<File>) -> Result<(), CError> {
-        match self {
-            Format::XYZ(format) => format.finalize(writer),
-            Format::PDB(format) => format.finalize(writer),
-            Format::SMI(format) => format.finalize(writer),
-            Format::SDF(format) => format.finalize(writer),
+    pub(crate) fn write_next(
+        &mut self,
+        writer: &mut BufWriter<File>,
+        frame: &Frame,
+    ) -> Result<(), CError> {
+        dispatch!(self, write_next, writer, frame)
+    }
+
+    pub(crate) fn finalize(&self, writer: &mut BufWriter<File>) -> Result<(), CError> {
+        dispatch!(self, finalize, writer)
+    }
+}
+
+/// Text-format reader with frame indexing via byte offset scanning.
+/// Owns the codec, the buffered reader, and the frame position index.
+pub(crate) struct TextReader {
+    codec: CodecImpl,
+    reader: BufReader<File>,
+    frame_positions: Vec<u64>,
+}
+
+impl TextReader {
+    pub(crate) fn open(path: &Path, kind: FormatKind) -> Result<Self, CError> {
+        let codec = CodecImpl::from_kind(kind)?;
+        let mut reader = BufReader::new(File::open(path)?);
+
+        let mut frame_positions = vec![0];
+        while let Some(pos) = codec.forward(&mut reader)? {
+            frame_positions.push(pos);
         }
+        reader.rewind()?;
+
+        Ok(Self {
+            codec,
+            reader,
+            frame_positions,
+        })
+    }
+
+    pub(crate) fn read(&mut self) -> Result<Frame, CError> {
+        self.codec.read_next(&mut self.reader)
+    }
+
+    pub(crate) fn read_at(&mut self, index: usize) -> Result<Frame, CError> {
+        let position = *self
+            .frame_positions
+            .get(index)
+            .ok_or_else(|| CError::GenericError("frame index out of bounds".to_string()))?;
+        self.reader.seek(SeekFrom::Start(position))?;
+        self.codec.read_next(&mut self.reader)
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.frame_positions.len().saturating_sub(1)
+    }
+}
+
+/// Text-format writer.
+pub(crate) struct TextWriter {
+    codec: CodecImpl,
+    writer: BufWriter<File>,
+}
+
+impl TextWriter {
+    pub(crate) fn create(path: &Path, kind: FormatKind) -> Result<Self, CError> {
+        let codec = CodecImpl::from_kind(kind)?;
+        Ok(Self {
+            codec,
+            writer: BufWriter::new(File::create(path)?),
+        })
+    }
+
+    pub(crate) fn write(&mut self, frame: &Frame) -> Result<(), CError> {
+        self.codec.write_next(&mut self.writer, frame)?;
+        self.writer.flush()?;
+        Ok(())
+    }
+
+    pub(crate) fn finish(&mut self) -> Result<(), CError> {
+        self.codec.finalize(&mut self.writer)?;
+        self.writer.flush()?;
+        Ok(())
     }
 }

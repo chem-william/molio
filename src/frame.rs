@@ -66,6 +66,12 @@ impl Frame {
     pub fn topology_as_mut(&mut self) -> &mut Topology {
         &mut self.topology
     }
+
+    /// Set the unit cell of this frame to `cell`
+    pub fn set_unitcell(&mut self, cell: UnitCell) {
+        self.unit_cell = cell;
+    }
+
     pub fn size(&self) -> usize {
         self.topology.size()
     }

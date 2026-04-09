@@ -86,6 +86,7 @@ impl<'a> IntoIterator for &'a Residue {
     }
 }
 
+#[allow(dead_code)]
 impl Residue {
     fn iter(&self) -> Iter<'_, usize> {
         <&Self as IntoIterator>::into_iter(self)
