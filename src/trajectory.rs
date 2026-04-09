@@ -13,7 +13,9 @@ use std::path::Path;
 
 /// A handle to a trajectory file for reading.
 pub struct TrajectoryReader {
+    /// Number of frames in the file
     pub size: usize,
+
     strategy: ReaderStrategy,
     current_index: usize,
 }

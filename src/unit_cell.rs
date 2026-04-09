@@ -199,6 +199,8 @@ impl PartialEq for UnitCell {
     }
 }
 
+impl Eq for UnitCell {}
+
 impl UnitCell {
     #[must_use]
     pub fn new() -> Self {

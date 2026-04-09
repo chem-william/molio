@@ -24,7 +24,7 @@ pub struct Frame {
     positions: Vec<[f64; 3]>,
 
     /// Velocities of the particles.
-    velocities: Option<Vec<[f64; 3]>>,
+    pub(crate) velocities: Option<Vec<[f64; 3]>>,
 
     /// Topology of the described system
     topology: Topology,
@@ -69,6 +69,11 @@ impl Frame {
 
     pub fn topology_as_mut(&mut self) -> &mut Topology {
         &mut self.topology
+    }
+
+    /// Get a reference to the unit cell of this [`Frame`]
+    pub fn cell(&self) -> &UnitCell {
+        &self.unit_cell
     }
 
     /// Set the unit cell of this frame to `cell`

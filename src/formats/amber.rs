@@ -52,9 +52,9 @@ fn read_array(
                 .read_record_f32(variable.var.name(), index)
                 .map_err(|e| CError::GenericError(e.to_string()))?;
             for (idx, item) in array.iter_mut().enumerate() {
-                item[0] = f64::from(buffer[3 * idx + 0]);
-                item[1] = f64::from(buffer[3 * idx + 1]);
-                item[2] = f64::from(buffer[3 * idx + 2]);
+                item[0] = variable.scale * f64::from(buffer[3 * idx + 0]);
+                item[1] = variable.scale * f64::from(buffer[3 * idx + 1]);
+                item[2] = variable.scale * f64::from(buffer[3 * idx + 2]);
             }
         }
         DataType::F64 => {
@@ -62,9 +62,9 @@ fn read_array(
                 .read_record_f64(variable.var.name(), index)
                 .map_err(|e| CError::GenericError(e.to_string()))?;
             for (idx, item) in array.iter_mut().enumerate() {
-                item[0] = buffer[3 * idx + 0];
-                item[1] = buffer[3 * idx + 1];
-                item[2] = buffer[3 * idx + 2];
+                item[0] = variable.scale * buffer[3 * idx + 0];
+                item[1] = variable.scale * buffer[3 * idx + 1];
+                item[2] = variable.scale * buffer[3 * idx + 2];
             }
         }
     };
@@ -185,6 +185,31 @@ fn scale_for_time(units: &str) -> f64 {
     }
 }
 
+fn scale_factor(variable: &Variable) -> Result<f64, CError> {
+    if let Some(scale) = variable
+        .get_attr_f32("scale_factor")
+        .and_then(|scale| scale.first().copied())
+    {
+        return Ok(f64::from(scale));
+    }
+
+    if let Some(scale) = variable
+        .get_attr_f64("scale_factor")
+        .and_then(|scale| scale.first().copied())
+    {
+        return Ok(scale);
+    }
+
+    if variable.get_attr("scale_factor").is_some() {
+        return Err(CError::GenericError(format!(
+            "scale_factor attribute for '{}' must be a floating point value",
+            variable.name()
+        )));
+    }
+
+    Ok(1.0)
+}
+
 impl AMBERTrajFormat {
     fn not_implemented() -> CError {
         CError::UnsupportedFileFormat("AMBER is not implemented yet".to_string())
@@ -196,6 +221,11 @@ impl AMBERTrajFormat {
         };
 
         let mut lengths = [0.0; 3];
+        let cell_lengths = self
+            .variables
+            .cell_lengths
+            .as_ref()
+            .expect("we just checked for None");
         match self
             .variables
             .cell_lengths
@@ -211,22 +241,27 @@ impl AMBERTrajFormat {
                     .read_record_f32("cell_lengths", self.index)
                     .map_err(|e| CError::GenericError(e.to_string()))?;
 
-                lengths[0] = f64::from(buffer[0]);
-                lengths[1] = f64::from(buffer[1]);
-                lengths[2] = f64::from(buffer[2]);
+                lengths[0] = cell_lengths.scale * f64::from(buffer[0]);
+                lengths[1] = cell_lengths.scale * f64::from(buffer[1]);
+                lengths[2] = cell_lengths.scale * f64::from(buffer[2]);
             }
             DataType::F64 => {
                 let buffer = self
                     .file_reader
                     .read_record_f64("cell_lengths", self.index)
                     .map_err(|e| CError::GenericError(e.to_string()))?;
-                lengths[0] = buffer[0];
-                lengths[1] = buffer[1];
-                lengths[2] = buffer[2];
+                lengths[0] = cell_lengths.scale * buffer[0];
+                lengths[1] = cell_lengths.scale * buffer[1];
+                lengths[2] = cell_lengths.scale * buffer[2];
             }
         };
 
         let mut angles = [0.0; 3];
+        let cell_angles = self
+            .variables
+            .cell_angles
+            .as_ref()
+            .expect("we just checked for None");
         match self
             .variables
             .cell_angles
@@ -242,18 +277,18 @@ impl AMBERTrajFormat {
                     .read_record_f32("cell_angles", self.index)
                     .map_err(|e| CError::GenericError(e.to_string()))?;
 
-                angles[0] = f64::from(buffer[0]);
-                angles[1] = f64::from(buffer[1]);
-                angles[2] = f64::from(buffer[2]);
+                angles[0] = cell_angles.scale * f64::from(buffer[0]);
+                angles[1] = cell_angles.scale * f64::from(buffer[1]);
+                angles[2] = cell_angles.scale * f64::from(buffer[2]);
             }
             DataType::F64 => {
                 let buffer = self
                     .file_reader
                     .read_record_f64("cell_angles", self.index)
                     .map_err(|e| CError::GenericError(e.to_string()))?;
-                angles[0] = buffer[0];
-                angles[1] = buffer[1];
-                angles[2] = buffer[2];
+                angles[0] = cell_angles.scale * buffer[0];
+                angles[1] = cell_angles.scale * buffer[1];
+                angles[2] = cell_angles.scale * buffer[2];
             }
         };
 
@@ -285,7 +320,7 @@ impl AMBERTrajFormat {
         let coordinates = if let Some(coordinates) = file_reader.data_set().get_var("coordinates") {
             let mut coords = Some(VariableWithScale {
                 var: coordinates.clone(),
-                scale: 1.0,
+                scale: scale_factor(&coordinates)?,
             });
             if let Some(units) = coordinates.get_attr_as_string("units") {
                 coords.as_mut().expect("we just init'ed").scale *=
@@ -302,7 +337,7 @@ impl AMBERTrajFormat {
         let velocities = if let Some(velocities) = file_reader.data_set().get_var("velocities") {
             let mut velo = Some(VariableWithScale {
                 var: velocities.clone(),
-                scale: 1.0,
+                scale: scale_factor(&velocities)?,
             });
             if let Some(units) = velocities.get_attr_as_string("units") {
                 velo.as_mut().expect("we just init'ed").scale *= scale_for_velocity(units.as_str());
@@ -324,7 +359,7 @@ impl AMBERTrajFormat {
         {
             cell_lengths = Some(VariableWithScale {
                 var: read_cell_lengths.clone(),
-                scale: 1.0,
+                scale: scale_factor(&read_cell_lengths)?,
             });
             if let Some(units) = read_cell_lengths.get_attr_as_string("units") {
                 cell_lengths.as_mut().expect("we just init'ed it").scale *=
@@ -335,7 +370,7 @@ impl AMBERTrajFormat {
 
             cell_angles = Some(VariableWithScale {
                 var: read_cell_angles.clone(),
-                scale: 1.0,
+                scale: scale_factor(&read_cell_angles)?,
             });
             if let Some(units) = read_cell_angles.get_attr_as_string("units") {
                 let scaling_factor = match units.to_lowercase().as_str() {
@@ -366,7 +401,7 @@ impl AMBERTrajFormat {
         let time = if let Some(time) = file_reader.data_set().get_var("time") {
             let mut t = Some(VariableWithScale {
                 var: time.clone(),
-                scale: 1.0,
+                scale: scale_factor(&time)?,
             });
             if let Some(units) = time.get_attr_as_string("units") {
                 t.as_mut().expect("we just init'ed").scale *= scale_for_time(units.as_str());
@@ -394,7 +429,6 @@ impl AMBERTrajFormat {
             cell_angles,
             time,
         };
-        // dbg!(&variables);
         let format = AMBERTrajFormat {
             file_reader,
             index: 0,
@@ -435,7 +469,6 @@ impl AMBERTrajFormat {
         }
 
         frame.resize(self.n_atoms)?;
-
         if let Some(coordinates) = self.variables.coordinates.as_ref() {
             read_array(
                 &mut self.file_reader,
@@ -446,6 +479,7 @@ impl AMBERTrajFormat {
         }
 
         if let Some(velocities) = self.variables.velocities.as_ref() {
+            frame.velocities = Some(Vec::with_capacity(self.n_atoms));
             read_array(
                 &mut self.file_reader,
                 self.index,
@@ -513,7 +547,10 @@ mod tests {
 
     use assert_approx_eq::assert_approx_eq;
 
-    use crate::trajectory::Trajectory;
+    use crate::{
+        trajectory::Trajectory,
+        unit_cell::{CellShape, UnitCell},
+    };
 
     #[test]
     fn read_files_in_netcdf_format() {
@@ -581,5 +618,36 @@ mod tests {
             frame.properties.get("time").unwrap().as_double().unwrap(),
             3.01
         );
+    }
+
+    #[test]
+    fn no_cell() {
+        let path = Path::new("./src/tests-data/netcdf/no-cell.nc");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        let frame = trajectory.read().unwrap().unwrap();
+
+        assert_eq!(frame.size(), 1989);
+        assert_eq!(
+            frame.properties.get("name").unwrap().as_string().unwrap(),
+            "Cpptraj Generated trajectory"
+        );
+        assert_eq!(*frame.cell(), UnitCell::new());
+    }
+
+    #[test]
+    fn scale_factor() {
+        let path = Path::new("./src/tests-data/netcdf/scaled_traj.nc");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        assert_eq!(trajectory.size, 26);
+
+        let frame = trajectory.read_at(12).unwrap().unwrap();
+        assert_eq!(frame.size(), 1938);
+        assert_eq!(frame.properties.get("name"), None);
+
+        let cell = frame.cell();
+        assert_eq!(cell.shape, CellShape::Orthorhombic);
+        assert_approx_eq!(cell.lengths()[0], 1.765 * 60.9682, 1e-4);
+        assert_approx_eq!(cell.lengths()[1], 1.765 * 60.9682, 1e-4);
+        assert_approx_eq!(cell.lengths()[2], 1.765 * 0.0, 1e-4);
     }
 }
