@@ -563,5 +563,23 @@ mod tests {
             frame.properties.get("time").unwrap().as_double().unwrap(),
             2.04
         );
+
+        while let Some(next_frame) = trajectory.read().unwrap() {
+            frame = next_frame;
+        }
+
+        let positions = frame.positions();
+        assert_approx_eq!(positions[0][0], 0.3185586, 1e-4);
+        assert_approx_eq!(positions[0][1], 8.776042, 1e-4);
+        assert_approx_eq!(positions[0][2], 11.8927, 1e-4);
+
+        assert_approx_eq!(positions[296][0], 7.089802, 1e-4);
+        assert_approx_eq!(positions[296][1], 10.35007, 1e-4);
+        assert_approx_eq!(positions[296][2], 12.8159, 1e-4);
+
+        assert_approx_eq!(
+            frame.properties.get("time").unwrap().as_double().unwrap(),
+            3.01
+        );
     }
 }
