@@ -61,12 +61,6 @@ impl Trajectory {
     pub fn open_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryReader, CError> {
         let kind = format.resolve(path)?;
 
-        if kind == FormatKind::AMBER {
-            return Err(CError::UnsupportedFileFormat(
-                "AMBER is not implemented yet".to_string(),
-            ));
-        }
-
         let strategy = TextReader::open(path, kind)?;
         let size = strategy.len();
 
@@ -95,12 +89,6 @@ impl Trajectory {
     /// fails to initialize.
     pub fn create_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryWriter, CError> {
         let kind = format.resolve(path)?;
-
-        if kind == FormatKind::AMBER {
-            return Err(CError::UnsupportedFileFormat(
-                "AMBER is not implemented yet".to_string(),
-            ));
-        }
 
         let strategy = TextWriter::create(path, kind)?;
 
