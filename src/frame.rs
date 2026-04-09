@@ -80,6 +80,10 @@ impl Frame {
         &self.positions
     }
 
+    pub fn positions_mut(&mut self) -> &mut Vec<[f64; 3]> {
+        &mut self.positions
+    }
+
     pub fn add_atom(&mut self, atom: Atom, position: [f64; 3]) {
         self.topology.atoms.push(atom);
         self.positions.push(position);

@@ -147,6 +147,7 @@ mod matrix {
     /// Returns an error if the lengths or angles are invalid
     pub fn cell_matrix_from_lengths_angles(
         lengths: Vec3D,
+        // TODO: probably this shouldn't be mut
         angles: &mut Vec3D,
     ) -> Result<Matrix3<f64>, CError> {
         validation::check_lengths(&lengths)?;

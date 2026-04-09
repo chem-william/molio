@@ -5,6 +5,7 @@
 // See LICENSE at the project root for full text.
 
 use crate::error::CError;
+use crate::formats::amber::AMBERTrajFormat;
 use crate::formats::pdb::PDBFormat;
 use crate::formats::sdf::SDFFormat;
 use crate::formats::smi::SMIFormat;
@@ -28,6 +29,8 @@ pub enum FormatKind {
     SMI,
     /// SDF file format.
     SDF,
+    /// AMBER NetCDF binary format.
+    AMBER,
     /// Automatically detect format from file extension.
     Guess,
 }
@@ -49,6 +52,7 @@ impl FormatKind {
             "pdb" => Ok(Self::PDB),
             "smi" => Ok(Self::SMI),
             "sdf" => Ok(Self::SDF),
+            "ncrst" | "nc" => Ok(Self::AMBER),
             _ => Err(CError::UnknownFormat(ext.to_string())),
         }
     }
@@ -124,6 +128,9 @@ impl CodecImpl {
             FormatKind::PDB => Ok(Self::Pdb(PDBFormat::new())),
             FormatKind::SMI => Ok(Self::Smi(SMIFormat::default())),
             FormatKind::SDF => Ok(Self::Sdf(SDFFormat)),
+            FormatKind::AMBER => {
+                unreachable!("AMBER uses its own binary reader, not CodecImpl")
+            }
             FormatKind::Guess => {
                 unreachable!("Guess should be handled before reaching CodecImpl")
             }
@@ -162,7 +169,7 @@ pub(crate) struct TextReader {
 impl TextReader {
     pub(crate) fn open(path: &Path, kind: FormatKind) -> Result<Self, CError> {
         let codec = CodecImpl::from_kind(kind)?;
-        let mut reader = BufReader::new(File::open(path)?);
+        let mut reader = BufReader::with_capacity(64 * 1024, File::open(path)?);
 
         let mut frame_positions = vec![0];
         while let Some(pos) = codec.forward(&mut reader)? {
@@ -220,5 +227,57 @@ impl TextWriter {
         self.codec.finalize(&mut self.writer)?;
         self.writer.flush()?;
         Ok(())
+    }
+}
+
+/// Strategy enum dispatching reads to either text or binary format backends.
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum ReaderStrategy {
+    Text(TextReader),
+    Binary(AMBERTrajFormat),
+}
+
+impl ReaderStrategy {
+    pub(crate) fn read(&mut self) -> Result<Frame, CError> {
+        match self {
+            Self::Text(t) => t.read(),
+            Self::Binary(b) => b.read(),
+        }
+    }
+
+    pub(crate) fn read_at(&mut self, index: usize) -> Result<Frame, CError> {
+        match self {
+            Self::Text(t) => t.read_at(index),
+            Self::Binary(b) => b.read_at(index),
+        }
+    }
+
+    pub(crate) fn len(&self) -> Result<usize, CError> {
+        match self {
+            Self::Text(t) => Ok(t.len()),
+            Self::Binary(b) => b.len(),
+        }
+    }
+}
+
+/// Strategy enum dispatching writes to either text or binary format backends.
+pub(crate) enum WriterStrategy {
+    Text(TextWriter),
+    Binary(AMBERTrajFormat),
+}
+
+impl WriterStrategy {
+    pub(crate) fn write(&mut self, frame: &Frame) -> Result<(), CError> {
+        match self {
+            Self::Text(t) => t.write(frame),
+            Self::Binary(b) => b.write(frame),
+        }
+    }
+
+    pub(crate) fn finish(&mut self) -> Result<(), CError> {
+        match self {
+            Self::Text(t) => t.finish(),
+            Self::Binary(b) => b.finish(),
+        }
     }
 }

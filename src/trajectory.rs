@@ -5,7 +5,8 @@
 // See LICENSE at the project root for full text.
 
 use crate::error::CError;
-use crate::format::{FormatKind, TextReader, TextWriter};
+use crate::format::{FormatKind, ReaderStrategy, TextReader, TextWriter, WriterStrategy};
+use crate::formats::amber::AMBERTrajFormat;
 use crate::frame::Frame;
 use log::error;
 use std::path::Path;
@@ -13,13 +14,13 @@ use std::path::Path;
 /// A handle to a trajectory file for reading.
 pub struct TrajectoryReader {
     pub size: usize,
-    strategy: TextReader,
+    strategy: ReaderStrategy,
     current_index: usize,
 }
 
 /// A handle to a trajectory file for writing.
 pub struct TrajectoryWriter {
-    strategy: TextWriter,
+    strategy: WriterStrategy,
     frame_count: usize,
 }
 
@@ -61,14 +62,12 @@ impl Trajectory {
     pub fn open_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryReader, CError> {
         let kind = format.resolve(path)?;
 
-        if kind == FormatKind::AMBER {
-            return Err(CError::UnsupportedFileFormat(
-                "AMBER is not implemented yet".to_string(),
-            ));
-        }
-
-        let strategy = TextReader::open(path, kind)?;
-        let size = strategy.len();
+        let strategy = if kind == FormatKind::AMBER {
+            ReaderStrategy::Binary(AMBERTrajFormat::open(path)?)
+        } else {
+            ReaderStrategy::Text(TextReader::open(path, kind)?)
+        };
+        let size = strategy.len()?;
 
         Ok(TrajectoryReader {
             size,
@@ -96,13 +95,11 @@ impl Trajectory {
     pub fn create_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryWriter, CError> {
         let kind = format.resolve(path)?;
 
-        if kind == FormatKind::AMBER {
-            return Err(CError::UnsupportedFileFormat(
-                "AMBER is not implemented yet".to_string(),
-            ));
-        }
-
-        let strategy = TextWriter::create(path, kind)?;
+        let strategy = if kind == FormatKind::AMBER {
+            WriterStrategy::Binary(AMBERTrajFormat::create(path)?)
+        } else {
+            WriterStrategy::Text(TextWriter::create(path, kind)?)
+        };
 
         Ok(TrajectoryWriter {
             strategy,
