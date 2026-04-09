@@ -465,14 +465,14 @@ impl AMBERTrajFormat {
                 DataType::F32 => {
                     let value = self
                         .file_reader
-                        .read_record_f32("time", 0)
+                        .read_record_f32("time", self.index)
                         .map_err(|e| CError::GenericError(e.to_string()))?;
                     time_value = time.scale * f64::from(value[0]);
                 }
                 DataType::F64 => {
                     let value = self
                         .file_reader
-                        .read_record_f64("time", 0)
+                        .read_record_f64("time", self.index)
                         .map_err(|e| CError::GenericError(e.to_string()))?;
                     time_value = time.scale * value[0];
                 }
@@ -537,6 +537,31 @@ mod tests {
         assert_approx_eq!(
             frame.properties.get("time").unwrap().as_double().unwrap(),
             2.02
+        );
+    }
+
+    #[test]
+    fn read_more_than_one_frame() {
+        let path = Path::new("./src/tests-data/netcdf/water.nc");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        let mut frame = trajectory.read().unwrap().unwrap();
+        frame = trajectory.read().unwrap().unwrap();
+        frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 297);
+        assert_eq!(frame.properties.get("name"), None);
+
+        let positions = frame.positions();
+        assert_approx_eq!(positions[0][0], 0.2990952, 1e-4);
+        assert_approx_eq!(positions[0][1], 8.31003, 1e-4);
+        assert_approx_eq!(positions[0][2], 11.72146, 1e-4);
+
+        assert_approx_eq!(positions[296][0], 6.797599, 1e-4);
+        assert_approx_eq!(positions[296][1], 11.50882, 1e-4);
+        assert_approx_eq!(positions[296][2], 12.70423, 1e-4);
+
+        assert_approx_eq!(
+            frame.properties.get("time").unwrap().as_double().unwrap(),
+            2.04
         );
     }
 }
