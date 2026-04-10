@@ -5,8 +5,9 @@
 // See LICENSE at the project root for full text.
 
 use crate::error::CError;
-use crate::format::{FormatKind, ReaderStrategy, TextReader, TextWriter, WriterStrategy};
-use crate::formats::amber::AMBERTrajFormat;
+use crate::format::{
+    BinaryReader, BinaryWriter, FormatKind, ReaderStrategy, TextReader, TextWriter, WriterStrategy,
+};
 use crate::frame::Frame;
 use log::error;
 use std::path::Path;
@@ -64,8 +65,8 @@ impl Trajectory {
     pub fn open_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryReader, CError> {
         let kind = format.resolve(path)?;
 
-        let strategy = if kind == FormatKind::AMBER {
-            ReaderStrategy::Binary(AMBERTrajFormat::open(path)?)
+        let strategy = if kind.is_binary() {
+            ReaderStrategy::Binary(BinaryReader::open(path, kind)?)
         } else {
             ReaderStrategy::Text(TextReader::open(path, kind)?)
         };
@@ -97,8 +98,8 @@ impl Trajectory {
     pub fn create_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryWriter, CError> {
         let kind = format.resolve(path)?;
 
-        let strategy = if kind == FormatKind::AMBER {
-            WriterStrategy::Binary(AMBERTrajFormat::create(path)?)
+        let strategy = if kind.is_binary() {
+            WriterStrategy::Binary(BinaryWriter::create(path, kind)?)
         } else {
             WriterStrategy::Text(TextWriter::create(path, kind)?)
         };

@@ -63,6 +63,10 @@ impl FormatKind {
             kind => Ok(kind),
         }
     }
+
+    pub(crate) fn is_binary(self) -> bool {
+        matches!(self, Self::AMBER)
+    }
 }
 
 /// Low-level codec trait for text-based formats.
@@ -230,11 +234,108 @@ impl TextWriter {
     }
 }
 
+// Dispatches a method call across all variants of the binary codec enum.
+macro_rules! binary_dispatch {
+    ($self:expr, $method:ident $(, $arg:expr)*) => {
+        match $self {
+            BinaryCodecImpl::Amber(inner) => inner.$method($($arg),*),
+        }
+    };
+}
+
+/// Enum wrapping binary-based codecs. Each variant owns its own I/O state,
+/// unlike text codecs which share a common `BufReader`/`BufWriter`.
+pub(crate) enum BinaryCodecImpl {
+    Amber(AMBERTrajFormat),
+}
+
+impl BinaryCodecImpl {
+    pub(crate) fn open(path: &Path, kind: FormatKind) -> Result<Self, CError> {
+        match kind {
+            FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::open(path)?)),
+            _ => unreachable!("only binary formats should reach BinaryCodecImpl::open"),
+        }
+    }
+
+    pub(crate) fn create(path: &Path, kind: FormatKind) -> Result<Self, CError> {
+        match kind {
+            FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::create(path)?)),
+            _ => unreachable!("only binary formats should reach BinaryCodecImpl::create"),
+        }
+    }
+
+    pub(crate) fn read(&mut self) -> Result<Frame, CError> {
+        binary_dispatch!(self, read)
+    }
+
+    pub(crate) fn read_at(&mut self, index: usize) -> Result<Frame, CError> {
+        binary_dispatch!(self, read_at, index)
+    }
+
+    pub(crate) fn len(&self) -> Result<usize, CError> {
+        binary_dispatch!(self, len)
+    }
+
+    pub(crate) fn write(&mut self, frame: &Frame) -> Result<(), CError> {
+        binary_dispatch!(self, write, frame)
+    }
+
+    pub(crate) fn finish(&mut self) -> Result<(), CError> {
+        binary_dispatch!(self, finish)
+    }
+}
+
+/// Binary-format reader. Mirrors [`TextReader`] for symmetry.
+pub(crate) struct BinaryReader {
+    codec: BinaryCodecImpl,
+}
+
+impl BinaryReader {
+    pub(crate) fn open(path: &Path, kind: FormatKind) -> Result<Self, CError> {
+        Ok(Self {
+            codec: BinaryCodecImpl::open(path, kind)?,
+        })
+    }
+
+    pub(crate) fn read(&mut self) -> Result<Frame, CError> {
+        self.codec.read()
+    }
+
+    pub(crate) fn read_at(&mut self, index: usize) -> Result<Frame, CError> {
+        self.codec.read_at(index)
+    }
+
+    pub(crate) fn len(&self) -> Result<usize, CError> {
+        self.codec.len()
+    }
+}
+
+/// Binary-format writer. Mirrors [`TextWriter`] for symmetry.
+pub(crate) struct BinaryWriter {
+    codec: BinaryCodecImpl,
+}
+
+impl BinaryWriter {
+    pub(crate) fn create(path: &Path, kind: FormatKind) -> Result<Self, CError> {
+        Ok(Self {
+            codec: BinaryCodecImpl::create(path, kind)?,
+        })
+    }
+
+    pub(crate) fn write(&mut self, frame: &Frame) -> Result<(), CError> {
+        self.codec.write(frame)
+    }
+
+    pub(crate) fn finish(&mut self) -> Result<(), CError> {
+        self.codec.finish()
+    }
+}
+
 /// Strategy enum dispatching reads to either text or binary format backends.
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum ReaderStrategy {
     Text(TextReader),
-    Binary(AMBERTrajFormat),
+    Binary(BinaryReader),
 }
 
 impl ReaderStrategy {
@@ -263,7 +364,7 @@ impl ReaderStrategy {
 /// Strategy enum dispatching writes to either text or binary format backends.
 pub(crate) enum WriterStrategy {
     Text(TextWriter),
-    Binary(AMBERTrajFormat),
+    Binary(BinaryWriter),
 }
 
 impl WriterStrategy {
