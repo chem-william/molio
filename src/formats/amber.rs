@@ -15,7 +15,7 @@ struct VariableWithScale {
     var: Variable,
     scale: f64,
 }
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Variables {
     coordinates: Option<VariableWithScale>,
     velocities: Option<VariableWithScale>,
@@ -26,9 +26,10 @@ struct Variables {
 
 /// AMBER does not use the text codec traits. It is a dedicated binary
 /// format entry point with its own owned state.
-#[derive(Debug)]
-pub struct AMBERTrajFormat {
-    file_reader: FileReader,
+#[derive(Debug, Default)]
+pub struct AMBERTrajFormat<'a> {
+    reader: Option<FileReader>,
+    writer: Option<FileWriter<'a>>,
     index: usize,
     file_title: String,
     variables: Variables,
@@ -48,9 +49,7 @@ fn read_array(
             ));
         }
         DataType::F32 => {
-            let buffer = file_reader
-                .read_record_f32(variable.var.name(), index)
-                .map_err(|e| CError::GenericError(e.to_string()))?;
+            let buffer = file_reader.read_record_f32(variable.var.name(), index)?;
             for (idx, item) in array.iter_mut().enumerate() {
                 item[0] = variable.scale * f64::from(buffer[3 * idx + 0]);
                 item[1] = variable.scale * f64::from(buffer[3 * idx + 1]);
@@ -58,9 +57,7 @@ fn read_array(
             }
         }
         DataType::F64 => {
-            let buffer = file_reader
-                .read_record_f64(variable.var.name(), index)
-                .map_err(|e| CError::GenericError(e.to_string()))?;
+            let buffer = file_reader.read_record_f64(variable.var.name(), index)?;
             for (idx, item) in array.iter_mut().enumerate() {
                 item[0] = variable.scale * buffer[3 * idx + 0];
                 item[1] = variable.scale * buffer[3 * idx + 1];
@@ -210,7 +207,7 @@ fn scale_factor(variable: &Variable) -> Result<f64, CError> {
     Ok(1.0)
 }
 
-impl AMBERTrajFormat {
+impl<'a> AMBERTrajFormat<'a> {
     fn not_implemented() -> CError {
         CError::UnsupportedFileFormat("AMBER is not implemented yet".to_string())
     }
@@ -218,41 +215,25 @@ impl AMBERTrajFormat {
     fn initialize(&mut self, frame: &Frame, convention: &str) -> Result<(), CError> {
         let data_set: DataSet = {
             let mut data_set: DataSet = DataSet::new();
-            data_set.add_global_attr_string("Conventions", convention);
-            data_set.add_global_attr_string("ConventionVersion", "1.0");
-            data_set.add_global_attr_string("program", "molio");
-            data_set.add_global_attr_string("programVersion", env!("CARGO_PKG_VERSION"));
+            data_set.add_global_attr_string("Conventions", convention)?;
+            data_set.add_global_attr_string("ConventionVersion", "1.0")?;
+            data_set.add_global_attr_string("program", "molio")?;
+            data_set.add_global_attr_string("programVersion", env!("CARGO_PKG_VERSION"))?;
 
             if !self.file_title.is_empty() {
-                data_set.add_global_attr_string("title", self.file_title.as_str());
+                data_set.add_global_attr_string("title", self.file_title.as_str())?;
             }
 
-            data_set
-                .add_fixed_dim("spatial", 3)
-                .map_err(|e| CError::GenericError(e.to_string()))?;
-            data_set
-                .add_fixed_dim("atom", self.n_atoms)
-                .map_err(|e| CError::GenericError(e.to_string()))?;
+            data_set.add_fixed_dim("spatial", 3)?;
+            data_set.add_fixed_dim("atom", self.n_atoms)?;
 
-            data_set
-                .add_fixed_dim("cell_spatial", 3)
-                .map_err(|e| CError::GenericError(e.to_string()))?;
-            data_set
-                .add_fixed_dim("cell_angular", 3)
-                .map_err(|e| CError::GenericError(e.to_string()))?;
-            data_set
-                .add_fixed_dim("label", 5)
-                .map_err(|e| CError::GenericError(e.to_string()))?;
+            data_set.add_fixed_dim("cell_spatial", 3)?;
+            data_set.add_fixed_dim("cell_angular", 3)?;
+            data_set.add_fixed_dim("label", 5)?;
 
-            data_set
-                .add_var_u8("spatial", &["spatial"])
-                .map_err(|e| CError::GenericError(e.to_string()))?;
-            data_set
-                .add_var_u8("cell_spatial", &["cell_spatial"])
-                .map_err(|e| CError::GenericError(e.to_string()))?;
-            data_set
-                .add_var_u8("cell_angular", &["cell_angular", "label"])
-                .map_err(|e| CError::GenericError(e.to_string()))?;
+            data_set.add_var_u8("spatial", &["spatial"])?;
+            data_set.add_var_u8("cell_spatial", &["cell_spatial"])?;
+            data_set.add_var_u8("cell_angular", &["cell_angular", "label"])?;
 
             data_set
         };
@@ -264,6 +245,10 @@ impl AMBERTrajFormat {
         if self.variables.cell_lengths.is_none() || self.variables.cell_angles.is_none() {
             return Ok(None);
         };
+        let reader = self
+            .reader
+            .as_mut()
+            .expect("reader should've been initialized");
 
         let mut lengths = [0.0; 3];
         let cell_lengths = self
@@ -281,20 +266,14 @@ impl AMBERTrajFormat {
         {
             DataType::I8 | DataType::U8 | DataType::I16 | DataType::I32 => unreachable!(),
             DataType::F32 => {
-                let buffer = self
-                    .file_reader
-                    .read_record_f32("cell_lengths", self.index)
-                    .map_err(|e| CError::GenericError(e.to_string()))?;
+                let buffer = reader.read_record_f32("cell_lengths", self.index)?;
 
                 lengths[0] = cell_lengths.scale * f64::from(buffer[0]);
                 lengths[1] = cell_lengths.scale * f64::from(buffer[1]);
                 lengths[2] = cell_lengths.scale * f64::from(buffer[2]);
             }
             DataType::F64 => {
-                let buffer = self
-                    .file_reader
-                    .read_record_f64("cell_lengths", self.index)
-                    .map_err(|e| CError::GenericError(e.to_string()))?;
+                let buffer = reader.read_record_f64("cell_lengths", self.index)?;
                 lengths[0] = cell_lengths.scale * buffer[0];
                 lengths[1] = cell_lengths.scale * buffer[1];
                 lengths[2] = cell_lengths.scale * buffer[2];
@@ -317,20 +296,14 @@ impl AMBERTrajFormat {
         {
             DataType::I8 | DataType::U8 | DataType::I16 | DataType::I32 => unreachable!(),
             DataType::F32 => {
-                let buffer = self
-                    .file_reader
-                    .read_record_f32("cell_angles", self.index)
-                    .map_err(|e| CError::GenericError(e.to_string()))?;
+                let buffer = reader.read_record_f32("cell_angles", self.index)?;
 
                 angles[0] = cell_angles.scale * f64::from(buffer[0]);
                 angles[1] = cell_angles.scale * f64::from(buffer[1]);
                 angles[2] = cell_angles.scale * f64::from(buffer[2]);
             }
             DataType::F64 => {
-                let buffer = self
-                    .file_reader
-                    .read_record_f64("cell_angles", self.index)
-                    .map_err(|e| CError::GenericError(e.to_string()))?;
+                let buffer = reader.read_record_f64("cell_angles", self.index)?;
                 angles[0] = cell_angles.scale * buffer[0];
                 angles[1] = cell_angles.scale * buffer[1];
                 angles[2] = cell_angles.scale * buffer[2];
@@ -475,7 +448,8 @@ impl AMBERTrajFormat {
             time,
         };
         let format = AMBERTrajFormat {
-            file_reader,
+            reader: Some(file_reader),
+            writer: None,
             index: 0,
             file_title,
             variables,
@@ -487,8 +461,14 @@ impl AMBERTrajFormat {
         Ok(format)
     }
 
-    pub fn create(_path: &Path) -> Result<Self, CError> {
-        Err(Self::not_implemented())
+    pub fn create(path: &Path) -> Result<Self, CError> {
+        let writer = FileWriter::open(path)?;
+
+        Ok(Self {
+            reader: None,
+            writer: Some(writer),
+            ..Default::default()
+        })
     }
 
     pub fn read(&mut self) -> Result<Frame, CError> {
@@ -514,19 +494,19 @@ impl AMBERTrajFormat {
         }
 
         frame.resize(self.n_atoms)?;
+
+        let reader = self
+            .reader
+            .as_mut()
+            .expect("reader should've been initialized");
         if let Some(coordinates) = self.variables.coordinates.as_ref() {
-            read_array(
-                &mut self.file_reader,
-                self.index,
-                &coordinates,
-                frame.positions_mut(),
-            )?;
+            read_array(reader, self.index, &coordinates, frame.positions_mut())?;
         }
 
         if let Some(velocities) = self.variables.velocities.as_ref() {
             frame.velocities = Some(vec![[0.0; 3]; self.n_atoms]);
             read_array(
-                &mut self.file_reader,
+                reader,
                 self.index,
                 &velocities,
                 frame.velocities_mut().expect("just resized velocities"),
@@ -542,17 +522,11 @@ impl AMBERTrajFormat {
                     ));
                 }
                 DataType::F32 => {
-                    let value = self
-                        .file_reader
-                        .read_record_f32("time", self.index)
-                        .map_err(|e| CError::GenericError(e.to_string()))?;
+                    let value = reader.read_record_f32("time", self.index)?;
                     time_value = time.scale * f64::from(value[0]);
                 }
                 DataType::F64 => {
-                    let value = self
-                        .file_reader
-                        .read_record_f64("time", self.index)
-                        .map_err(|e| CError::GenericError(e.to_string()))?;
+                    let value = reader.read_record_f64("time", self.index)?;
                     time_value = time.scale * value[0];
                 }
             }
@@ -565,7 +539,9 @@ impl AMBERTrajFormat {
     }
 
     pub fn len(&self) -> Result<usize, CError> {
-        self.file_reader
+        self.reader
+            .as_ref()
+            .expect("we should have init reader")
             .data_set()
             .num_records()
             .ok_or(CError::GenericError(

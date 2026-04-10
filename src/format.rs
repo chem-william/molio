@@ -186,15 +186,15 @@ macro_rules! format_dispatch {
 /// Format reader — one variant per supported format.
 /// Text formats are wrapped in [`TextReader`], binary formats appear directly.
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum FormatReader {
+pub(crate) enum FormatReader<'a> {
     Xyz(TextReader<XYZFormat>),
     Pdb(TextReader<PDBFormat>),
     Smi(TextReader<SMIFormat>),
     Sdf(TextReader<SDFFormat>),
-    Amber(AMBERTrajFormat),
+    Amber(AMBERTrajFormat<'a>),
 }
 
-impl FormatReader {
+impl<'a> FormatReader<'a> {
     pub(crate) fn open(path: &Path, kind: FormatKind) -> Result<Self, CError> {
         match kind {
             FormatKind::XYZ => Ok(Self::Xyz(TextReader::open(path, XYZFormat)?)),
@@ -202,7 +202,9 @@ impl FormatReader {
             FormatKind::SMI => Ok(Self::Smi(TextReader::open(path, SMIFormat::default())?)),
             FormatKind::SDF => Ok(Self::Sdf(TextReader::open(path, SDFFormat)?)),
             FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::open(path)?)),
-            FormatKind::Guess => unreachable!("Guess should be resolved before reaching FormatReader"),
+            FormatKind::Guess => {
+                unreachable!("Guess should be resolved before reaching FormatReader")
+            }
         }
     }
 
@@ -221,15 +223,15 @@ impl FormatReader {
 
 /// Format writer — one variant per supported format.
 /// Text formats are wrapped in [`TextWriter`], binary formats appear directly.
-pub(crate) enum FormatWriter {
+pub(crate) enum FormatWriter<'a> {
     Xyz(TextWriter<XYZFormat>),
     Pdb(TextWriter<PDBFormat>),
     Smi(TextWriter<SMIFormat>),
     Sdf(TextWriter<SDFFormat>),
-    Amber(AMBERTrajFormat),
+    Amber(AMBERTrajFormat<'a>),
 }
 
-impl FormatWriter {
+impl<'a> FormatWriter<'a> {
     pub(crate) fn create(path: &Path, kind: FormatKind) -> Result<Self, CError> {
         match kind {
             FormatKind::XYZ => Ok(Self::Xyz(TextWriter::create(path, XYZFormat)?)),
@@ -237,7 +239,9 @@ impl FormatWriter {
             FormatKind::SMI => Ok(Self::Smi(TextWriter::create(path, SMIFormat::default())?)),
             FormatKind::SDF => Ok(Self::Sdf(TextWriter::create(path, SDFFormat)?)),
             FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::create(path)?)),
-            FormatKind::Guess => unreachable!("Guess should be resolved before reaching FormatWriter"),
+            FormatKind::Guess => {
+                unreachable!("Guess should be resolved before reaching FormatWriter")
+            }
         }
     }
 
