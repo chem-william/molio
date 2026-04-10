@@ -5,9 +5,7 @@
 // See LICENSE at the project root for full text.
 
 use crate::error::CError;
-use crate::format::{
-    BinaryReader, BinaryWriter, FormatKind, ReaderStrategy, TextReader, TextWriter, WriterStrategy,
-};
+use crate::format::{FormatKind, FormatReader, FormatWriter};
 use crate::frame::Frame;
 use log::error;
 use std::path::Path;
@@ -17,13 +15,13 @@ pub struct TrajectoryReader {
     /// Number of frames in the file
     pub size: usize,
 
-    strategy: ReaderStrategy,
+    strategy: FormatReader,
     current_index: usize,
 }
 
 /// A handle to a trajectory file for writing.
 pub struct TrajectoryWriter {
-    strategy: WriterStrategy,
+    strategy: FormatWriter,
     frame_count: usize,
 }
 
@@ -65,11 +63,7 @@ impl Trajectory {
     pub fn open_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryReader, CError> {
         let kind = format.resolve(path)?;
 
-        let strategy = if kind.is_binary() {
-            ReaderStrategy::Binary(BinaryReader::open(path, kind)?)
-        } else {
-            ReaderStrategy::Text(TextReader::open(path, kind)?)
-        };
+        let strategy = FormatReader::open(path, kind)?;
         let size = strategy.len()?;
 
         Ok(TrajectoryReader {
@@ -98,11 +92,7 @@ impl Trajectory {
     pub fn create_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryWriter, CError> {
         let kind = format.resolve(path)?;
 
-        let strategy = if kind.is_binary() {
-            WriterStrategy::Binary(BinaryWriter::create(path, kind)?)
-        } else {
-            WriterStrategy::Text(TextWriter::create(path, kind)?)
-        };
+        let strategy = FormatWriter::create(path, kind)?;
 
         Ok(TrajectoryWriter {
             strategy,
