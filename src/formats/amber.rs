@@ -7,7 +7,7 @@
 use crate::{error::CError, frame::Frame, property::Property, unit_cell::UnitCell};
 use core::f64;
 use log::{debug, warn};
-use netcdf3::{DataSet, DataType, FileReader, Variable};
+use netcdf3::{DataSet, DataType, FileReader, FileWriter, Variable};
 use std::path::Path;
 
 #[derive(Debug)]
@@ -213,6 +213,51 @@ fn scale_factor(variable: &Variable) -> Result<f64, CError> {
 impl AMBERTrajFormat {
     fn not_implemented() -> CError {
         CError::UnsupportedFileFormat("AMBER is not implemented yet".to_string())
+    }
+
+    fn initialize(&mut self, frame: &Frame, convention: &str) -> Result<(), CError> {
+        let data_set: DataSet = {
+            let mut data_set: DataSet = DataSet::new();
+            data_set.add_global_attr_string("Conventions", convention);
+            data_set.add_global_attr_string("ConventionVersion", "1.0");
+            data_set.add_global_attr_string("program", "molio");
+            data_set.add_global_attr_string("programVersion", env!("CARGO_PKG_VERSION"));
+
+            if !self.file_title.is_empty() {
+                data_set.add_global_attr_string("title", self.file_title.as_str());
+            }
+
+            data_set
+                .add_fixed_dim("spatial", 3)
+                .map_err(|e| CError::GenericError(e.to_string()))?;
+            data_set
+                .add_fixed_dim("atom", self.n_atoms)
+                .map_err(|e| CError::GenericError(e.to_string()))?;
+
+            data_set
+                .add_fixed_dim("cell_spatial", 3)
+                .map_err(|e| CError::GenericError(e.to_string()))?;
+            data_set
+                .add_fixed_dim("cell_angular", 3)
+                .map_err(|e| CError::GenericError(e.to_string()))?;
+            data_set
+                .add_fixed_dim("label", 5)
+                .map_err(|e| CError::GenericError(e.to_string()))?;
+
+            data_set
+                .add_var_u8("spatial", &["spatial"])
+                .map_err(|e| CError::GenericError(e.to_string()))?;
+            data_set
+                .add_var_u8("cell_spatial", &["cell_spatial"])
+                .map_err(|e| CError::GenericError(e.to_string()))?;
+            data_set
+                .add_var_u8("cell_angular", &["cell_angular", "label"])
+                .map_err(|e| CError::GenericError(e.to_string()))?;
+
+            data_set
+        };
+
+        Ok(())
     }
 
     fn read_cell(&mut self) -> Result<Option<UnitCell>, CError> {
@@ -532,8 +577,10 @@ impl AMBERTrajFormat {
         self.len().map(|n| n == 0)
     }
 
-    pub fn write(&mut self, _frame: &Frame) -> Result<(), CError> {
-        Err(Self::not_implemented())
+    pub fn write(&mut self, frame: &Frame) -> Result<(), CError> {
+        self.initialize(frame, "AMBER")?;
+
+        Ok(())
     }
 
     pub fn finish(&mut self) -> Result<(), CError> {
@@ -546,8 +593,10 @@ mod tests {
     use std::path::Path;
 
     use assert_approx_eq::assert_approx_eq;
+    use tempfile::Builder;
 
     use crate::{
+        frame::Frame,
         trajectory::Trajectory,
         unit_cell::{CellShape, UnitCell},
     };
@@ -581,9 +630,9 @@ mod tests {
     fn read_more_than_one_frame() {
         let path = Path::new("./src/tests-data/netcdf/water.nc");
         let mut trajectory = Trajectory::open(path).unwrap();
+        trajectory.read().unwrap().unwrap();
+        trajectory.read().unwrap().unwrap();
         let mut frame = trajectory.read().unwrap().unwrap();
-        frame = trajectory.read().unwrap().unwrap();
-        frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 297);
         assert_eq!(frame.properties.get("name"), None);
 
@@ -666,5 +715,35 @@ mod tests {
         assert_approx_eq!(velocities[1600][0], -0.3342645 * -0.856, 1e-4);
         assert_approx_eq!(velocities[1600][1], 0.322594 * -0.856, 1e-4);
         assert_approx_eq!(velocities[1600][2], -2.446901 * -0.856, 1e-4);
+    }
+
+    #[test]
+    fn write_files_in_netcdf_format() {
+        let mut frame = Frame::from_unitcell(
+            UnitCell::new_from_lengths_angles([2.0, 3.0, 4.0], &mut [80.0, 90.0, 120.0]).unwrap(),
+        );
+        frame.properties.insert(
+            "name".to_string(),
+            crate::property::Property::String("Test Title 123".to_string()),
+        );
+        frame
+            .properties
+            .insert("time".to_string(), crate::property::Property::Double(2.0));
+        for i in 0..4 {
+            frame.add_atom_with_velocity(
+                crate::atom::Atom::new("X".to_string()),
+                [1.0 * i as f64, 2.0 * i as f64, 3.0 * i as f64],
+                [-3.0, -2.0, -1.0],
+            );
+        }
+        let named_tmpfile = Builder::new()
+            .prefix("netcdf-test-write")
+            .suffix(".nc")
+            .tempfile()
+            .unwrap();
+        let mut trajectory = Trajectory::create(named_tmpfile.path()).unwrap();
+        trajectory.write(&frame).unwrap();
+        trajectory.write(&frame).unwrap();
+        drop(trajectory);
     }
 }

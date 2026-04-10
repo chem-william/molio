@@ -42,6 +42,16 @@ impl Frame {
         }
     }
 
+    pub fn from_unitcell(unit_cell: UnitCell) -> Self {
+        Frame {
+            unit_cell,
+            properties: Properties::new(),
+            positions: vec![],
+            velocities: None,
+            topology: Topology::default(),
+        }
+    }
+
     /// Get a const reference to the topology of this frame
     ///
     /// It is not possible to get a modifiable reference to the topology,
@@ -104,6 +114,14 @@ impl Frame {
     pub fn add_atom(&mut self, atom: Atom, position: [f64; 3]) {
         self.topology.atoms.push(atom);
         self.positions.push(position);
+    }
+
+    pub fn add_atom_with_velocity(&mut self, atom: Atom, position: [f64; 3], velocity: [f64; 3]) {
+        self.topology.atoms.push(atom);
+        self.positions.push(position);
+        if let Some(velocities) = self.velocities.as_mut() {
+            velocities.push(velocity);
+        }
     }
 
     /// Remove all connectivity information in the frame's topology
