@@ -91,10 +91,6 @@ impl Frame {
         self.unit_cell = cell;
     }
 
-    pub fn size(&self) -> usize {
-        self.topology.size()
-    }
-
     pub fn positions(&self) -> &Vec<[f64; 3]> {
         &self.positions
     }
@@ -159,6 +155,22 @@ impl Frame {
     /// `j`.
     pub fn add_bond(&mut self, i: usize, j: usize, bond_order: BondOrder) -> Result<(), CError> {
         self.topology.add_bond(i, j, bond_order)
+    }
+
+    pub(crate) fn add_velocities(&mut self) {
+        if self.velocities.is_none() {
+            self.velocities = Some(vec![[0.0; 3]; self.size()]);
+        }
+    }
+
+    pub(crate) fn size(&self) -> usize {
+        debug_assert!(self.positions.len() == self.topology.size());
+
+        if let Some(velocities) = self.velocities.as_ref() {
+            debug_assert!(self.positions.len() == velocities.len())
+        }
+
+        self.positions.len()
     }
 }
 
