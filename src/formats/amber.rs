@@ -311,7 +311,19 @@ impl AMBERTrajFormat {
     }
 
     pub(crate) fn open(path: &Path, mode: FileMode) -> Result<Self, CError> {
-        let mut file_reader = FileReader::open(path).unwrap();
+        // For append mode, if the file is missing or not yet a valid NetCDF-3 file,
+        // treat it the same as creating a new file.
+        let mut file_reader = match FileReader::open(path) {
+            Ok(r) => r,
+            Err(_) if mode == FileMode::Append => {
+                return Ok(Self {
+                    write_path: Some(path.to_path_buf()),
+                    mode,
+                    ..Default::default()
+                });
+            }
+            Err(e) => return Err(CError::GenericError(e.to_string())),
+        };
 
         validate_common(&file_reader, "AMBER")?;
 
@@ -632,7 +644,8 @@ impl AMBERTrajFormat {
             return Ok(());
         }
 
-        if self.mode == FileMode::Append {
+        let existing_count = self.index - self.buffered_frames.len();
+        if self.mode == FileMode::Append && existing_count > 0 {
             self.finish_append(&path)
         } else {
             self.finish_create(&path)
@@ -996,6 +1009,27 @@ mod tests {
 
         {
             let mut trajectory = Trajectory::append(named_tmpfile.path()).unwrap();
+            trajectory.write(&frame).unwrap();
+        }
+
+        let mut trajectory = Trajectory::open(named_tmpfile.path()).unwrap();
+        assert_eq!(trajectory.size, 2);
+        check_frame(&trajectory.read().unwrap().unwrap());
+        check_frame(&trajectory.read().unwrap().unwrap());
+    }
+
+    #[test]
+    fn append_to_new_file() {
+        let frame = generate_frame();
+        let named_tmpfile = Builder::new()
+            .prefix("netcdf-test-append")
+            .suffix(".nc")
+            .tempfile()
+            .unwrap();
+
+        {
+            let mut trajectory = Trajectory::append(named_tmpfile.path()).unwrap();
+            trajectory.write(&frame).unwrap();
             trajectory.write(&frame).unwrap();
         }
 
