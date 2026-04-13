@@ -61,7 +61,6 @@ pub(crate) enum FileMode {
     #[default]
     Read,
     Append,
-    Write,
 }
 
 /// Which AMBER NetCDF flavour the file uses.
@@ -103,7 +102,7 @@ fn read_array(
                 Convention::Restart => file_reader.read_var_f32(name)?,
             };
             for (idx, item) in array.iter_mut().enumerate() {
-                item[0] = variable.scale * f64::from(buffer[3 * idx + 0]);
+                item[0] = variable.scale * f64::from(buffer[3 * idx]);
                 item[1] = variable.scale * f64::from(buffer[3 * idx + 1]);
                 item[2] = variable.scale * f64::from(buffer[3 * idx + 2]);
             }
@@ -114,7 +113,7 @@ fn read_array(
                 Convention::Restart => file_reader.read_var_f64(name)?,
             };
             for (idx, item) in array.iter_mut().enumerate() {
-                item[0] = variable.scale * buffer[3 * idx + 0];
+                item[0] = variable.scale * buffer[3 * idx];
                 item[1] = variable.scale * buffer[3 * idx + 1];
                 item[2] = variable.scale * buffer[3 * idx + 2];
             }
@@ -151,14 +150,13 @@ fn validate_common(file_reader: &FileReader, convention: &str) -> Result<(), CEr
         assert_eq!(
             spatial.size(),
             3,
-            "{}",
-            format!(
-                "'spatial' dimension must have a size of 3, got {}",
-                spatial.size()
-            )
+            "'spatial' dimension must have a size of 3, got {}",
+            spatial.size()
         );
     } else {
-        return Err(CError::GenericError(format!("missing 'spatial' dimension")));
+        return Err(CError::GenericError(
+            "missing 'spatial' dimension".to_string(),
+        ));
     }
 
     file_reader
@@ -170,22 +168,16 @@ fn validate_common(file_reader: &FileReader, convention: &str) -> Result<(), CEr
         assert_eq!(
             cell_spatial.size(),
             3,
-            "{}",
-            format!(
-                "'cell_spatial' dimension must have a size of 3, got {}",
-                cell_spatial.size()
-            )
+            "'cell_spatial' dimension must have a size of 3, got {}",
+            cell_spatial.size()
         );
     };
     if let Some(cell_angular) = file_reader.data_set().get_dim("cell_angular") {
         assert_eq!(
             cell_angular.size(),
             3,
-            "{}",
-            format!(
-                "'cell_angular' dimension must have a size of 3, got {}",
-                cell_angular.size()
-            )
+            "'cell_angular' dimension must have a size of 3, got {}",
+            cell_angular.size()
         );
     };
 
@@ -211,12 +203,12 @@ fn scale_for_velocity(units: &str) -> f64 {
     let lower_case = units.to_lowercase();
 
     let mut splitted = lower_case.split('/');
-    if let Some(scale) = splitted.next() {
-        if let Some(time_unit) = splitted.next().as_mut() {
-            let scale = scale_for_distance(scale);
-            let time_unit = scale_for_time(*time_unit);
-            return scale / time_unit;
-        };
+    if let Some(scale) = splitted.next()
+        && let Some(time_unit) = splitted.next().as_mut()
+    {
+        let scale = scale_for_distance(scale);
+        let time_unit = scale_for_time(time_unit);
+        return scale / time_unit;
     }
     warn!("unknown unit ({units}) for velocities");
     1.0
@@ -375,7 +367,7 @@ impl AMBERTrajFormat {
         let coordinates = if let Some(coordinates) = file_reader.data_set().get_var("coordinates") {
             let mut coords = Some(VariableWithScale {
                 var: coordinates.clone(),
-                scale: scale_factor(&coordinates)?,
+                scale: scale_factor(coordinates)?,
             });
             if let Some(units) = coordinates.get_attr_as_string("units") {
                 coords.as_mut().expect("we just init'ed").scale *=
@@ -392,7 +384,7 @@ impl AMBERTrajFormat {
         let velocities = if let Some(velocities) = file_reader.data_set().get_var("velocities") {
             let mut velo = Some(VariableWithScale {
                 var: velocities.clone(),
-                scale: scale_factor(&velocities)?,
+                scale: scale_factor(velocities)?,
             });
             if let Some(units) = velocities.get_attr_as_string("units") {
                 velo.as_mut().expect("we just init'ed").scale *= scale_for_velocity(units.as_str());
@@ -414,7 +406,7 @@ impl AMBERTrajFormat {
         {
             cell_lengths = Some(VariableWithScale {
                 var: read_cell_lengths.clone(),
-                scale: scale_factor(&read_cell_lengths)?,
+                scale: scale_factor(read_cell_lengths)?,
             });
             if let Some(units) = read_cell_lengths.get_attr_as_string("units") {
                 cell_lengths.as_mut().expect("we just init'ed it").scale *=
@@ -425,7 +417,7 @@ impl AMBERTrajFormat {
 
             cell_angles = Some(VariableWithScale {
                 var: read_cell_angles.clone(),
-                scale: scale_factor(&read_cell_angles)?,
+                scale: scale_factor(read_cell_angles)?,
             });
             if let Some(units) = read_cell_angles.get_attr_as_string("units") {
                 let scaling_factor = match units.to_lowercase().as_str() {
@@ -456,7 +448,7 @@ impl AMBERTrajFormat {
         let time = if let Some(time) = file_reader.data_set().get_var("time") {
             let mut t = Some(VariableWithScale {
                 var: time.clone(),
-                scale: scale_factor(&time)?,
+                scale: scale_factor(time)?,
             });
             if let Some(units) = time.get_attr_as_string("units") {
                 t.as_mut().expect("we just init'ed").scale *= scale_for_time(units.as_str());
@@ -567,8 +559,7 @@ impl AMBERTrajFormat {
         }
 
         if let Some(time) = self.variables.time.as_ref() {
-            let time_value;
-            match time.var.data_type() {
+            let time_value = match time.var.data_type() {
                 DataType::I8 | DataType::U8 | DataType::I16 | DataType::I32 => {
                     return Err(CError::GenericError(
                         "invalid type for time variable".to_string(),
@@ -579,16 +570,16 @@ impl AMBERTrajFormat {
                         Convention::Amber => reader.read_record_f32("time", index)?,
                         Convention::Restart => reader.read_var_f32("time")?,
                     };
-                    time_value = time.scale * f64::from(value[0]);
+                    time.scale * f64::from(value[0])
                 }
                 DataType::F64 => {
                     let value = match convention {
                         Convention::Amber => reader.read_record_f64("time", index)?,
                         Convention::Restart => reader.read_var_f64("time")?,
                     };
-                    time_value = time.scale * value[0];
+                    time.scale * value[0]
                 }
-            }
+            };
             frame
                 .properties
                 .insert("time".to_string(), Property::Double(time_value));

@@ -235,6 +235,7 @@ impl FormatReader {
 
 /// Format writer — one variant per supported format.
 /// Text formats are wrapped in [`TextWriter`], binary formats appear directly.
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum FormatWriter {
     Xyz(TextWriter<XYZFormat>),
     Pdb(TextWriter<PDBFormat>),
