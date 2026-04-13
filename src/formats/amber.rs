@@ -648,7 +648,7 @@ impl AMBERTrajFormat {
         }
 
         // Create FileWriter locally — both data_set and writer live in this scope
-        let mut writer = FileWriter::create_new(path)?;
+        let mut writer = FileWriter::open(path)?;
         writer.set_def(&data_set, netcdf3::Version::Offset64Bit, 0)?;
 
         // Write fixed variables
@@ -808,6 +808,56 @@ mod tests {
         assert_approx_eq!(velocities[1600][2], -2.446901 * -0.856, 1e-4);
     }
 
+    fn check_frame(frame: &Frame) {
+        let name = frame.properties.get("name").unwrap().as_string().unwrap();
+        assert_eq!(name, "Test Title 123");
+
+        let positions = frame.positions();
+        assert_approx_eq!(positions[0][0], 0.0, 1e-6);
+        assert_approx_eq!(positions[0][1], 0.0, 1e-6);
+        assert_approx_eq!(positions[0][2], 0.0, 1e-6);
+
+        assert_approx_eq!(positions[1][0], 1.0, 1e-6);
+        assert_approx_eq!(positions[1][1], 2.0, 1e-6);
+        assert_approx_eq!(positions[1][2], 3.0, 1e-6);
+
+        assert_approx_eq!(positions[2][0], 2.0, 1e-6);
+        assert_approx_eq!(positions[2][1], 4.0, 1e-6);
+        assert_approx_eq!(positions[2][2], 6.0, 1e-6);
+
+        assert_approx_eq!(positions[3][0], 3.0, 1e-6);
+        assert_approx_eq!(positions[3][1], 6.0, 1e-6);
+        assert_approx_eq!(positions[3][2], 9.0, 1e-6);
+
+        let velocities = frame.velocities().unwrap();
+        assert_approx_eq!(velocities[0][0], -3.0, 1e-6);
+        assert_approx_eq!(velocities[0][1], -2.0, 1e-6);
+        assert_approx_eq!(velocities[0][2], -1.0, 1e-6);
+
+        assert_approx_eq!(velocities[1][0], -3.0, 1e-6);
+        assert_approx_eq!(velocities[1][1], -2.0, 1e-6);
+        assert_approx_eq!(velocities[1][2], -1.0, 1e-6);
+
+        assert_approx_eq!(velocities[2][0], -3.0, 1e-6);
+        assert_approx_eq!(velocities[2][1], -2.0, 1e-6);
+        assert_approx_eq!(velocities[2][2], -1.0, 1e-6);
+
+        assert_approx_eq!(velocities[3][0], -3.0, 1e-6);
+        assert_approx_eq!(velocities[3][1], -2.0, 1e-6);
+        assert_approx_eq!(velocities[3][2], -1.0, 1e-6);
+
+        let cell = frame.cell();
+        let lengths = cell.lengths();
+        let angles = cell.angles();
+        assert_approx_eq!(lengths[0], 2.0, 1e-6);
+        assert_approx_eq!(lengths[1], 3.0, 1e-6);
+        assert_approx_eq!(lengths[2], 4.0, 1e-6);
+
+        assert_approx_eq!(angles[0], 80.0, 1e-6);
+        assert_approx_eq!(angles[1], 90.0, 1e-6);
+        assert_approx_eq!(angles[2], 120.0, 1e-6);
+    }
+
     #[test]
     fn write_files_in_netcdf_format() {
         let mut frame = Frame::from_unitcell(
@@ -837,5 +887,9 @@ mod tests {
         trajectory.write(&frame).unwrap();
         trajectory.write(&frame).unwrap();
         drop(trajectory);
+
+        let mut trajectory = Trajectory::open(named_tmpfile.path()).unwrap();
+        check_frame(&trajectory.read().unwrap().unwrap());
+        check_frame(&trajectory.read().unwrap().unwrap());
     }
 }
