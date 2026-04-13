@@ -481,7 +481,7 @@ impl AMBERTrajFormat {
         }
 
         if let Some(velocities) = self.variables.velocities.as_ref() {
-            frame.velocities = Some(vec![[0.0; 3]; self.n_atoms]);
+            frame.add_velocities();
             read_array(
                 reader,
                 self.index,
@@ -820,6 +820,7 @@ mod tests {
         frame
             .properties
             .insert("time".to_string(), crate::property::Property::Double(2.0));
+        frame.add_velocities();
         for i in 0..4 {
             frame.add_atom_with_velocity(
                 crate::atom::Atom::new("X".to_string()),
