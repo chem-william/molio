@@ -6,6 +6,7 @@
 
 use crate::error::CError;
 use crate::formats::amber::AMBERTrajFormat;
+use crate::formats::amber::FileMode;
 use crate::formats::pdb::PDBFormat;
 use crate::formats::sdf::SDFFormat;
 use crate::formats::smi::SMIFormat;
@@ -201,7 +202,7 @@ impl FormatReader {
             FormatKind::PDB => Ok(Self::Pdb(TextReader::open(path, PDBFormat::new())?)),
             FormatKind::SMI => Ok(Self::Smi(TextReader::open(path, SMIFormat::default())?)),
             FormatKind::SDF => Ok(Self::Sdf(TextReader::open(path, SDFFormat)?)),
-            FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::open(path)?)),
+            FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::open(path, FileMode::Read)?)),
             FormatKind::Guess => {
                 unreachable!("Guess should be resolved before reaching FormatReader")
             }
@@ -232,6 +233,17 @@ pub(crate) enum FormatWriter {
 }
 
 impl FormatWriter {
+    pub(crate) fn open(path: &Path, kind: FormatKind) -> Result<Self, CError> {
+        match kind {
+            FormatKind::XYZ | FormatKind::PDB | FormatKind::SMI | FormatKind::SDF => {
+                unimplemented!("we cannot append to a text format")
+            }
+            FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::open(path, FileMode::Append)?)),
+            FormatKind::Guess => {
+                unreachable!("Guess should be resolved before reaching FormatWriter")
+            }
+        }
+    }
     pub(crate) fn create(path: &Path, kind: FormatKind) -> Result<Self, CError> {
         match kind {
             FormatKind::XYZ => Ok(Self::Xyz(TextWriter::create(path, XYZFormat)?)),

@@ -7,8 +7,11 @@
 use crate::{error::CError, frame::Frame, property::Property, unit_cell::UnitCell};
 use core::f64;
 use log::{debug, warn};
-use netcdf3::{DataSet, DataType, FileReader, FileWriter, Variable};
-use std::path::{Path, PathBuf};
+use netcdf3::{DataSet, DataType, FileReader, FileWriter, Variable, Version};
+use std::{
+    fs::OpenOptions,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug)]
 struct VariableWithScale {
@@ -47,6 +50,17 @@ pub struct AMBERTrajFormat {
     buffered_frames: Vec<BufferedFrame>,
     has_velocities: bool,
     initialized: bool,
+    mode: FileMode,
+    version: Option<Version>,
+}
+
+// TODO: probably this needs to go somewhere more general so it can be reused with other binary formats
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub(crate) enum FileMode {
+    #[default]
+    Read,
+    Append,
+    Write,
 }
 
 fn read_array(
@@ -296,7 +310,7 @@ impl AMBERTrajFormat {
         )?))
     }
 
-    pub fn open(path: &Path) -> Result<Self, CError> {
+    pub(crate) fn open(path: &Path, mode: FileMode) -> Result<Self, CError> {
         let mut file_reader = FileReader::open(path).unwrap();
 
         validate_common(&file_reader, "AMBER")?;
@@ -427,16 +441,33 @@ impl AMBERTrajFormat {
             cell_angles,
             time,
         };
+        let index = if mode == FileMode::Append {
+            file_reader
+                .data_set()
+                .num_records()
+                .expect("data_set to have records")
+        } else {
+            0
+        };
+        let version = Some(file_reader.version());
+        let has_velocities = variables.velocities.is_some();
+        let write_path = if mode == FileMode::Append {
+            Some(path.to_path_buf())
+        } else {
+            None
+        };
         let format = AMBERTrajFormat {
             reader: Some(file_reader),
-            index: 0,
+            index,
             file_title,
             variables,
             n_atoms,
+            mode,
+            version,
+            has_velocities,
+            write_path,
             ..Default::default()
         };
-
-        // TODO: append mode, line 143 chemfiles/src/formats/AmberNetCDF.cpp
 
         Ok(format)
     }
@@ -593,7 +624,7 @@ impl AMBERTrajFormat {
 
     pub fn finish(&mut self) -> Result<(), CError> {
         let path = match self.write_path.as_ref() {
-            Some(p) => p,
+            Some(p) => p.clone(),
             None => return Ok(()),
         };
 
@@ -601,10 +632,90 @@ impl AMBERTrajFormat {
             return Ok(());
         }
 
-        let num_frames = self.buffered_frames.len();
-        let has_time = self.buffered_frames.iter().any(|f| f.time.is_some());
+        if self.mode == FileMode::Append {
+            self.finish_append(&path)
+        } else {
+            self.finish_create(&path)
+        }
+    }
 
-        // Build the DataSet locally — ephemeral, like the C++ builder
+    fn finish_create(&mut self, path: &Path) -> Result<(), CError> {
+        let has_time = self.buffered_frames.iter().any(|f| f.time.is_some());
+        let total_frames = self.buffered_frames.len();
+
+        let data_set = self.build_data_set(total_frames, has_time, self.has_velocities)?;
+
+        let mut writer = FileWriter::open(path)?;
+        writer.set_def(&data_set, Version::Offset64Bit, 0)?;
+
+        writer.write_var_u8("spatial", b"xyz")?;
+        writer.write_var_u8("cell_spatial", b"abc")?;
+        writer.write_var_u8("cell_angular", b"alphabeta gamma")?;
+
+        for (i, frame) in self.buffered_frames.iter().enumerate() {
+            writer.write_record_f32("coordinates", i, &frame.positions)?;
+            writer.write_record_f32("cell_lengths", i, &frame.cell_lengths)?;
+            writer.write_record_f32("cell_angles", i, &frame.cell_angles)?;
+            if let Some(ref velocities) = frame.velocities {
+                writer.write_record_f32("velocities", i, velocities)?;
+            }
+            if let Some(time) = frame.time {
+                writer.write_record_f32("time", i, &[time])?;
+            }
+        }
+
+        writer.close()?;
+        self.buffered_frames.clear();
+        Ok(())
+    }
+
+    fn finish_append(&mut self, path: &Path) -> Result<(), CError> {
+        let new_count = self.buffered_frames.len();
+        let existing_count = self.index - new_count;
+        let total_count = self.index;
+
+        let has_velocities = self.variables.velocities.is_some();
+        let has_time = self.variables.time.is_some();
+        let version = self.version.clone().unwrap_or(Version::Offset64Bit);
+
+        let data_set = self.build_data_set(total_count, has_time, has_velocities)?;
+
+        let output_file = OpenOptions::new().write(true).open(path)?;
+        let mut writer = FileWriter::open_seek_write(
+            path.as_os_str().to_str().expect("valid unicode path"),
+            Box::new(output_file),
+        )?;
+
+        // Rewrite the header at offset 0 with the updated record count; the data
+        // area already contains the existing records and is left intact.
+        writer.set_def(&data_set, version, 0)?;
+
+        // Write only the new records at their correct positions after the existing ones.
+        for (i, frame) in self.buffered_frames.iter().enumerate() {
+            let record_index = existing_count + i;
+            writer.write_record_f32("coordinates", record_index, &frame.positions)?;
+            writer.write_record_f32("cell_lengths", record_index, &frame.cell_lengths)?;
+            writer.write_record_f32("cell_angles", record_index, &frame.cell_angles)?;
+            if let Some(ref velocities) = frame.velocities {
+                writer.write_record_f32("velocities", record_index, velocities)?;
+            }
+            if let Some(time) = frame.time {
+                writer.write_record_f32("time", record_index, &[time])?;
+            }
+        }
+        // Drop writer without calling close(): close() would fill unwritten record
+        // slots (0..existing_count) with NC_FILL, overwriting the existing data.
+
+        self.buffered_frames.clear();
+        Ok(())
+    }
+
+    fn build_data_set(
+        &self,
+        total_frames: usize,
+        has_time: bool,
+        has_velocities: bool,
+    ) -> Result<DataSet, CError> {
         let mut data_set = DataSet::new();
         data_set.add_global_attr_string("Conventions", "AMBER")?;
         data_set.add_global_attr_string("ConventionVersion", "1.0")?;
@@ -615,19 +726,17 @@ impl AMBERTrajFormat {
             data_set.add_global_attr_string("title", &self.file_title)?;
         }
 
-        data_set.set_unlimited_dim("frame", num_frames)?;
+        data_set.set_unlimited_dim("frame", total_frames)?;
         data_set.add_fixed_dim("spatial", 3)?;
         data_set.add_fixed_dim("atom", self.n_atoms)?;
         data_set.add_fixed_dim("cell_spatial", 3)?;
         data_set.add_fixed_dim("cell_angular", 3)?;
         data_set.add_fixed_dim("label", 5)?;
 
-        // Fixed variables
         data_set.add_var_u8("spatial", &["spatial"])?;
         data_set.add_var_u8("cell_spatial", &["cell_spatial"])?;
         data_set.add_var_u8("cell_angular", &["cell_angular", "label"])?;
 
-        // Record variables
         if has_time {
             data_set.add_var_f32("time", &["frame"])?;
             data_set.add_var_attr_string("time", "units", "picosecond")?;
@@ -642,40 +751,12 @@ impl AMBERTrajFormat {
         data_set.add_var_f32("cell_angles", &["frame", "cell_angular"])?;
         data_set.add_var_attr_string("cell_angles", "units", "degree")?;
 
-        if self.has_velocities {
+        if has_velocities {
             data_set.add_var_f32("velocities", &["frame", "atom", "spatial"])?;
             data_set.add_var_attr_string("velocities", "units", "angstrom/picosecond")?;
         }
 
-        // Create FileWriter locally — both data_set and writer live in this scope
-        let mut writer = FileWriter::open(path)?;
-        writer.set_def(&data_set, netcdf3::Version::Offset64Bit, 0)?;
-
-        // Write fixed variables
-        writer.write_var_u8("spatial", b"xyz")?;
-        writer.write_var_u8("cell_spatial", b"abc")?;
-        writer.write_var_u8("cell_angular", b"alphabeta gamma")?;
-
-        // Write record variables
-        for (i, frame) in self.buffered_frames.iter().enumerate() {
-            writer.write_record_f32("coordinates", i, &frame.positions)?;
-
-            writer.write_record_f32("cell_lengths", i, &frame.cell_lengths)?;
-            writer.write_record_f32("cell_angles", i, &frame.cell_angles)?;
-
-            if let Some(ref velocities) = frame.velocities {
-                writer.write_record_f32("velocities", i, velocities)?;
-            }
-
-            if let Some(time) = frame.time {
-                writer.write_record_f32("time", i, &[time])?;
-            }
-        }
-
-        writer.close()?;
-        self.buffered_frames.clear();
-
-        Ok(())
+        Ok(data_set)
     }
 }
 
@@ -858,8 +939,7 @@ mod tests {
         assert_approx_eq!(angles[2], 120.0, 1e-6);
     }
 
-    #[test]
-    fn write_files_in_netcdf_format() {
+    fn generate_frame() -> Frame {
         let mut frame = Frame::from_unitcell(
             UnitCell::new_from_lengths_angles([2.0, 3.0, 4.0], &mut [80.0, 90.0, 120.0]).unwrap(),
         );
@@ -878,6 +958,13 @@ mod tests {
                 [-3.0, -2.0, -1.0],
             );
         }
+
+        frame
+    }
+
+    #[test]
+    fn write_files_in_netcdf_format() {
+        let frame = generate_frame();
         let named_tmpfile = Builder::new()
             .prefix("netcdf-test-write")
             .suffix(".nc")
@@ -889,6 +976,31 @@ mod tests {
         drop(trajectory);
 
         let mut trajectory = Trajectory::open(named_tmpfile.path()).unwrap();
+        check_frame(&trajectory.read().unwrap().unwrap());
+        check_frame(&trajectory.read().unwrap().unwrap());
+    }
+
+    #[test]
+    fn append_to_existing_file() {
+        let frame = generate_frame();
+        let named_tmpfile = Builder::new()
+            .prefix("netcdf-test-append")
+            .suffix(".nc")
+            .tempfile()
+            .unwrap();
+
+        {
+            let mut trajectory = Trajectory::create(named_tmpfile.path()).unwrap();
+            trajectory.write(&frame).unwrap();
+        }
+
+        {
+            let mut trajectory = Trajectory::append(named_tmpfile.path()).unwrap();
+            trajectory.write(&frame).unwrap();
+        }
+
+        let mut trajectory = Trajectory::open(named_tmpfile.path()).unwrap();
+        assert_eq!(trajectory.size, 2);
         check_frame(&trajectory.read().unwrap().unwrap());
         check_frame(&trajectory.read().unwrap().unwrap());
     }

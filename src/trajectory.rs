@@ -60,10 +60,7 @@ impl Trajectory {
     ///
     /// Returns an error if the file cannot be opened or the format fails to
     /// initialize.
-    pub fn open_with_format(
-        path: &Path,
-        format: FormatKind,
-    ) -> Result<TrajectoryReader, CError> {
+    pub fn open_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryReader, CError> {
         let kind = format.resolve(path)?;
 
         let strategy = FormatReader::open(path, kind)?;
@@ -73,6 +70,21 @@ impl Trajectory {
             size,
             strategy,
             current_index: 0,
+        })
+    }
+
+    pub fn append(path: &Path) -> Result<TrajectoryWriter, CError> {
+        Self::append_with_format(path, FormatKind::Guess)
+    }
+
+    pub fn append_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryWriter, CError> {
+        let kind = format.resolve(path)?;
+
+        let strategy = FormatWriter::open(path, kind)?;
+
+        Ok(TrajectoryWriter {
+            strategy,
+            frame_count: 0,
         })
     }
 
@@ -92,10 +104,7 @@ impl Trajectory {
     ///
     /// Returns an error if the output file cannot be created or the format
     /// fails to initialize.
-    pub fn create_with_format(
-        path: &Path,
-        format: FormatKind,
-    ) -> Result<TrajectoryWriter, CError> {
+    pub fn create_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryWriter, CError> {
         let kind = format.resolve(path)?;
 
         let strategy = FormatWriter::create(path, kind)?;
