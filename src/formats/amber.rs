@@ -8,7 +8,7 @@ use crate::{error::CError, frame::Frame, property::Property, unit_cell::UnitCell
 use core::f64;
 use log::{debug, warn};
 use netcdf3::{DataSet, DataType, FileReader, FileWriter, Variable};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 struct VariableWithScale {
@@ -24,16 +24,29 @@ struct Variables {
     time: Option<VariableWithScale>,
 }
 
+#[derive(Debug)]
+struct BufferedFrame {
+    positions: Vec<f32>,
+    velocities: Option<Vec<f32>>,
+    cell_lengths: [f32; 3],
+    cell_angles: [f32; 3],
+    time: Option<f32>,
+}
+
 /// AMBER does not use the text codec traits. It is a dedicated binary
 /// format entry point with its own owned state.
 #[derive(Debug, Default)]
-pub struct AMBERTrajFormat<'a> {
+pub struct AMBERTrajFormat {
     reader: Option<FileReader>,
-    writer: Option<FileWriter<'a>>,
+    variables: Variables,
     index: usize,
     file_title: String,
-    variables: Variables,
     n_atoms: usize,
+    // Writing state
+    write_path: Option<PathBuf>,
+    buffered_frames: Vec<BufferedFrame>,
+    has_velocities: bool,
+    initialized: bool,
 }
 
 fn read_array(
@@ -207,40 +220,7 @@ fn scale_factor(variable: &Variable) -> Result<f64, CError> {
     Ok(1.0)
 }
 
-impl<'a> AMBERTrajFormat<'a> {
-    fn not_implemented() -> CError {
-        CError::UnsupportedFileFormat("AMBER is not implemented yet".to_string())
-    }
-
-    fn initialize(&mut self, frame: &Frame, convention: &str) -> Result<(), CError> {
-        let data_set: DataSet = {
-            let mut data_set: DataSet = DataSet::new();
-            data_set.add_global_attr_string("Conventions", convention)?;
-            data_set.add_global_attr_string("ConventionVersion", "1.0")?;
-            data_set.add_global_attr_string("program", "molio")?;
-            data_set.add_global_attr_string("programVersion", env!("CARGO_PKG_VERSION"))?;
-
-            if !self.file_title.is_empty() {
-                data_set.add_global_attr_string("title", self.file_title.as_str())?;
-            }
-
-            data_set.add_fixed_dim("spatial", 3)?;
-            data_set.add_fixed_dim("atom", self.n_atoms)?;
-
-            data_set.add_fixed_dim("cell_spatial", 3)?;
-            data_set.add_fixed_dim("cell_angular", 3)?;
-            data_set.add_fixed_dim("label", 5)?;
-
-            data_set.add_var_u8("spatial", &["spatial"])?;
-            data_set.add_var_u8("cell_spatial", &["cell_spatial"])?;
-            data_set.add_var_u8("cell_angular", &["cell_angular", "label"])?;
-
-            data_set
-        };
-
-        Ok(())
-    }
-
+impl AMBERTrajFormat {
     fn read_cell(&mut self) -> Result<Option<UnitCell>, CError> {
         if self.variables.cell_lengths.is_none() || self.variables.cell_angles.is_none() {
             return Ok(None);
@@ -449,11 +429,11 @@ impl<'a> AMBERTrajFormat<'a> {
         };
         let format = AMBERTrajFormat {
             reader: Some(file_reader),
-            writer: None,
             index: 0,
             file_title,
             variables,
             n_atoms,
+            ..Default::default()
         };
 
         // TODO: append mode, line 143 chemfiles/src/formats/AmberNetCDF.cpp
@@ -462,11 +442,8 @@ impl<'a> AMBERTrajFormat<'a> {
     }
 
     pub fn create(path: &Path) -> Result<Self, CError> {
-        let writer = FileWriter::open(path)?;
-
         Ok(Self {
-            reader: None,
-            writer: Some(writer),
+            write_path: Some(path.to_path_buf()),
             ..Default::default()
         })
     }
@@ -554,13 +531,151 @@ impl<'a> AMBERTrajFormat<'a> {
     }
 
     pub fn write(&mut self, frame: &Frame) -> Result<(), CError> {
-        self.initialize(frame, "AMBER")?;
+        if !self.initialized {
+            self.n_atoms = frame.size();
+            self.has_velocities = frame.velocities().is_some();
+            if let Some(Property::String(name)) = frame.properties.get("name") {
+                self.file_title = name.clone();
+            }
+            self.initialized = true;
+        }
 
+        if frame.size() != self.n_atoms {
+            return Err(CError::GenericError(format!(
+                "this file can only write frames with {} atoms, but the frame contains {} atoms",
+                self.n_atoms,
+                frame.size()
+            )));
+        }
+
+        let mut positions = Vec::with_capacity(3 * self.n_atoms);
+        for pos in frame.positions() {
+            positions.push(pos[0] as f32);
+            positions.push(pos[1] as f32);
+            positions.push(pos[2] as f32);
+        }
+
+        let velocities = if self.has_velocities {
+            frame.velocities().map(|vels| {
+                let mut v = Vec::with_capacity(3 * self.n_atoms);
+                for vel in vels {
+                    v.push(vel[0] as f32);
+                    v.push(vel[1] as f32);
+                    v.push(vel[2] as f32);
+                }
+                v
+            })
+        } else {
+            None
+        };
+
+        let cell = frame.cell();
+        let lengths = cell.lengths();
+        let angles = cell.angles();
+
+        let time = frame
+            .properties
+            .get("time")
+            .and_then(|p| p.as_double())
+            .map(|t| t as f32);
+
+        self.buffered_frames.push(BufferedFrame {
+            positions,
+            velocities,
+            cell_lengths: [lengths[0] as f32, lengths[1] as f32, lengths[2] as f32],
+            cell_angles: [angles[0] as f32, angles[1] as f32, angles[2] as f32],
+            time,
+        });
+
+        self.index += 1;
         Ok(())
     }
 
     pub fn finish(&mut self) -> Result<(), CError> {
-        Err(Self::not_implemented())
+        let path = match self.write_path.as_ref() {
+            Some(p) => p,
+            None => return Ok(()),
+        };
+
+        if self.buffered_frames.is_empty() {
+            return Ok(());
+        }
+
+        let num_frames = self.buffered_frames.len();
+        let has_time = self.buffered_frames.iter().any(|f| f.time.is_some());
+
+        // Build the DataSet locally — ephemeral, like the C++ builder
+        let mut data_set = DataSet::new();
+        data_set.add_global_attr_string("Conventions", "AMBER")?;
+        data_set.add_global_attr_string("ConventionVersion", "1.0")?;
+        data_set.add_global_attr_string("program", "molio")?;
+        data_set.add_global_attr_string("programVersion", env!("CARGO_PKG_VERSION"))?;
+
+        if !self.file_title.is_empty() {
+            data_set.add_global_attr_string("title", &self.file_title)?;
+        }
+
+        data_set.set_unlimited_dim("frame", num_frames)?;
+        data_set.add_fixed_dim("spatial", 3)?;
+        data_set.add_fixed_dim("atom", self.n_atoms)?;
+        data_set.add_fixed_dim("cell_spatial", 3)?;
+        data_set.add_fixed_dim("cell_angular", 3)?;
+        data_set.add_fixed_dim("label", 5)?;
+
+        // Fixed variables
+        data_set.add_var_u8("spatial", &["spatial"])?;
+        data_set.add_var_u8("cell_spatial", &["cell_spatial"])?;
+        data_set.add_var_u8("cell_angular", &["cell_angular", "label"])?;
+
+        // Record variables
+        if has_time {
+            data_set.add_var_f32("time", &["frame"])?;
+            data_set.add_var_attr_string("time", "units", "picosecond")?;
+        }
+
+        data_set.add_var_f32("coordinates", &["frame", "atom", "spatial"])?;
+        data_set.add_var_attr_string("coordinates", "units", "angstrom")?;
+
+        data_set.add_var_f32("cell_lengths", &["frame", "cell_spatial"])?;
+        data_set.add_var_attr_string("cell_lengths", "units", "angstrom")?;
+
+        data_set.add_var_f32("cell_angles", &["frame", "cell_angular"])?;
+        data_set.add_var_attr_string("cell_angles", "units", "degree")?;
+
+        if self.has_velocities {
+            data_set.add_var_f32("velocities", &["frame", "atom", "spatial"])?;
+            data_set.add_var_attr_string("velocities", "units", "angstrom/picosecond")?;
+        }
+
+        // Create FileWriter locally — both data_set and writer live in this scope
+        let mut writer = FileWriter::create_new(path)?;
+        writer.set_def(&data_set, netcdf3::Version::Offset64Bit, 0)?;
+
+        // Write fixed variables
+        writer.write_var_u8("spatial", b"xyz")?;
+        writer.write_var_u8("cell_spatial", b"abc")?;
+        writer.write_var_u8("cell_angular", b"alphabeta gamma")?;
+
+        // Write record variables
+        for (i, frame) in self.buffered_frames.iter().enumerate() {
+            writer.write_record_f32("coordinates", i, &frame.positions)?;
+
+            writer.write_record_f32("cell_lengths", i, &frame.cell_lengths)?;
+            writer.write_record_f32("cell_angles", i, &frame.cell_angles)?;
+
+            if let Some(ref velocities) = frame.velocities {
+                writer.write_record_f32("velocities", i, velocities)?;
+            }
+
+            if let Some(time) = frame.time {
+                writer.write_record_f32("time", i, &[time])?;
+            }
+        }
+
+        writer.close()?;
+        self.buffered_frames.clear();
+
+        Ok(())
     }
 }
 

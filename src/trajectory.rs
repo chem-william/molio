@@ -11,17 +11,17 @@ use log::error;
 use std::path::Path;
 
 /// A handle to a trajectory file for reading.
-pub struct TrajectoryReader<'a> {
+pub struct TrajectoryReader {
     /// Number of frames in the file
     pub size: usize,
 
-    strategy: FormatReader<'a>,
+    strategy: FormatReader,
     current_index: usize,
 }
 
 /// A handle to a trajectory file for writing.
-pub struct TrajectoryWriter<'a> {
-    strategy: FormatWriter<'a>,
+pub struct TrajectoryWriter {
+    strategy: FormatWriter,
     frame_count: usize,
 }
 
@@ -50,7 +50,7 @@ impl Trajectory {
     /// # Errors
     ///
     /// Returns an error if the file cannot be opened or the format is unknown.
-    pub fn open<'a>(path: &'a Path) -> Result<TrajectoryReader<'a>, CError> {
+    pub fn open(path: &Path) -> Result<TrajectoryReader, CError> {
         Self::open_with_format(path, FormatKind::Guess)
     }
 
@@ -60,10 +60,10 @@ impl Trajectory {
     ///
     /// Returns an error if the file cannot be opened or the format fails to
     /// initialize.
-    pub fn open_with_format<'a>(
-        path: &'a Path,
+    pub fn open_with_format(
+        path: &Path,
         format: FormatKind,
-    ) -> Result<TrajectoryReader<'a>, CError> {
+    ) -> Result<TrajectoryReader, CError> {
         let kind = format.resolve(path)?;
 
         let strategy = FormatReader::open(path, kind)?;
@@ -82,7 +82,7 @@ impl Trajectory {
     ///
     /// Returns an error if the output file cannot be created or the format is
     /// unknown.
-    pub fn create<'a>(path: &'a Path) -> Result<TrajectoryWriter<'a>, CError> {
+    pub fn create(path: &Path) -> Result<TrajectoryWriter, CError> {
         Self::create_with_format(path, FormatKind::Guess)
     }
 
@@ -92,10 +92,10 @@ impl Trajectory {
     ///
     /// Returns an error if the output file cannot be created or the format
     /// fails to initialize.
-    pub fn create_with_format<'a>(
-        path: &'a Path,
+    pub fn create_with_format(
+        path: &Path,
         format: FormatKind,
-    ) -> Result<TrajectoryWriter<'a>, CError> {
+    ) -> Result<TrajectoryWriter, CError> {
         let kind = format.resolve(path)?;
 
         let strategy = FormatWriter::create(path, kind)?;
@@ -107,7 +107,7 @@ impl Trajectory {
     }
 }
 
-impl<'a> TrajectoryReader<'a> {
+impl TrajectoryReader {
     /// Reads the next frame from the trajectory.
     ///
     /// # Errors
@@ -161,7 +161,7 @@ impl<'a> TrajectoryReader<'a> {
     }
 }
 
-impl<'a> TrajectoryWriter<'a> {
+impl TrajectoryWriter {
     /// Writes a frame to the trajectory.
     ///
     /// # Errors
@@ -188,7 +188,7 @@ impl<'a> TrajectoryWriter<'a> {
     }
 }
 
-impl<'a> Drop for TrajectoryWriter<'a> {
+impl Drop for TrajectoryWriter {
     fn drop(&mut self) {
         if let Err(error) = self.finish() {
             error!("warning: Failed to finalize trajectory file: {error}");

@@ -62,6 +62,10 @@ writer.write(&frame).unwrap();
 writer.finish().unwrap();
 ```
 
+### Format specific notes
+
+- AMBER: we use [netcdf3](https://docs.rs/netcdf3/latest/netcdf3/), a pure Rust implementation for reading and writing NetCDF-3 files, to read AMBER trajectories. However, due to the way that lib performs, writes to disk won't happen until we hit `finish()`. There are no partial writes.
+
 ## Contributions
 [Contributions](https://github.com/chem-william/molio/edit/main/CONTRIBUTING.md) are very welcome! Please open an [issue](https://github.com/chem-william/molio/issues/new) to discuss bugs or new features.
 

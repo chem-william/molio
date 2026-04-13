@@ -186,15 +186,15 @@ macro_rules! format_dispatch {
 /// Format reader — one variant per supported format.
 /// Text formats are wrapped in [`TextReader`], binary formats appear directly.
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum FormatReader<'a> {
+pub(crate) enum FormatReader {
     Xyz(TextReader<XYZFormat>),
     Pdb(TextReader<PDBFormat>),
     Smi(TextReader<SMIFormat>),
     Sdf(TextReader<SDFFormat>),
-    Amber(AMBERTrajFormat<'a>),
+    Amber(AMBERTrajFormat),
 }
 
-impl<'a> FormatReader<'a> {
+impl FormatReader {
     pub(crate) fn open(path: &Path, kind: FormatKind) -> Result<Self, CError> {
         match kind {
             FormatKind::XYZ => Ok(Self::Xyz(TextReader::open(path, XYZFormat)?)),
@@ -223,15 +223,15 @@ impl<'a> FormatReader<'a> {
 
 /// Format writer — one variant per supported format.
 /// Text formats are wrapped in [`TextWriter`], binary formats appear directly.
-pub(crate) enum FormatWriter<'a> {
+pub(crate) enum FormatWriter {
     Xyz(TextWriter<XYZFormat>),
     Pdb(TextWriter<PDBFormat>),
     Smi(TextWriter<SMIFormat>),
     Sdf(TextWriter<SDFFormat>),
-    Amber(AMBERTrajFormat<'a>),
+    Amber(AMBERTrajFormat),
 }
 
-impl<'a> FormatWriter<'a> {
+impl FormatWriter {
     pub(crate) fn create(path: &Path, kind: FormatKind) -> Result<Self, CError> {
         match kind {
             FormatKind::XYZ => Ok(Self::Xyz(TextWriter::create(path, XYZFormat)?)),
