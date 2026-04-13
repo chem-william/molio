@@ -45,6 +45,7 @@ pub struct AMBERTrajFormat {
     index: usize,
     file_title: String,
     n_atoms: usize,
+    convention: Convention,
     // Writing state
     write_path: Option<PathBuf>,
     buffered_frames: Vec<BufferedFrame>,
@@ -63,12 +64,33 @@ pub(crate) enum FileMode {
     Write,
 }
 
+/// Which AMBER NetCDF flavour the file uses.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub(crate) enum Convention {
+    /// AMBER trajectory (multi-frame, unlimited `frame` dimension).
+    #[default]
+    Amber,
+    /// AMBER restart (single snapshot, no `frame` dimension).
+    Restart,
+}
+
+impl Convention {
+    fn as_str(self) -> &'static str {
+        match self {
+            Convention::Amber => "AMBER",
+            Convention::Restart => "AMBERRESTART",
+        }
+    }
+}
+
 fn read_array(
     file_reader: &mut FileReader,
     index: usize,
+    convention: Convention,
     variable: &VariableWithScale,
     array: &mut [[f64; 3]],
 ) -> Result<(), CError> {
+    let name = variable.var.name();
     match variable.var.data_type() {
         DataType::I8 | DataType::U8 | DataType::I16 | DataType::I32 => {
             return Err(CError::GenericError(
@@ -76,7 +98,10 @@ fn read_array(
             ));
         }
         DataType::F32 => {
-            let buffer = file_reader.read_record_f32(variable.var.name(), index)?;
+            let buffer = match convention {
+                Convention::Amber => file_reader.read_record_f32(name, index)?,
+                Convention::Restart => file_reader.read_var_f32(name)?,
+            };
             for (idx, item) in array.iter_mut().enumerate() {
                 item[0] = variable.scale * f64::from(buffer[3 * idx + 0]);
                 item[1] = variable.scale * f64::from(buffer[3 * idx + 1]);
@@ -84,7 +109,10 @@ fn read_array(
             }
         }
         DataType::F64 => {
-            let buffer = file_reader.read_record_f64(variable.var.name(), index)?;
+            let buffer = match convention {
+                Convention::Amber => file_reader.read_record_f64(name, index)?,
+                Convention::Restart => file_reader.read_var_f64(name)?,
+            };
             for (idx, item) in array.iter_mut().enumerate() {
                 item[0] = variable.scale * buffer[3 * idx + 0];
                 item[1] = variable.scale * buffer[3 * idx + 1];
@@ -239,6 +267,8 @@ impl AMBERTrajFormat {
         if self.variables.cell_lengths.is_none() || self.variables.cell_angles.is_none() {
             return Ok(None);
         };
+        let convention = self.convention;
+        let index = self.index;
         let reader = self
             .reader
             .as_mut()
@@ -250,24 +280,22 @@ impl AMBERTrajFormat {
             .cell_lengths
             .as_ref()
             .expect("we just checked for None");
-        match self
-            .variables
-            .cell_lengths
-            .as_ref()
-            .expect("we just checked for None")
-            .var
-            .data_type()
-        {
+        match cell_lengths.var.data_type() {
             DataType::I8 | DataType::U8 | DataType::I16 | DataType::I32 => unreachable!(),
             DataType::F32 => {
-                let buffer = reader.read_record_f32("cell_lengths", self.index)?;
-
+                let buffer = match convention {
+                    Convention::Amber => reader.read_record_f32("cell_lengths", index)?,
+                    Convention::Restart => reader.read_var_f32("cell_lengths")?,
+                };
                 lengths[0] = cell_lengths.scale * f64::from(buffer[0]);
                 lengths[1] = cell_lengths.scale * f64::from(buffer[1]);
                 lengths[2] = cell_lengths.scale * f64::from(buffer[2]);
             }
             DataType::F64 => {
-                let buffer = reader.read_record_f64("cell_lengths", self.index)?;
+                let buffer = match convention {
+                    Convention::Amber => reader.read_record_f64("cell_lengths", index)?,
+                    Convention::Restart => reader.read_var_f64("cell_lengths")?,
+                };
                 lengths[0] = cell_lengths.scale * buffer[0];
                 lengths[1] = cell_lengths.scale * buffer[1];
                 lengths[2] = cell_lengths.scale * buffer[2];
@@ -280,24 +308,22 @@ impl AMBERTrajFormat {
             .cell_angles
             .as_ref()
             .expect("we just checked for None");
-        match self
-            .variables
-            .cell_angles
-            .as_ref()
-            .expect("we just checked for None")
-            .var
-            .data_type()
-        {
+        match cell_angles.var.data_type() {
             DataType::I8 | DataType::U8 | DataType::I16 | DataType::I32 => unreachable!(),
             DataType::F32 => {
-                let buffer = reader.read_record_f32("cell_angles", self.index)?;
-
+                let buffer = match convention {
+                    Convention::Amber => reader.read_record_f32("cell_angles", index)?,
+                    Convention::Restart => reader.read_var_f32("cell_angles")?,
+                };
                 angles[0] = cell_angles.scale * f64::from(buffer[0]);
                 angles[1] = cell_angles.scale * f64::from(buffer[1]);
                 angles[2] = cell_angles.scale * f64::from(buffer[2]);
             }
             DataType::F64 => {
-                let buffer = reader.read_record_f64("cell_angles", self.index)?;
+                let buffer = match convention {
+                    Convention::Amber => reader.read_record_f64("cell_angles", index)?,
+                    Convention::Restart => reader.read_var_f64("cell_angles")?,
+                };
                 angles[0] = cell_angles.scale * buffer[0];
                 angles[1] = cell_angles.scale * buffer[1];
                 angles[2] = cell_angles.scale * buffer[2];
@@ -310,22 +336,27 @@ impl AMBERTrajFormat {
         )?))
     }
 
-    pub(crate) fn open(path: &Path, mode: FileMode) -> Result<Self, CError> {
+    pub(crate) fn open(
+        path: &Path,
+        mode: FileMode,
+        convention: Convention,
+    ) -> Result<Self, CError> {
         // For append mode, if the file is missing or not yet a valid NetCDF-3 file,
         // treat it the same as creating a new file.
-        let mut file_reader = match FileReader::open(path) {
+        let file_reader = match FileReader::open(path) {
             Ok(r) => r,
             Err(_) if mode == FileMode::Append => {
                 return Ok(Self {
                     write_path: Some(path.to_path_buf()),
                     mode,
+                    convention,
                     ..Default::default()
                 });
             }
             Err(e) => return Err(CError::GenericError(e.to_string())),
         };
 
-        validate_common(&file_reader, "AMBER")?;
+        validate_common(&file_reader, convention.as_str())?;
 
         let file_title =
             if let Some(file_title) = file_reader.data_set().get_global_attr_as_string("title") {
@@ -438,14 +469,6 @@ impl AMBERTrajFormat {
             None
         };
 
-        let mut array = vec![[0.0; 3]; n_atoms];
-        read_array(
-            &mut file_reader,
-            0,
-            coordinates.as_ref().unwrap(),
-            array.as_mut_slice(),
-        )?;
-
         let variables = Variables {
             coordinates,
             velocities,
@@ -453,13 +476,13 @@ impl AMBERTrajFormat {
             cell_angles,
             time,
         };
-        let index = if mode == FileMode::Append {
-            file_reader
+        let index = match convention {
+            Convention::Restart => 0,
+            Convention::Amber if mode == FileMode::Append => file_reader
                 .data_set()
                 .num_records()
-                .expect("data_set to have records")
-        } else {
-            0
+                .expect("data_set to have records"),
+            Convention::Amber => 0,
         };
         let version = Some(file_reader.version());
         let has_velocities = variables.velocities.is_some();
@@ -475,6 +498,7 @@ impl AMBERTrajFormat {
             variables,
             n_atoms,
             mode,
+            convention,
             version,
             has_velocities,
             write_path,
@@ -515,20 +539,29 @@ impl AMBERTrajFormat {
 
         frame.resize(self.n_atoms)?;
 
+        let convention = self.convention;
+        let index = self.index;
         let reader = self
             .reader
             .as_mut()
             .expect("reader should've been initialized");
         if let Some(coordinates) = self.variables.coordinates.as_ref() {
-            read_array(reader, self.index, &coordinates, frame.positions_mut())?;
+            read_array(
+                reader,
+                index,
+                convention,
+                coordinates,
+                frame.positions_mut(),
+            )?;
         }
 
         if let Some(velocities) = self.variables.velocities.as_ref() {
             frame.add_velocities();
             read_array(
                 reader,
-                self.index,
-                &velocities,
+                index,
+                convention,
+                velocities,
                 frame.velocities_mut().expect("just resized velocities"),
             )?;
         }
@@ -542,11 +575,17 @@ impl AMBERTrajFormat {
                     ));
                 }
                 DataType::F32 => {
-                    let value = reader.read_record_f32("time", self.index)?;
+                    let value = match convention {
+                        Convention::Amber => reader.read_record_f32("time", index)?,
+                        Convention::Restart => reader.read_var_f32("time")?,
+                    };
                     time_value = time.scale * f64::from(value[0]);
                 }
                 DataType::F64 => {
-                    let value = reader.read_record_f64("time", self.index)?;
+                    let value = match convention {
+                        Convention::Amber => reader.read_record_f64("time", index)?,
+                        Convention::Restart => reader.read_var_f64("time")?,
+                    };
                     time_value = time.scale * value[0];
                 }
             }
@@ -559,14 +598,18 @@ impl AMBERTrajFormat {
     }
 
     pub fn len(&self) -> Result<usize, CError> {
-        self.reader
-            .as_ref()
-            .expect("we should have init reader")
-            .data_set()
-            .num_records()
-            .ok_or(CError::GenericError(
-                "should not have unlimited-size dimension".to_string(),
-            ))
+        match self.convention {
+            Convention::Restart => Ok(1),
+            Convention::Amber => self
+                .reader
+                .as_ref()
+                .expect("we should have init reader")
+                .data_set()
+                .num_records()
+                .ok_or(CError::GenericError(
+                    "expected unlimited 'frame' dimension to be defined".to_string(),
+                )),
+        }
     }
 
     pub fn is_empty(&self) -> Result<bool, CError> {
@@ -1037,5 +1080,21 @@ mod tests {
         assert_eq!(trajectory.size, 2);
         check_frame(&trajectory.read().unwrap().unwrap());
         check_frame(&trajectory.read().unwrap().unwrap());
+    }
+
+    // AMBER restart format
+
+    #[test]
+    fn rst_water() {
+        let path = Path::new("./src/tests-data/netcdf/water.ncrst");
+        let mut trajectory = Trajectory::open(path).unwrap();
+        assert_eq!(trajectory.size, 1);
+
+        let frame = trajectory.read().unwrap().unwrap();
+        assert_eq!(frame.size(), 297);
+        assert_eq!(
+            frame.properties.get("name").unwrap().as_string().unwrap(),
+            "Cpptraj Generated Restart"
+        );
     }
 }

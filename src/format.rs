@@ -5,8 +5,7 @@
 // See LICENSE at the project root for full text.
 
 use crate::error::CError;
-use crate::formats::amber::AMBERTrajFormat;
-use crate::formats::amber::FileMode;
+use crate::formats::amber::{AMBERTrajFormat, Convention, FileMode};
 use crate::formats::pdb::PDBFormat;
 use crate::formats::sdf::SDFFormat;
 use crate::formats::smi::SMIFormat;
@@ -32,6 +31,8 @@ pub enum FormatKind {
     SDF,
     /// AMBER NetCDF binary format.
     AMBER,
+    /// AMBER NetCDF restart format.
+    AMBERRestart,
     /// Automatically detect format from file extension.
     Guess,
 }
@@ -53,7 +54,8 @@ impl FormatKind {
             "pdb" => Ok(Self::PDB),
             "smi" => Ok(Self::SMI),
             "sdf" => Ok(Self::SDF),
-            "ncrst" | "nc" => Ok(Self::AMBER),
+            "ncrst" => Ok(Self::AMBERRestart),
+            "nc" => Ok(Self::AMBER),
             _ => Err(CError::UnknownFormat(ext.to_string())),
         }
     }
@@ -202,7 +204,16 @@ impl FormatReader {
             FormatKind::PDB => Ok(Self::Pdb(TextReader::open(path, PDBFormat::new())?)),
             FormatKind::SMI => Ok(Self::Smi(TextReader::open(path, SMIFormat::default())?)),
             FormatKind::SDF => Ok(Self::Sdf(TextReader::open(path, SDFFormat)?)),
-            FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::open(path, FileMode::Read)?)),
+            FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::open(
+                path,
+                FileMode::Read,
+                Convention::Amber,
+            )?)),
+            FormatKind::AMBERRestart => Ok(Self::Amber(AMBERTrajFormat::open(
+                path,
+                FileMode::Read,
+                Convention::Restart,
+            )?)),
             FormatKind::Guess => {
                 unreachable!("Guess should be resolved before reaching FormatReader")
             }
@@ -238,7 +249,12 @@ impl FormatWriter {
             FormatKind::XYZ | FormatKind::PDB | FormatKind::SMI | FormatKind::SDF => {
                 unimplemented!("we cannot append to a text format")
             }
-            FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::open(path, FileMode::Append)?)),
+            FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::open(
+                path,
+                FileMode::Append,
+                Convention::Amber,
+            )?)),
+            FormatKind::AMBERRestart => unimplemented!("amber restart open on formatwriter"),
             FormatKind::Guess => {
                 unreachable!("Guess should be resolved before reaching FormatWriter")
             }
@@ -251,6 +267,7 @@ impl FormatWriter {
             FormatKind::SMI => Ok(Self::Smi(TextWriter::create(path, SMIFormat::default())?)),
             FormatKind::SDF => Ok(Self::Sdf(TextWriter::create(path, SDFFormat)?)),
             FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::create(path)?)),
+            FormatKind::AMBERRestart => unimplemented!("amber restart create on formatwriter"),
             FormatKind::Guess => {
                 unreachable!("Guess should be resolved before reaching FormatWriter")
             }
