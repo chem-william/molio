@@ -68,6 +68,7 @@ pub enum HelixType {
 }
 
 impl HelixType {
+    #[must_use]
     pub fn nth(n: usize) -> Option<&'static str> {
         match n {
             0 => Some("right-handed alpha helix"),
@@ -85,6 +86,7 @@ impl HelixType {
     }
 }
 
+#[must_use]
 pub fn get_record(line: &[u8]) -> Record {
     let rec = if line.len() >= 6 { &line[..6] } else { line };
 
@@ -117,7 +119,6 @@ const DIGITS_LOWER: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
 
 /// Convert a byte slice to a str, panicking if invalid.
 /// PDB files are assumed to be valid ASCII.
-#[inline(always)]
 fn as_str(b: &[u8]) -> &str {
     std::str::from_utf8(b).unwrap()
 }
@@ -675,6 +676,7 @@ impl PDBFormat {
         Ok(())
     }
 
+    #[must_use]
     pub fn new() -> Self {
         PDBFormat {
             residues: Vec::new(),

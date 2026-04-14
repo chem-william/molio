@@ -27,7 +27,7 @@ impl Codec for SDFFormat {
         if !line.is_empty() {
             frame
                 .properties
-                .insert("name".to_string(), Property::String(line.to_string()));
+                .insert("name".to_string(), Property::String(line.clone()));
         }
         reader.read_line(&mut line)?; // Program line - skip it
         reader.read_line(&mut line)?; // Comment line - skip it

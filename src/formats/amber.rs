@@ -63,7 +63,7 @@ pub(crate) enum FileMode {
     Append,
 }
 
-/// Which AMBER NetCDF flavour the file uses.
+/// Which AMBER `NetCDF` flavour the file uses.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub(crate) enum Convention {
     /// AMBER trajectory (multi-frame, unlimited `frame` dimension).
@@ -214,7 +214,7 @@ fn validate_common(file_reader: &FileReader, convention: &str) -> Result<(), CEr
             return Err(CError::GenericError(
                 "could not read attr as string".to_string(),
             ));
-        };
+        }
 
         Ok(())
     }
@@ -246,7 +246,7 @@ fn validate_common(file_reader: &FileReader, convention: &str) -> Result<(), CEr
             "'cell_spatial' dimension must have a size of 3, got {}",
             cell_spatial.size()
         )));
-    };
+    }
     if let Some(cell_angular) = file_reader.data_set().get_dim("cell_angular")
         && cell_angular.size() != 3
     {
@@ -254,7 +254,7 @@ fn validate_common(file_reader: &FileReader, convention: &str) -> Result<(), CEr
             "'cell_angular' dimension must have a size of 3, got {}",
             cell_angular.size()
         )));
-    };
+    }
 
     Ok(())
 }
@@ -333,7 +333,7 @@ impl AMBERTrajFormat {
     fn read_cell(&mut self) -> Result<Option<UnitCell>, CError> {
         if self.variables.cell_lengths.is_none() || self.variables.cell_angles.is_none() {
             return Ok(None);
-        };
+        }
         let convention = self.convention;
         let index = self.index;
         let reader = self
@@ -383,12 +383,10 @@ impl AMBERTrajFormat {
 
         validate_common(&file_reader, convention.as_str())?;
 
-        let file_title =
-            if let Some(file_title) = file_reader.data_set().get_global_attr_as_string("title") {
-                file_title
-            } else {
-                "".to_string()
-            };
+        let file_title = file_reader
+            .data_set()
+            .get_global_attr_as_string("title")
+            .unwrap_or_default();
 
         let n_atoms = file_reader
             .data_set()
@@ -407,7 +405,7 @@ impl AMBERTrajFormat {
                     scale_for_distance(units.as_str());
             } else {
                 debug!("not scaling coordinates");
-            };
+            }
             coords
         } else {
             warn!("the coordinates variable is not defined in this file.");
@@ -423,7 +421,7 @@ impl AMBERTrajFormat {
                 velo.as_mut().expect("we just init'ed").scale *= scale_for_velocity(units.as_str());
             } else {
                 debug!("not scaling velocities");
-            };
+            }
             velo
         } else {
             warn!("the velocities variable is not defined in this file.");
@@ -446,7 +444,7 @@ impl AMBERTrajFormat {
                     scale_for_distance(units.as_str());
             } else {
                 debug!("not scaling cell lengths");
-            };
+            }
 
             cell_angles = Some(VariableWithScale {
                 var: read_cell_angles.clone(),
@@ -464,7 +462,7 @@ impl AMBERTrajFormat {
                 cell_angles.as_mut().expect("we just init'ed it").scale *= scaling_factor;
             } else {
                 debug!("not scaling cell angles");
-            };
+            }
         } else if read_cell_lengths.is_some() {
             if read_cell_angles.is_none() {
                 return Err(CError::GenericError(
@@ -476,7 +474,7 @@ impl AMBERTrajFormat {
                     "cell_lengths requires coordinates to be defined.".to_string(),
                 ));
             }
-        };
+        }
 
         let time = if let Some(time) = file_reader.data_set().get_var("time") {
             let mut t = Some(VariableWithScale {
@@ -487,7 +485,7 @@ impl AMBERTrajFormat {
                 t.as_mut().expect("we just init'ed").scale *= scale_for_time(units.as_str());
             } else {
                 debug!("not scaling time");
-            };
+            }
             t
         } else {
             warn!("the timevariable is not defined in this file.");
@@ -502,12 +500,11 @@ impl AMBERTrajFormat {
             time,
         };
         let index = match convention {
-            Convention::Restart => 0,
             Convention::Amber if mode == FileMode::Append => file_reader
                 .data_set()
                 .num_records()
                 .expect("data_set to have records"),
-            Convention::Amber => 0,
+            Convention::Restart | Convention::Amber => 0,
         };
         let version = Some(file_reader.version());
         let has_velocities = variables.velocities.is_some();
@@ -553,7 +550,7 @@ impl AMBERTrajFormat {
         let mut frame = Frame::new();
         if let Some(unitcell) = self.read_cell()? {
             frame.set_unitcell(unitcell);
-        };
+        }
 
         if !self.file_title.is_empty() {
             frame.properties.insert(
@@ -672,7 +669,7 @@ impl AMBERTrajFormat {
         let time = frame
             .properties
             .get("time")
-            .and_then(|p| p.as_double())
+            .and_then(super::super::property::Property::as_double)
             .map(|t| t as f32);
 
         self.buffered_frames.push(BufferedFrame {
@@ -850,13 +847,13 @@ mod tests {
         assert_eq!(frame.properties.get("name"), None);
 
         let positions = frame.positions();
-        assert_approx_eq!(positions[0][0], 0.4172191, 1e-4);
-        assert_approx_eq!(positions[0][1], 8.303366, 1e-4);
-        assert_approx_eq!(positions[0][2], 11.73717, 1e-4);
+        assert_approx_eq!(positions[0][0], 0.4172_191, 1e-4);
+        assert_approx_eq!(positions[0][1], 8.303_366, 1e-4);
+        assert_approx_eq!(positions[0][2], 11.73_717, 1e-4);
 
-        assert_approx_eq!(positions[296][0], 6.664049, 1e-4);
-        assert_approx_eq!(positions[296][1], 11.61418, 1e-4);
-        assert_approx_eq!(positions[296][2], 12.96149, 1e-4);
+        assert_approx_eq!(positions[296][0], 6.664_049, 1e-4);
+        assert_approx_eq!(positions[296][1], 11.61_418, 1e-4);
+        assert_approx_eq!(positions[296][2], 12.96_149, 1e-4);
 
         assert_approx_eq!(
             frame.properties.get("time").unwrap().as_double().unwrap(),
@@ -946,13 +943,13 @@ mod tests {
         assert_approx_eq!(positions[296][2], 0.0 * 0.455, 1e-4);
 
         let velocities = frame.velocities().unwrap();
-        assert_approx_eq!(velocities[1400][0], 0.6854072 * -0.856, 1e-4);
-        assert_approx_eq!(velocities[1400][1], 0.09196011 * -0.856, 1e-4);
-        assert_approx_eq!(velocities[1400][2], 2.260214 * -0.856, 1e-4);
+        assert_approx_eq!(velocities[1400][0], 0.6854_072 * -0.856, 1e-4);
+        assert_approx_eq!(velocities[1400][1], 0.09196_011 * -0.856, 1e-4);
+        assert_approx_eq!(velocities[1400][2], 2.260_214 * -0.856, 1e-4);
 
-        assert_approx_eq!(velocities[1600][0], -0.3342645 * -0.856, 1e-4);
-        assert_approx_eq!(velocities[1600][1], 0.322594 * -0.856, 1e-4);
-        assert_approx_eq!(velocities[1600][2], -2.446901 * -0.856, 1e-4);
+        assert_approx_eq!(velocities[1600][0], -0.3342_645 * -0.856, 1e-4);
+        assert_approx_eq!(velocities[1600][1], 0.322_594 * -0.856, 1e-4);
+        assert_approx_eq!(velocities[1600][2], -2.446_901 * -0.856, 1e-4);
     }
 
     fn check_frame(frame: &Frame) {
@@ -1020,7 +1017,7 @@ mod tests {
         for i in 0..4 {
             frame.add_atom_with_velocity(
                 crate::atom::Atom::new("X".to_string()),
-                [1.0 * i as f64, 2.0 * i as f64, 3.0 * i as f64],
+                [1.0 * f64::from(i), 2.0 * f64::from(i), 3.0 * f64::from(i)],
                 [-3.0, -2.0, -1.0],
             );
         }

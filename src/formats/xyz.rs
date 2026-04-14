@@ -23,6 +23,7 @@ pub struct XYZFormat;
 type PropertiesList = BTreeMap<String, PropertyKind>;
 
 impl XYZFormat {
+    #[must_use]
     pub fn parse_unitcell(lattice: &str) -> UnitCell {
         let mut matrix = Matrix3::zeros();
 

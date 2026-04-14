@@ -39,6 +39,7 @@ impl Index<usize> for Dihedral {
 
 impl Dihedral {
     /// Create a new `Dihedral` containing the atoms `i`, `j`, `k` and `m`.
+    #[must_use]
     pub fn new(i: usize, j: usize, k: usize, m: usize) -> Self {
         assert!(
             !(i == j || j == k || k == m),

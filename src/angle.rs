@@ -37,6 +37,7 @@ impl Index<usize> for Angle {
 }
 
 impl Angle {
+    #[must_use]
     pub fn new(i: usize, j: usize, k: usize) -> Self {
         assert!(
             !(i == j || i == k || j == k),

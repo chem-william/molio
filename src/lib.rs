@@ -26,6 +26,7 @@ use std::path::Path;
 use crate::trajectory::Trajectory;
 
 /// Read a trajectory file and return the total number of atoms processed
+#[must_use]
 pub fn read_trajectory(path: &Path) -> usize {
     let mut trajectory = Trajectory::open(path).unwrap();
     let mut total_atoms = 0;

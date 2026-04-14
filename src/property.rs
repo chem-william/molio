@@ -102,6 +102,7 @@ impl Eq for Property {}
 pub struct Properties(HashMap<String, Property>);
 
 impl Properties {
+    #[must_use]
     pub fn new() -> Self {
         Properties(HashMap::new())
     }
@@ -154,6 +155,7 @@ impl Property {
     }
 
     /// Returns the boolean value if this is a [`Property::Bool`] property, or `None` otherwise.
+    #[must_use]
     pub fn as_bool(&self) -> Option<bool> {
         if let Property::Bool(b) = *self {
             Some(b)
@@ -167,6 +169,7 @@ impl Property {
     /// # Panics
     ///
     /// Panics if the property is not [`Property::Bool`].
+    #[must_use]
     pub fn expect_bool(&self) -> bool {
         match *self {
             Property::Bool(b) => b,
@@ -175,6 +178,7 @@ impl Property {
     }
 
     /// Returns the double value if this is a [`Property::Double`] property, or `None` otherwise.
+    #[must_use]
     pub fn as_double(&self) -> Option<f64> {
         if let Property::Double(x) = *self {
             Some(x)
@@ -188,6 +192,7 @@ impl Property {
     /// # Panics
     ///
     /// Panics if the property is not [`Property::Double`].
+    #[must_use]
     pub fn expect_double(&self) -> f64 {
         match *self {
             Property::Double(d) => d,
@@ -196,6 +201,7 @@ impl Property {
     }
 
     /// Returns the string slice if this is a [`Property::String`] property, or `None` otherwise.
+    #[must_use]
     pub fn as_string(&self) -> Option<&str> {
         if let Property::String(ref s) = *self {
             Some(s)
@@ -209,6 +215,7 @@ impl Property {
     /// # Panics
     ///
     /// Panics if the property is not [`Property::String`].
+    #[must_use]
     pub fn expect_string(&self) -> &str {
         match *self {
             Property::String(ref s) => s,
@@ -217,6 +224,7 @@ impl Property {
     }
 
     /// Returns the 3D vector if this is a [`Property::Vector3D`] property, or `None` otherwise.
+    #[must_use]
     pub fn as_vector3d(&self) -> Option<[f64; 3]> {
         if let Property::Vector3D(v) = *self {
             Some(v)
@@ -230,6 +238,7 @@ impl Property {
     /// # Panics
     ///
     /// Panics if the property is not [`Property::Vector3D`].
+    #[must_use]
     pub fn expect_vector3d(&self) -> [f64; 3] {
         match *self {
             Property::Vector3D(v) => v,
@@ -238,6 +247,7 @@ impl Property {
     }
 
     /// Returns the 3×3 matrix array if this is a [`Property::Matrix3x3`] property, or `None` otherwise.
+    #[must_use]
     pub fn as_matrix3x3(&self) -> Option<[f64; 9]> {
         if let Property::Matrix3x3(m) = *self {
             let mut array = [0.0; 9];
@@ -253,6 +263,7 @@ impl Property {
     /// # Panics
     ///
     /// Panics if the property is not [`Property::Matrix3x3`].
+    #[must_use]
     pub fn expect_matrix3x3(&self) -> [f64; 9] {
         match *self {
             Property::Matrix3x3(m) => {
