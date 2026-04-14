@@ -11,7 +11,6 @@ use crate::error::CError;
 use crate::format::Codec;
 use crate::frame::Frame;
 use crate::property::Property;
-use crate::property::PropertyKind;
 use crate::residue::{FullResidueId, Residue};
 use crate::unit_cell::UnitCell;
 use log::warn;
@@ -342,12 +341,15 @@ impl PDBFormat {
             );
         }
 
-        let x = Property::parse_value(as_str(line[30..38].trim_ascii()), &PropertyKind::Double)?
-            .expect_double();
-        let y = Property::parse_value(as_str(line[38..46].trim_ascii()), &PropertyKind::Double)?
-            .expect_double();
-        let z = Property::parse_value(as_str(line[46..54].trim_ascii()), &PropertyKind::Double)?
-            .expect_double();
+        let x = as_str(line[30..38].trim_ascii())
+            .parse::<f64>()
+            .map_err(|e| CError::GenericError(format!("expected double, found {e}")))?;
+        let y = as_str(line[38..46].trim_ascii())
+            .parse::<f64>()
+            .map_err(|e| CError::GenericError(format!("expected double, found {e}")))?;
+        let z = as_str(line[46..54].trim_ascii())
+            .parse::<f64>()
+            .map_err(|e| CError::GenericError(format!("expected double, found {e}")))?;
         frame.add_atom(atom, [x, y, z]);
 
         let atom_id = frame.size() - 1;
