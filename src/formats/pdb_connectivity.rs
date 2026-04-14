@@ -32,6 +32,7 @@ pub const INTERNER: &[&str; 136] = &[
 ];
 
 // Find the connectivity data for a given residue name
+#[must_use]
 pub fn find(name: &str) -> Option<&'static [(usize, usize)]> {
     PDB_CONNECTIVITY_MAP.get(name).copied()
 }

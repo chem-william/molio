@@ -41,7 +41,7 @@ impl fmt::Display for BondOrder {
     }
 }
 
-/// Currently, we're not handling 'CurlySMILES'
+/// Currently, we're not handling '`CurlySMILES`'
 #[derive(Default)]
 pub struct SMIFormat {
     /// Residue information in the current step

@@ -16,6 +16,7 @@ pub struct Atom {
 }
 
 impl Atom {
+    #[must_use]
     pub fn new(name: String) -> Self {
         Self {
             name: name.clone(),
@@ -26,6 +27,7 @@ impl Atom {
         }
     }
 
+    #[must_use]
     pub fn with_symbol(name: String, symbol: String) -> Self {
         Self {
             name,

@@ -24,6 +24,7 @@ enum State {
 }
 
 impl<'a> ExtendedXyzParser<'a> {
+    #[must_use]
     pub fn new(line: &'a str) -> Self {
         ExtendedXyzParser { line }
     }
@@ -90,6 +91,7 @@ impl<'a> ExtendedXyzParser<'a> {
     }
 
     /// Parses a single line of KEY=VALUE and standalone flags into a [`ExtendedXyzProperties`].
+    #[must_use]
     pub fn parse(&self) -> ExtendedXyzProperties {
         let mut map = BTreeMap::new();
         for tok in ExtendedXyzParser::split_tokens(self.line) {

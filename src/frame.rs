@@ -42,6 +42,7 @@ impl Frame {
         }
     }
 
+    #[must_use]
     pub fn from_unitcell(unit_cell: UnitCell) -> Self {
         Frame {
             unit_cell,
@@ -59,6 +60,7 @@ impl Frame {
     /// the actual positions and velocity storage. Instead, all the mutating
     /// functionalities of the topology are mirrored on the frame (adding and
     /// removing bonds, adding residues, *etc.*)
+    #[must_use]
     pub fn topology(&self) -> &Topology {
         &self.topology
     }
@@ -82,6 +84,7 @@ impl Frame {
     }
 
     /// Get a reference to the unit cell of this [`Frame`]
+    #[must_use]
     pub fn cell(&self) -> &UnitCell {
         &self.unit_cell
     }
@@ -91,6 +94,7 @@ impl Frame {
         self.unit_cell = cell;
     }
 
+    #[must_use]
     pub fn positions(&self) -> &Vec<[f64; 3]> {
         &self.positions
     }
@@ -99,6 +103,7 @@ impl Frame {
         &mut self.positions
     }
 
+    #[must_use]
     pub fn velocities(&self) -> Option<&Vec<[f64; 3]>> {
         self.velocities.as_ref()
     }
@@ -167,7 +172,7 @@ impl Frame {
         debug_assert!(self.positions.len() == self.topology.size());
 
         if let Some(velocities) = self.velocities.as_ref() {
-            debug_assert!(self.positions.len() == velocities.len())
+            debug_assert!(self.positions.len() == velocities.len());
         }
 
         self.positions.len()

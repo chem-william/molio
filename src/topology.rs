@@ -83,6 +83,7 @@ impl Topology {
     }
 
     /// Returns a vector of all bonds present in the topology.
+    #[must_use]
     pub fn bonds(&self) -> Vec<Bond> {
         self.connect.bonds.iter().copied().collect()
     }
@@ -198,6 +199,7 @@ impl Topology {
         false
     }
 
+    #[must_use]
     pub fn bond_orders(&self) -> &Vec<BondOrder> {
         &self.connect.bond_orders
     }

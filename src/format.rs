@@ -29,9 +29,9 @@ pub enum FormatKind {
     SMI,
     /// SDF file format.
     SDF,
-    /// AMBER NetCDF binary format.
+    /// AMBER `NetCDF` binary format.
     AMBER,
-    /// AMBER NetCDF restart format.
+    /// AMBER `NetCDF` restart format.
     AMBERRestart,
     /// Automatically detect format from file extension.
     Guess,

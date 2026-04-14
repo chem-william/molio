@@ -31,11 +31,13 @@ pub struct FrameIndex(usize);
 
 impl FrameIndex {
     /// Creates a new frame index if it is within the valid range.
+    #[must_use]
     pub fn new(index: usize, max: usize) -> Option<Self> {
         if index < max { Some(Self(index)) } else { None }
     }
 
     /// Get the underlying index value.
+    #[must_use]
     pub fn value(self) -> usize {
         self.0
     }
@@ -159,6 +161,7 @@ impl TrajectoryReader {
     }
 
     /// Gets a frame index if it is valid for this trajectory.
+    #[must_use]
     pub fn frame_index(&self, index: usize) -> Option<FrameIndex> {
         FrameIndex::new(index, self.size)
     }
@@ -192,6 +195,7 @@ impl TrajectoryWriter {
     }
 
     /// Returns the number of frames written so far.
+    #[must_use]
     pub fn frame_count(&self) -> usize {
         self.frame_count
     }
