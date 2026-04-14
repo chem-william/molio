@@ -86,52 +86,58 @@ impl HelixType {
     }
 }
 
-pub fn get_record(line: &str) -> Record {
+pub fn get_record(line: &[u8]) -> Record {
     let rec = if line.len() >= 6 { &line[..6] } else { line };
 
     match rec {
-        "ENDMDL" => Record::ENDMDL,
-        _ if rec.starts_with("END") => Record::END,
-        "CRYST1" => Record::CRYST1,
-        "ATOM  " => Record::ATOM,
-        "HETATM" => Record::HETATM,
-        "CONECT" => Record::CONECT,
-        _ if rec.starts_with("MODEL") => Record::MODEL,
-        _ if rec.starts_with("TER") => Record::TER,
-        "HELIX " => Record::HELIX,
-        "SHEET " => Record::SHEET,
-        "TURN  " => Record::TURN,
-        "HEADER" => Record::HEADER,
-        "TITLE " => Record::TITLE,
-        "REMARK" | "MASTER" | "AUTHOR" | "CAVEAT" | "COMPND" | "EXPDTA" | "KEYWDS" | "OBSLTE"
-        | "SOURCE" | "SPLIT " | "SPRSDE" | "JRNL  " | "SEQRES" | "HET   " | "REVDAT" | "SCALE1"
-        | "SCALE2" | "SCALE3" | "ORIGX1" | "ORIGX2" | "ORIGX3" | "ANISOU" | "SITE  " | "FORMUL"
-        | "DBREF " | "HETNAM" | "HETSYN" | "SSBOND" | "LINK  " | "SEQADV" | "MODRES" | "CISPEP" => {
-            Record::IGNORED_
-        }
-        _ if line.trim().is_empty() => Record::IGNORED_,
+        b"ENDMDL" => Record::ENDMDL,
+        _ if rec.starts_with(b"END") => Record::END,
+        b"CRYST1" => Record::CRYST1,
+        b"ATOM  " => Record::ATOM,
+        b"HETATM" => Record::HETATM,
+        b"CONECT" => Record::CONECT,
+        _ if rec.starts_with(b"MODEL") => Record::MODEL,
+        _ if rec.starts_with(b"TER") => Record::TER,
+        b"HELIX " => Record::HELIX,
+        b"SHEET " => Record::SHEET,
+        b"TURN  " => Record::TURN,
+        b"HEADER" => Record::HEADER,
+        b"TITLE " => Record::TITLE,
+        b"REMARK" | b"MASTER" | b"AUTHOR" | b"CAVEAT" | b"COMPND" | b"EXPDTA" | b"KEYWDS"
+        | b"OBSLTE" | b"SOURCE" | b"SPLIT " | b"SPRSDE" | b"JRNL  " | b"SEQRES" | b"HET   "
+        | b"REVDAT" | b"SCALE1" | b"SCALE2" | b"SCALE3" | b"ORIGX1" | b"ORIGX2" | b"ORIGX3"
+        | b"ANISOU" | b"SITE  " | b"FORMUL" | b"DBREF " | b"HETNAM" | b"HETSYN" | b"SSBOND"
+        | b"LINK  " | b"SEQADV" | b"MODRES" | b"CISPEP" => Record::IGNORED_,
+        _ if line.trim_ascii().is_empty() => Record::IGNORED_,
         _ => Record::UNKNOWN_,
     }
 }
 
-const DIGITS_UPPER: &str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const DIGITS_LOWER: &str = "0123456789abcdefghijklmnopqrstuvwxyz";
+const DIGITS_UPPER: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const DIGITS_LOWER: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
 
-fn decode_pure(s: &str) -> i64 {
+/// Convert a byte slice to a str, panicking if invalid.
+/// PDB files are assumed to be valid ASCII.
+#[inline(always)]
+fn as_str(b: &[u8]) -> &str {
+    std::str::from_utf8(b).unwrap()
+}
+
+fn decode_pure(s: &[u8]) -> i64 {
     let mut result: i64 = 0;
     let base = 36; // Supports 0-9, A-Z, a-z, but lowercase maps like uppercase
 
-    for c in s.chars() {
+    for &c in s {
         result *= base;
-        result += i64::from(digit_to_value(c));
+        result += i64::from(byte_to_value(c));
     }
 
     result
 }
 
-fn encode_pure(digits: &str, value: i64) -> String {
+fn encode_pure(digits: &[u8], value: i64) -> String {
     if value == 0 {
-        return digits.chars().nth(1).unwrap().to_string();
+        return (digits[1] as char).to_string();
     }
 
     let n = i64::try_from(digits.len()).unwrap();
@@ -141,7 +147,7 @@ fn encode_pure(digits: &str, value: i64) -> String {
     while val != 0 {
         let rest = val / n;
         let rem = usize::try_from(val - rest * n).unwrap();
-        let ch = digits.as_bytes()[rem] as char;
+        let ch = digits[rem] as char;
         result.push(ch);
         val = rest;
     }
@@ -149,12 +155,12 @@ fn encode_pure(digits: &str, value: i64) -> String {
     result.chars().rev().collect()
 }
 
-fn digit_to_value(c: char) -> i32 {
+fn byte_to_value(c: u8) -> i32 {
     match c {
-        '0'..='9' => i32::from(c as u8 - b'0'),
-        'A'..='Z' => i32::from(c as u8 - b'A') + 10,
-        'a'..='z' => i32::from(c as u8 - b'a') + 10,
-        _ => panic!("Invalid character: {c}"),
+        b'0'..=b'9' => i32::from(c - b'0'),
+        b'A'..=b'Z' => i32::from(c - b'A') + 10,
+        b'a'..=b'z' => i32::from(c - b'a') + 10,
+        _ => panic!("Invalid character: {}", c as char),
     }
 }
 
@@ -162,53 +168,54 @@ fn pow_int(base: usize, power: usize) -> i64 {
     (base.pow(power as u32)) as i64
 }
 
-pub(crate) fn decode_hybrid36(width: usize, line: &str) -> Result<i64, CError> {
+pub(crate) fn decode_hybrid36(width: usize, line: &[u8]) -> Result<i64, CError> {
     if line.len() > width {
         return Err(CError::GenericError(format!(
-            "length of '{line}' is greater than the width '{width}'. this is a bug"
+            "length of '{}' is greater than the width '{width}'. this is a bug",
+            as_str(line)
         )));
     }
-    let trimmed_line = line.trim();
-
-    let f = trimmed_line.chars().next();
-    if let Some(f) = f {
-        if f == ' ' {
-            // Space-prefixed numbers are not encoded => return 0
-            return Ok(0);
-        } else if f == '-' || f.is_ascii_digit() {
-            // Try to parse as a number
-            return trimmed_line.parse().map_err(|_e| {
-                CError::GenericError(format!("expected negative number. got '{f}'"))
-            });
-        }
-    }
+    let trimmed_line = line.trim_ascii();
 
     if trimmed_line.is_empty() {
         return Ok(0);
     }
 
-    if DIGITS_UPPER.contains(f.unwrap()) {
+    let f = trimmed_line[0];
+    if f == b' ' {
+        // Space-prefixed numbers are not encoded => return 0
+        return Ok(0);
+    } else if f == b'-' || f.is_ascii_digit() {
+        // Try to parse as a number
+        return as_str(trimmed_line).parse().map_err(|_e| {
+            CError::GenericError(format!("expected negative number. got '{}'", f as char))
+        });
+    }
+
+    if DIGITS_UPPER.contains(&f) {
         let is_valid = trimmed_line
-            .chars()
+            .iter()
             .all(|c| c.is_ascii_digit() || c.is_ascii_uppercase());
 
         if !is_valid {
             return Err(CError::GenericError(format!(
-                "the value '{trimmed_line}' is not a valid hybrid 36 number"
+                "the value '{}' is not a valid hybrid 36 number",
+                as_str(trimmed_line)
             )));
         }
 
         return Ok(decode_pure(trimmed_line) - 10 * pow_int(36, width - 1) + pow_int(10, width));
     }
 
-    if DIGITS_LOWER.contains(f.unwrap()) {
+    if DIGITS_LOWER.contains(&f) {
         let is_valid = trimmed_line
-            .chars()
+            .iter()
             .all(|c| c.is_ascii_digit() || c.is_ascii_lowercase());
 
         if !is_valid {
             return Err(CError::GenericError(format!(
-                "the value '{trimmed_line}' is not a valid hybrid 36 number"
+                "the value '{}' is not a valid hybrid 36 number",
+                as_str(trimmed_line)
             )));
         }
 
@@ -216,7 +223,8 @@ pub(crate) fn decode_hybrid36(width: usize, line: &str) -> Result<i64, CError> {
     }
 
     Err(CError::GenericError(format!(
-        "the value '{line}' is not a valid hybrid 36 number"
+        "the value '{}' is not a valid hybrid 36 number",
+        as_str(line)
     )))
 }
 
@@ -280,13 +288,18 @@ impl Default for PDBFormat {
 }
 
 impl PDBFormat {
-    fn parse_atom(&mut self, frame: &mut Frame, line: &str, is_hetatm: bool) -> Result<(), CError> {
-        debug_assert!(line[..6] == *"ATOM  " || line[..6] == *"HETATM");
+    fn parse_atom(
+        &mut self,
+        frame: &mut Frame,
+        line: &[u8],
+        is_hetatm: bool,
+    ) -> Result<(), CError> {
+        debug_assert!(&line[..6] == b"ATOM  " || &line[..6] == b"HETATM");
 
         if line.len() < 54 {
             return Err(CError::InvalidRecord {
                 expected_record_type: "ATOM".to_string(),
-                actual_record_type: line.to_string(),
+                actual_record_type: as_str(line).to_string(),
                 reason: "line too short".to_string(),
             });
         }
@@ -309,38 +322,43 @@ impl PDBFormat {
             }
         }
 
-        let name = &line[12..16].trim();
+        let name = line[12..16].trim_ascii();
         let mut atom = if line.len() >= 78 {
             let atom_type = &line[76..78];
-            let name = (*name).to_string();
-            let symbol = atom_type.trim().to_string();
+            let name = as_str(name).to_string();
+            let symbol = as_str(atom_type.trim_ascii()).to_string();
             Atom::with_symbol(name, symbol)
         } else {
             // Read just the atom name and hope for the best
-            let name = (*name).to_string();
+            let name = as_str(name).to_string();
             Atom::new(name)
         };
 
         let altloc = &line[16..17];
-        if altloc != " " {
-            atom.properties
-                .insert("altloc".into(), Property::String(altloc.to_string()));
+        if altloc != b" " {
+            atom.properties.insert(
+                "altloc".into(),
+                Property::String(as_str(altloc).to_string()),
+            );
         }
 
-        let x = Property::parse_value(line[30..38].trim(), &PropertyKind::Double)?.expect_double();
-        let y = Property::parse_value(line[38..46].trim(), &PropertyKind::Double)?.expect_double();
-        let z = Property::parse_value(line[46..54].trim(), &PropertyKind::Double)?.expect_double();
+        let x = Property::parse_value(as_str(line[30..38].trim_ascii()), &PropertyKind::Double)?
+            .expect_double();
+        let y = Property::parse_value(as_str(line[38..46].trim_ascii()), &PropertyKind::Double)?
+            .expect_double();
+        let z = Property::parse_value(as_str(line[46..54].trim_ascii()), &PropertyKind::Double)?
+            .expect_double();
         frame.add_atom(atom, [x, y, z]);
 
         let atom_id = frame.size() - 1;
-        let insertion_code = line.as_bytes()[26] as char;
+        let insertion_code = line[26] as char;
         // If there's no residue information so return early
         let Ok(resid) = decode_hybrid36(4, &line[22..26]) else {
             return Ok(());
         };
 
-        let chain = line.as_bytes()[21] as char;
-        let resname = line[17..20].trim().to_string();
+        let chain = line[21] as char;
+        let resname = as_str(line[17..20].trim_ascii()).to_string();
         let full_residue_id = FullResidueId {
             chain,
             resid,
@@ -385,23 +403,24 @@ impl PDBFormat {
             // to match MMTF format
             residue.properties.insert(
                 "chainid".into(),
-                Property::String((line.as_bytes()[21] as char).to_string()),
+                Property::String((line[21] as char).to_string()),
             );
 
             // PDB format makes no distinction between chainid and chainname
             residue.properties.insert(
                 "chainname".into(),
-                Property::String((line.as_bytes()[21] as char).to_string()),
+                Property::String((line[21] as char).to_string()),
             );
 
             // segment name is not part of the standard, but something added by
             // CHARM/NAMD in the un-used character range 73-76
             if line.len() > 72 {
-                let segname = line[72..76].trim();
+                let segname = line[72..76].trim_ascii();
                 if !segname.is_empty() {
-                    residue
-                        .properties
-                        .insert("segname".into(), Property::String(segname.to_string()));
+                    residue.properties.insert(
+                        "segname".into(),
+                        Property::String(as_str(segname).to_string()),
+                    );
                 }
             }
 
@@ -460,40 +479,28 @@ impl PDBFormat {
         Ok(())
     }
 
-    fn parse_cryst1(frame: &mut Frame, line: &str) -> Result<(), CError> {
-        assert_eq!(&line[..6], "CRYST1");
+    fn parse_cryst1(frame: &mut Frame, line: &[u8]) -> Result<(), CError> {
+        assert_eq!(&line[..6], b"CRYST1");
         if line.len() < 54 {
             return Err(CError::InvalidRecord {
                 expected_record_type: "CRYST1".to_string(),
-                actual_record_type: line.to_string(),
+                actual_record_type: as_str(line).to_string(),
                 reason: "line too short".to_string(),
             });
         }
 
-        let a = line[6..15]
-            .trim()
-            .parse::<f64>()
-            .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let b = line[15..24]
-            .trim()
-            .parse::<f64>()
-            .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let c = line[24..33]
-            .trim()
-            .parse::<f64>()
-            .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let alpha = line[33..40]
-            .trim()
-            .parse::<f64>()
-            .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let beta = line[40..47]
-            .trim()
-            .parse::<f64>()
-            .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
-        let gamma = line[47..54]
-            .trim()
-            .parse::<f64>()
-            .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))?;
+        let parse_val = |input: &[u8]| {
+            std::str::from_utf8(input.trim_ascii())
+                .unwrap()
+                .parse::<f64>()
+                .map_err(|e| CError::GenericError(format!("could not parse float: {e}")))
+        };
+        let a = parse_val(&line[6..15])?;
+        let b = parse_val(&line[15..24])?;
+        let c = parse_val(&line[24..33])?;
+        let alpha = parse_val(&line[33..40])?;
+        let beta = parse_val(&line[40..47])?;
+        let gamma = parse_val(&line[47..54])?;
 
         let unit_cell = UnitCell::new_from_lengths_angles([a, b, c], &mut [alpha, beta, gamma])?;
         frame.unit_cell = unit_cell;
@@ -501,14 +508,18 @@ impl PDBFormat {
         if line.len() >= 55 {
             let space_group_slice = &line[55..std::cmp::min(line.len(), 65)];
             // TODO: handle this as a warning (somehow)?
-            if !space_group_slice.contains("P 1") && !space_group_slice.contains("P1") {
-                warn!("ignoring custom space group ({space_group_slice}), using P1 instead");
+            let space_group = std::str::from_utf8(space_group_slice).unwrap();
+            if !space_group.contains("P 1") && !space_group.contains("P1") {
+                warn!(
+                    "ignoring custom space group ({}), using P1 instead",
+                    std::str::from_utf8(space_group_slice).unwrap()
+                );
             }
         }
 
         Ok(())
     }
-    fn read_index(&self, line: &str, initial: usize) -> Result<usize, CError> {
+    fn read_index(&self, line: &[u8], initial: usize) -> Result<usize, CError> {
         debug_assert!(line.len() >= 5); // otherwise the indexing fails
         let mut pdb_atom_id = decode_hybrid36(5, &line[initial..initial + 5])?;
 
@@ -525,11 +536,11 @@ impl PDBFormat {
         Ok(usize::try_from(pdb_atom_id).unwrap() - self.atom_offsets.first().unwrap())
     }
 
-    fn add_bond(frame: &mut Frame, line: &str, i: usize, j: usize) {
+    fn add_bond(frame: &mut Frame, line: &[u8], i: usize, j: usize) {
         if i >= frame.size() || j >= frame.size() {
             warn!(
                 "ignoring CONECT ('{}') with atomic indexes bigger than frame size ({})",
-                line.trim(),
+                as_str(line.trim_ascii()),
                 frame.size()
             );
             return;
@@ -539,10 +550,10 @@ impl PDBFormat {
             .expect("could not add bond on frame when parsing CONECT");
     }
 
-    fn parse_conect(&self, frame: &mut Frame, line: &str) {
-        debug_assert_eq!(&line[..6], "CONECT");
+    fn parse_conect(&self, frame: &mut Frame, line: &[u8]) {
+        debug_assert_eq!(&line[..6], b"CONECT");
 
-        let line_length = line.trim().len();
+        let line_length = line.trim_ascii().len();
 
         let index_i = self
             .read_index(line, 6)
@@ -569,17 +580,17 @@ impl PDBFormat {
         }
     }
 
-    fn parse_helix(&mut self, line: &str) -> Result<(), CError> {
+    fn parse_helix(&mut self, line: &[u8]) -> Result<(), CError> {
         if line.len() < 33 + 5 {
-            warn!("HELIX record too short: {line}");
+            warn!("HELIX record too short: {}", as_str(line));
         }
 
-        let chain_start = line.as_bytes()[19] as char;
-        let chain_end = line.as_bytes()[31] as char;
-        let inscode_start = line.as_bytes()[25] as char;
-        let inscode_end = line.as_bytes()[37] as char;
-        let resname_start = line[15..18].trim();
-        let resname_end = line[27..30].trim();
+        let chain_start = line[19] as char;
+        let chain_end = line[31] as char;
+        let inscode_start = line[25] as char;
+        let inscode_end = line[37] as char;
+        let resname_start = line[15..18].trim_ascii();
+        let resname_end = line[27..30].trim_ascii();
 
         let resid_start = decode_hybrid36(4, &line[21..25])?;
         let resid_end = decode_hybrid36(4, &line[33..37])?;
@@ -593,19 +604,18 @@ impl PDBFormat {
         let start = FullResidueId {
             chain: chain_start,
             resid: resid_start,
-            resname: resname_start.to_string(),
+            resname: as_str(resname_start).to_string(),
             insertion_code: inscode_start,
         };
 
         let end = FullResidueId {
             chain: chain_end,
             resid: resid_end,
-            resname: resname_end.to_string(),
+            resname: as_str(resname_end).to_string(),
             insertion_code: inscode_end,
         };
 
-        let helix_type = &line[38..40]
-            .trim()
+        let helix_type = &as_str(line[38..40].trim_ascii())
             .parse::<usize>()
             .inspect_err(|e| warn!("failed to parse helix type: {e}"))
             .unwrap();
@@ -623,15 +633,15 @@ impl PDBFormat {
         Ok(())
     }
 
-    fn parse_secondary(&mut self, line: &str, start: usize, end: usize) -> Result<(), CError> {
+    fn parse_secondary(&mut self, line: &[u8], start: usize, end: usize) -> Result<(), CError> {
         if line.len() < end + 10 {
-            warn!("secondary structure record too short: '{line}'");
+            warn!("secondary structure record too short: '{}'", as_str(line));
         }
 
-        let resname_start = &line[start..start + 3].trim();
-        let resname_end = &line[end..end + 3].trim();
-        let chain_start = line.as_bytes()[start + 4] as char;
-        let chain_end = line.as_bytes()[end + 4] as char;
+        let resname_start = line[start..start + 3].trim_ascii();
+        let resname_end = line[end..end + 3].trim_ascii();
+        let chain_start = line[start + 4] as char;
+        let chain_end = line[end + 4] as char;
 
         if chain_start != chain_end {
             return Err(CError::GenericError(format!(
@@ -641,20 +651,20 @@ impl PDBFormat {
 
         let resid_start = decode_hybrid36(4, &line[start..start + 4])?;
         let resid_end = decode_hybrid36(4, &line[end..end + 4])?;
-        let inscode_start = line.as_bytes()[start + 9] as char;
-        let inscode_end = line.as_bytes()[end + 9] as char;
+        let inscode_start = line[start + 9] as char;
+        let inscode_end = line[end + 9] as char;
 
         let start = FullResidueId {
             chain: chain_start,
             resid: resid_start,
-            resname: (*resname_start).to_string(),
+            resname: as_str(resname_start).to_string(),
             insertion_code: inscode_start,
         };
 
         let end = FullResidueId {
             chain: chain_end,
             resid: resid_end,
-            resname: (*resname_end).to_string(),
+            resname: as_str(resname_end).to_string(),
             insertion_code: inscode_end,
         };
 
@@ -683,8 +693,8 @@ impl PDBFormat {
         }
     }
 
-    const END_RECORD: &str = "END";
-    const ENDMDL_RECORD: &str = "ENDMDL";
+    const END_RECORD: &[u8] = b"END";
+    const ENDMDL_RECORD: &[u8] = b"ENDMDL";
 
     fn link_standard_residue_bonds(frame: &mut Frame) {
         let mut link_previous_peptide = false;
@@ -956,30 +966,31 @@ impl Codec for PDBFormat {
         self.atom_offsets.clear();
 
         let mut frame = Frame::new();
-        let mut line = String::new();
+        let mut buf = Vec::new();
 
         let mut got_end = false;
-        while !got_end && reader.read_line(&mut line)? > 0 {
-            let record = get_record(&line);
+        while !got_end && reader.read_until(b'\n', &mut buf)? > 0 {
+            let line = buf.as_slice();
+            let record = get_record(line);
 
             match record {
                 Record::HEADER => {
                     if line.len() >= 50 {
                         frame.properties.insert(
                             "classification".into(),
-                            Property::String(line[10..50].trim().to_string()),
+                            Property::String(as_str(line[10..50].trim_ascii()).to_string()),
                         );
                     }
                     if line.len() >= 59 {
                         frame.properties.insert(
                             "deposition_date".into(),
-                            Property::String(line[50..59].trim().to_string()),
+                            Property::String(as_str(line[50..59].trim_ascii()).to_string()),
                         );
                     }
                     if line.len() >= 66 {
                         frame.properties.insert(
                             "pdb_idcode".into(),
-                            Property::String(line[62..66].trim().to_string()),
+                            Property::String(as_str(line[62..66].trim_ascii()).to_string()),
                         );
                     }
                 }
@@ -987,35 +998,36 @@ impl Codec for PDBFormat {
                     if line.len() < 11 {
                         continue;
                     }
-                    let title = line[10..80].trim();
+                    let end = std::cmp::min(line.len(), 80);
+                    let title = line[10..end].trim_ascii();
                     let current = frame
                         .properties
                         .get("name")
                         .and_then(|p| p.as_string())
                         .unwrap_or_default();
                     let new_title = if current.is_empty() {
-                        title.to_string()
+                        as_str(title).to_string()
                     } else {
-                        format!("{current} {title}")
+                        format!("{current} {}", as_str(title))
                     };
                     frame
                         .properties
                         .insert("name".into(), Property::String(new_title));
                 }
-                Record::CRYST1 => PDBFormat::parse_cryst1(&mut frame, &line).unwrap(),
-                Record::ATOM => self.parse_atom(&mut frame, &line, false).unwrap(),
-                Record::HETATM => self.parse_atom(&mut frame, &line, true).unwrap(),
-                Record::CONECT => self.parse_conect(&mut frame, &line),
+                Record::CRYST1 => PDBFormat::parse_cryst1(&mut frame, line).unwrap(),
+                Record::ATOM => self.parse_atom(&mut frame, line, false).unwrap(),
+                Record::HETATM => self.parse_atom(&mut frame, line, true).unwrap(),
+                Record::CONECT => self.parse_conect(&mut frame, line),
                 Record::MODEL => self.models += 1,
                 Record::ENDMDL => {
                     // look one line ahead to see if the next Record is an `END`
-                    let mut line = String::new();
-                    let bytes = reader.read_line(&mut line)?;
+                    let mut peek_buf = Vec::new();
+                    let bytes = reader.read_until(b'\n', &mut peek_buf)?;
                     if bytes > 0 {
                         reader.seek_relative(
                             -(i64::try_from(bytes).expect("failed to convert bytes offset")),
                         )?;
-                        if get_record(&line) == Record::END {
+                        if get_record(&peek_buf) == Record::END {
                             // If that is the case then wait for the next Record
                             continue;
                         }
@@ -1023,9 +1035,9 @@ impl Codec for PDBFormat {
                     // Else we have read a frame
                     got_end = true;
                 }
-                Record::HELIX => self.parse_helix(&line).unwrap(),
-                Record::SHEET => self.parse_secondary(&line, 17, 28).unwrap(),
-                Record::TURN => self.parse_secondary(&line, 15, 26).unwrap(),
+                Record::HELIX => self.parse_helix(line).unwrap(),
+                Record::SHEET => self.parse_secondary(line, 17, 28).unwrap(),
+                Record::TURN => self.parse_secondary(line, 15, 26).unwrap(),
                 Record::TER => {
                     if line.len() >= 12 {
                         let ter_serial =
@@ -1043,10 +1055,10 @@ impl Codec for PDBFormat {
                 Record::END => got_end = true,
                 Record::IGNORED_ => {}
                 Record::UNKNOWN_ => {
-                    warn!("ignoring unknown record: {line}");
+                    warn!("ignoring unknown record: {}", as_str(line));
                 }
             }
-            line.clear();
+            buf.clear();
         }
 
         if !got_end {
@@ -1059,28 +1071,27 @@ impl Codec for PDBFormat {
     }
 
     fn forward(&self, reader: &mut BufReader<File>) -> Result<Option<u64>, CError> {
-        let mut line = String::new();
+        let mut buf = Vec::new();
         let start = reader.stream_position()?;
 
-        while reader.read_line(&mut line)? > 0 {
-            if line.starts_with(Self::ENDMDL_RECORD) {
-                let mut next_line = String::new();
-                let bytes = reader.read_line(&mut next_line)?;
+        while reader.read_until(b'\n', &mut buf)? > 0 {
+            if buf.starts_with(Self::ENDMDL_RECORD) {
+                let mut next_buf = Vec::new();
+                let bytes = reader.read_until(b'\n', &mut next_buf)?;
 
                 reader.seek_relative(
                     -(i64::try_from(bytes).expect("failed to convert bytes offset")),
                 )?;
-                if next_line.trim().starts_with(Self::END_RECORD) {
-                    next_line.clear();
+                if next_buf.trim_ascii().starts_with(Self::END_RECORD) {
                     continue;
                 }
             }
 
-            if line.starts_with(Self::END_RECORD) {
+            if buf.starts_with(Self::END_RECORD) {
                 return Ok(Some(reader.stream_position()?));
             }
 
-            line.clear();
+            buf.clear();
         }
 
         if start == 0 {
@@ -1405,7 +1416,7 @@ mod tests {
         ($width:expr, $value:expr, $hybrid:expr) => {
             assert_eq!(encode_hybrid36($width, $value), $hybrid);
             assert_eq!(
-                decode_hybrid36($width, $hybrid).expect(
+                decode_hybrid36($width, $hybrid.as_bytes()).expect(
                     format!(
                         "decode failed with width '{0}' and hybrid '{1}'",
                         $width, $hybrid
@@ -1419,8 +1430,8 @@ mod tests {
 
     #[test]
     fn hybrid_encode_decode() {
-        assert_eq!(decode_hybrid36(4, "    ").unwrap(), 0);
-        assert_eq!(decode_hybrid36(4, "  -0").unwrap(), 0);
+        assert_eq!(decode_hybrid36(4, b"    ").unwrap(), 0);
+        assert_eq!(decode_hybrid36(4, b"  -0").unwrap(), 0);
 
         recycle_check!(4, -999, "-999");
         recycle_check!(4, -78, "-78");
@@ -1481,8 +1492,8 @@ mod tests {
         recycle_check!(4, 10_000 + 26 * 36 * 36 * 36 + 36 * 36 * 36, "b000");
         recycle_check!(4, 10_000 + 2 * 26 * 36 * 36 * 36 - 1, "zzzz");
 
-        assert_eq!(decode_hybrid36(5, "    ").unwrap(), 0);
-        assert_eq!(decode_hybrid36(5, "  -0").unwrap(), 0);
+        assert_eq!(decode_hybrid36(5, b"    ").unwrap(), 0);
+        assert_eq!(decode_hybrid36(5, b"  -0").unwrap(), 0);
         recycle_check!(5, -9999, "-9999");
         recycle_check!(5, -123, "-123");
         recycle_check!(5, -45, "-45");
@@ -2121,25 +2132,25 @@ mod tests {
     #[test]
     #[should_panic(expected = "the value '*0000' is not a valid hybrid 36 number")]
     fn decode_bad1() {
-        decode_hybrid36(5, "*0000").unwrap();
+        decode_hybrid36(5, b"*0000").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "the value 'A*000' is not a valid hybrid 36 number")]
     fn decode_bad2() {
-        decode_hybrid36(5, "A*000").unwrap();
+        decode_hybrid36(5, b"A*000").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "the value 'a*000' is not a valid hybrid 36 number")]
     fn decode_bad3() {
-        decode_hybrid36(5, "a*000").unwrap();
+        decode_hybrid36(5, b"a*000").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "length of '12345' is greater than the width '2'. this is a bug")]
     fn decode_bad4() {
-        decode_hybrid36(2, "12345").unwrap();
+        decode_hybrid36(2, b"12345").unwrap();
     }
 
     #[test]
