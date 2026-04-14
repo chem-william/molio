@@ -7,14 +7,16 @@
 
 Currently supports
 
-| Format         | Extension |
-| ------         | --------- |
-| (Extended) XYZ | .xyz      |
-| PDB            | .pdb      |
-| SDF            | .sdf      |
-| SMILES         | .smi      |
+| Format              | Extension |
+| ------              | --------- |
+| (Extended) XYZ      | .xyz      |
+| PDB                 | .pdb      |
+| SDF                 | .sdf      |
+| SMILES              | .smi      |
+| AMBER Trajectories  | .nc       |
+| AMBER Traj          | .ncrst    |
 
-This project is a Rust port of [`chemfiles`](https://github.com/chemfiles/chemfiles/), a modern C++ library with the same purpose.
+This project is heavily inspired by [`chemfiles`](https://github.com/chemfiles/chemfiles/), a modern C++ library with the same purpose.
 
 ## Usage
 
@@ -57,10 +59,16 @@ frame.add_atom(Atom::new("C".to_string()), [1.0, 2.0, 3.0]);
 // Write frames
 writer.write(&frame).unwrap();
 
-// Optionally, explicitly finalize the file (adds END record for PDB)
+// Optionally, explicitly finalize the file (for example, adds END record for PDB)
 // If not called explicitly, finalization happens when writer is dropped
 writer.finish().unwrap();
 ```
+
+### Format specific notes
+
+- AMBER: we use [netcdf3](https://docs.rs/netcdf3/latest/netcdf3/), a pure Rust implementation for reading and writing NetCDF-3 files, to read AMBER trajectories. However, due to the way that lib performs, writes to disk won't happen until we hit `finish()`. There are no partial writes.
+
+This also means that we can only read AMBER trajectories based on NetCDF-3 files.
 
 ## Contributions
 [Contributions](https://github.com/chem-william/molio/edit/main/CONTRIBUTING.md) are very welcome! Please open an [issue](https://github.com/chem-william/molio/issues/new) to discuss bugs or new features.

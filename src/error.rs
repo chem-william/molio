@@ -36,3 +36,21 @@ pub enum CError {
         reason: String,
     },
 }
+
+impl From<netcdf3::ReadError> for CError {
+    fn from(err: netcdf3::ReadError) -> Self {
+        Self::GenericError(err.to_string())
+    }
+}
+
+impl From<netcdf3::error::InvalidDataSet> for CError {
+    fn from(err: netcdf3::error::InvalidDataSet) -> Self {
+        Self::GenericError(err.to_string())
+    }
+}
+
+impl From<netcdf3::WriteError> for CError {
+    fn from(err: netcdf3::WriteError) -> Self {
+        Self::GenericError(format!("{err:?}"))
+    }
+}
