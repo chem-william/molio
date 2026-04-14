@@ -82,6 +82,85 @@ impl Convention {
     }
 }
 
+enum NumericData {
+    F32(Vec<f32>),
+    F64(Vec<f64>),
+}
+
+fn read_values(
+    file_reader: &mut FileReader,
+    index: usize,
+    convention: Convention,
+    variable: &Variable,
+    invalid_type_message: &str,
+) -> Result<NumericData, CError> {
+    let name = variable.name();
+    match variable.data_type() {
+        DataType::I8 | DataType::U8 | DataType::I16 | DataType::I32 => {
+            Err(CError::GenericError(invalid_type_message.to_string()))
+        }
+        DataType::F32 => {
+            let values = match convention {
+                Convention::Amber => file_reader.read_record_f32(name, index)?,
+                Convention::Restart => file_reader.read_var_f32(name)?,
+            };
+            Ok(NumericData::F32(values))
+        }
+        DataType::F64 => {
+            let values = match convention {
+                Convention::Amber => file_reader.read_record_f64(name, index)?,
+                Convention::Restart => file_reader.read_var_f64(name)?,
+            };
+            Ok(NumericData::F64(values))
+        }
+    }
+}
+
+fn read_triplet(
+    file_reader: &mut FileReader,
+    index: usize,
+    convention: Convention,
+    variable: &VariableWithScale,
+) -> Result<[f64; 3], CError> {
+    match read_values(
+        file_reader,
+        index,
+        convention,
+        &variable.var,
+        "invalid type for variable, expected f32/f64 data",
+    )? {
+        NumericData::F32(values) => Ok([
+            variable.scale * f64::from(values[0]),
+            variable.scale * f64::from(values[1]),
+            variable.scale * f64::from(values[2]),
+        ]),
+        NumericData::F64(values) => Ok([
+            variable.scale * values[0],
+            variable.scale * values[1],
+            variable.scale * values[2],
+        ]),
+    }
+}
+
+fn read_scalar(
+    file_reader: &mut FileReader,
+    index: usize,
+    convention: Convention,
+    variable: &VariableWithScale,
+    invalid_type_message: &str,
+) -> Result<f64, CError> {
+    match read_values(
+        file_reader,
+        index,
+        convention,
+        &variable.var,
+        invalid_type_message,
+    )? {
+        NumericData::F32(values) => Ok(variable.scale * f64::from(values[0])),
+        NumericData::F64(values) => Ok(variable.scale * values[0]),
+    }
+}
+
 fn read_array(
     file_reader: &mut FileReader,
     index: usize,
@@ -89,36 +168,28 @@ fn read_array(
     variable: &VariableWithScale,
     array: &mut [[f64; 3]],
 ) -> Result<(), CError> {
-    let name = variable.var.name();
-    match variable.var.data_type() {
-        DataType::I8 | DataType::U8 | DataType::I16 | DataType::I32 => {
-            return Err(CError::GenericError(
-                "invalid type for variable, expected f32/f64 data".to_string(),
-            ));
-        }
-        DataType::F32 => {
-            let buffer = match convention {
-                Convention::Amber => file_reader.read_record_f32(name, index)?,
-                Convention::Restart => file_reader.read_var_f32(name)?,
-            };
-            for (idx, item) in array.iter_mut().enumerate() {
-                item[0] = variable.scale * f64::from(buffer[3 * idx]);
-                item[1] = variable.scale * f64::from(buffer[3 * idx + 1]);
-                item[2] = variable.scale * f64::from(buffer[3 * idx + 2]);
+    match read_values(
+        file_reader,
+        index,
+        convention,
+        &variable.var,
+        "invalid type for variable, expected f32/f64 data",
+    )? {
+        NumericData::F32(values) => {
+            for (chunk, item) in values.chunks_exact(3).zip(array.iter_mut()) {
+                item[0] = variable.scale * f64::from(chunk[0]);
+                item[1] = variable.scale * f64::from(chunk[1]);
+                item[2] = variable.scale * f64::from(chunk[2]);
             }
         }
-        DataType::F64 => {
-            let buffer = match convention {
-                Convention::Amber => file_reader.read_record_f64(name, index)?,
-                Convention::Restart => file_reader.read_var_f64(name)?,
-            };
-            for (idx, item) in array.iter_mut().enumerate() {
-                item[0] = variable.scale * buffer[3 * idx];
-                item[1] = variable.scale * buffer[3 * idx + 1];
-                item[2] = variable.scale * buffer[3 * idx + 2];
+        NumericData::F64(values) => {
+            for (chunk, item) in values.chunks_exact(3).zip(array.iter_mut()) {
+                item[0] = variable.scale * chunk[0];
+                item[1] = variable.scale * chunk[1];
+                item[2] = variable.scale * chunk[2];
             }
         }
-    };
+    }
 
     Ok(())
 }
@@ -134,7 +205,11 @@ fn validate_common(file_reader: &FileReader, convention: &str) -> Result<(), CEr
         let read_attr = read_attr.get_as_string();
 
         if let Some(read_attr) = read_attr {
-            assert_eq!(read_attr, expected_attr, "expected '{expected_attr}'");
+            if read_attr != expected_attr {
+                return Err(CError::GenericError(format!(
+                    "expected '{expected_attr}', got {read_attr}"
+                )));
+            }
         } else {
             return Err(CError::GenericError(
                 "could not read attr as string".to_string(),
@@ -147,12 +222,12 @@ fn validate_common(file_reader: &FileReader, convention: &str) -> Result<(), CEr
     check_attr(data_set, "ConventionVersion", "1.0")?;
 
     if let Some(spatial) = file_reader.data_set().get_dim("spatial") {
-        assert_eq!(
-            spatial.size(),
-            3,
-            "'spatial' dimension must have a size of 3, got {}",
-            spatial.size()
-        );
+        if spatial.size() != 3 {
+            return Err(CError::GenericError(format!(
+                "'spatial' dimension must have a size of 3, got {}",
+                spatial.size()
+            )));
+        }
     } else {
         return Err(CError::GenericError(
             "missing 'spatial' dimension".to_string(),
@@ -164,21 +239,21 @@ fn validate_common(file_reader: &FileReader, convention: &str) -> Result<(), CEr
         .get_dim("atom")
         .ok_or(CError::GenericError("missing 'atom' dimension".to_string()))?;
 
-    if let Some(cell_spatial) = file_reader.data_set().get_dim("cell_spatial") {
-        assert_eq!(
-            cell_spatial.size(),
-            3,
+    if let Some(cell_spatial) = file_reader.data_set().get_dim("cell_spatial")
+        && cell_spatial.size() != 3
+    {
+        return Err(CError::GenericError(format!(
             "'cell_spatial' dimension must have a size of 3, got {}",
             cell_spatial.size()
-        );
+        )));
     };
-    if let Some(cell_angular) = file_reader.data_set().get_dim("cell_angular") {
-        assert_eq!(
-            cell_angular.size(),
-            3,
+    if let Some(cell_angular) = file_reader.data_set().get_dim("cell_angular")
+        && cell_angular.size() != 3
+    {
+        return Err(CError::GenericError(format!(
             "'cell_angular' dimension must have a size of 3, got {}",
             cell_angular.size()
-        );
+        )));
     };
 
     Ok(())
@@ -220,7 +295,7 @@ fn scale_for_time(units: &str) -> f64 {
         "picoseconds" | "picosecond" | "ps" => 1.0,
         "femtoseconds" | "femtosecond" | "fs" => 1e-3,
         "nanoseconds" | "nanosecond" | "ns" => 1e3,
-        "microseconds" | "microsecond" | "ms" => 1e6,
+        "microseconds" | "microsecond" | "µs" | "us" => 1e6,
         "seconds" | "second" | "s" => 1e12,
         unknown => {
             warn!("unknown unit ({unknown}) for time");
@@ -266,61 +341,19 @@ impl AMBERTrajFormat {
             .as_mut()
             .expect("reader should've been initialized");
 
-        let mut lengths = [0.0; 3];
         let cell_lengths = self
             .variables
             .cell_lengths
             .as_ref()
             .expect("we just checked for None");
-        match cell_lengths.var.data_type() {
-            DataType::I8 | DataType::U8 | DataType::I16 | DataType::I32 => unreachable!(),
-            DataType::F32 => {
-                let buffer = match convention {
-                    Convention::Amber => reader.read_record_f32("cell_lengths", index)?,
-                    Convention::Restart => reader.read_var_f32("cell_lengths")?,
-                };
-                lengths[0] = cell_lengths.scale * f64::from(buffer[0]);
-                lengths[1] = cell_lengths.scale * f64::from(buffer[1]);
-                lengths[2] = cell_lengths.scale * f64::from(buffer[2]);
-            }
-            DataType::F64 => {
-                let buffer = match convention {
-                    Convention::Amber => reader.read_record_f64("cell_lengths", index)?,
-                    Convention::Restart => reader.read_var_f64("cell_lengths")?,
-                };
-                lengths[0] = cell_lengths.scale * buffer[0];
-                lengths[1] = cell_lengths.scale * buffer[1];
-                lengths[2] = cell_lengths.scale * buffer[2];
-            }
-        };
+        let lengths = read_triplet(reader, index, convention, cell_lengths)?;
 
-        let mut angles = [0.0; 3];
         let cell_angles = self
             .variables
             .cell_angles
             .as_ref()
             .expect("we just checked for None");
-        match cell_angles.var.data_type() {
-            DataType::I8 | DataType::U8 | DataType::I16 | DataType::I32 => unreachable!(),
-            DataType::F32 => {
-                let buffer = match convention {
-                    Convention::Amber => reader.read_record_f32("cell_angles", index)?,
-                    Convention::Restart => reader.read_var_f32("cell_angles")?,
-                };
-                angles[0] = cell_angles.scale * f64::from(buffer[0]);
-                angles[1] = cell_angles.scale * f64::from(buffer[1]);
-                angles[2] = cell_angles.scale * f64::from(buffer[2]);
-            }
-            DataType::F64 => {
-                let buffer = match convention {
-                    Convention::Amber => reader.read_record_f64("cell_angles", index)?,
-                    Convention::Restart => reader.read_var_f64("cell_angles")?,
-                };
-                angles[0] = cell_angles.scale * buffer[0];
-                angles[1] = cell_angles.scale * buffer[1];
-                angles[2] = cell_angles.scale * buffer[2];
-            }
-        };
+        let mut angles = read_triplet(reader, index, convention, cell_angles)?;
 
         Ok(Some(UnitCell::new_from_lengths_angles(
             lengths,
@@ -559,27 +592,13 @@ impl AMBERTrajFormat {
         }
 
         if let Some(time) = self.variables.time.as_ref() {
-            let time_value = match time.var.data_type() {
-                DataType::I8 | DataType::U8 | DataType::I16 | DataType::I32 => {
-                    return Err(CError::GenericError(
-                        "invalid type for time variable".to_string(),
-                    ));
-                }
-                DataType::F32 => {
-                    let value = match convention {
-                        Convention::Amber => reader.read_record_f32("time", index)?,
-                        Convention::Restart => reader.read_var_f32("time")?,
-                    };
-                    time.scale * f64::from(value[0])
-                }
-                DataType::F64 => {
-                    let value = match convention {
-                        Convention::Amber => reader.read_record_f64("time", index)?,
-                        Convention::Restart => reader.read_var_f64("time")?,
-                    };
-                    time.scale * value[0]
-                }
-            };
+            let time_value = read_scalar(
+                reader,
+                index,
+                convention,
+                time,
+                "invalid type for time variable",
+            )?;
             frame
                 .properties
                 .insert("time".to_string(), Property::Double(time_value));
