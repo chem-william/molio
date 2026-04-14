@@ -23,6 +23,9 @@ pub struct Frame {
     /// Positions of the particles
     positions: Vec<[f64; 3]>,
 
+    /// Velocities of the particles.
+    pub(crate) velocities: Option<Vec<[f64; 3]>>,
+
     /// Topology of the described system
     topology: Topology,
 }
@@ -34,6 +37,17 @@ impl Frame {
             unit_cell: UnitCell::new(),
             properties: Properties::new(),
             positions: vec![],
+            velocities: None,
+            topology: Topology::default(),
+        }
+    }
+
+    pub fn from_unitcell(unit_cell: UnitCell) -> Self {
+        Frame {
+            unit_cell,
+            properties: Properties::new(),
+            positions: vec![],
+            velocities: None,
             topology: Topology::default(),
         }
     }
@@ -67,22 +81,43 @@ impl Frame {
         &mut self.topology
     }
 
+    /// Get a reference to the unit cell of this [`Frame`]
+    pub fn cell(&self) -> &UnitCell {
+        &self.unit_cell
+    }
+
     /// Set the unit cell of this frame to `cell`
     pub fn set_unitcell(&mut self, cell: UnitCell) {
         self.unit_cell = cell;
-    }
-
-    pub fn size(&self) -> usize {
-        self.topology.size()
     }
 
     pub fn positions(&self) -> &Vec<[f64; 3]> {
         &self.positions
     }
 
+    pub fn positions_mut(&mut self) -> &mut Vec<[f64; 3]> {
+        &mut self.positions
+    }
+
+    pub fn velocities(&self) -> Option<&Vec<[f64; 3]>> {
+        self.velocities.as_ref()
+    }
+
+    pub fn velocities_mut(&mut self) -> Option<&mut Vec<[f64; 3]>> {
+        self.velocities.as_mut()
+    }
+
     pub fn add_atom(&mut self, atom: Atom, position: [f64; 3]) {
         self.topology.atoms.push(atom);
         self.positions.push(position);
+    }
+
+    pub fn add_atom_with_velocity(&mut self, atom: Atom, position: [f64; 3], velocity: [f64; 3]) {
+        self.topology.atoms.push(atom);
+        self.positions.push(position);
+        if let Some(velocities) = self.velocities.as_mut() {
+            velocities.push(velocity);
+        }
     }
 
     /// Remove all connectivity information in the frame's topology
@@ -96,10 +131,10 @@ impl Frame {
 
     pub fn resize(&mut self, size: usize) -> Result<(), CError> {
         self.topology.resize(size)?;
-        self.positions.resize(size, [0.0, 0.0, 0.0]);
-        // if self.velocities.is_some() {
-        //     self.velocities.resize();
-        // }
+        self.positions.resize(size, [0.0; 3]);
+        if let Some(velocities) = self.velocities.as_mut() {
+            velocities.resize(size, [0.0; 3]);
+        }
         Ok(())
     }
 
@@ -120,6 +155,22 @@ impl Frame {
     /// `j`.
     pub fn add_bond(&mut self, i: usize, j: usize, bond_order: BondOrder) -> Result<(), CError> {
         self.topology.add_bond(i, j, bond_order)
+    }
+
+    pub(crate) fn add_velocities(&mut self) {
+        if self.velocities.is_none() {
+            self.velocities = Some(vec![[0.0; 3]; self.size()]);
+        }
+    }
+
+    pub(crate) fn size(&self) -> usize {
+        debug_assert!(self.positions.len() == self.topology.size());
+
+        if let Some(velocities) = self.velocities.as_ref() {
+            debug_assert!(self.positions.len() == velocities.len())
+        }
+
+        self.positions.len()
     }
 }
 

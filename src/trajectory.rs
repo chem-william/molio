@@ -5,21 +5,23 @@
 // See LICENSE at the project root for full text.
 
 use crate::error::CError;
-use crate::format::{FormatKind, TextReader, TextWriter};
+use crate::format::{FormatKind, FormatReader, FormatWriter};
 use crate::frame::Frame;
 use log::error;
 use std::path::Path;
 
 /// A handle to a trajectory file for reading.
 pub struct TrajectoryReader {
+    /// Number of frames in the file
     pub size: usize,
-    strategy: TextReader,
+
+    strategy: FormatReader,
     current_index: usize,
 }
 
 /// A handle to a trajectory file for writing.
 pub struct TrajectoryWriter {
-    strategy: TextWriter,
+    strategy: FormatWriter,
     frame_count: usize,
 }
 
@@ -61,13 +63,28 @@ impl Trajectory {
     pub fn open_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryReader, CError> {
         let kind = format.resolve(path)?;
 
-        let strategy = TextReader::open(path, kind)?;
-        let size = strategy.len();
+        let strategy = FormatReader::open(path, kind)?;
+        let size = strategy.len()?;
 
         Ok(TrajectoryReader {
             size,
             strategy,
             current_index: 0,
+        })
+    }
+
+    pub fn append(path: &Path) -> Result<TrajectoryWriter, CError> {
+        Self::append_with_format(path, FormatKind::Guess)
+    }
+
+    pub fn append_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryWriter, CError> {
+        let kind = format.resolve(path)?;
+
+        let strategy = FormatWriter::open(path, kind)?;
+
+        Ok(TrajectoryWriter {
+            strategy,
+            frame_count: 0,
         })
     }
 
@@ -90,7 +107,7 @@ impl Trajectory {
     pub fn create_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryWriter, CError> {
         let kind = format.resolve(path)?;
 
-        let strategy = TextWriter::create(path, kind)?;
+        let strategy = FormatWriter::create(path, kind)?;
 
         Ok(TrajectoryWriter {
             strategy,
