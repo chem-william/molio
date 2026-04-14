@@ -383,12 +383,10 @@ impl AMBERTrajFormat {
 
         validate_common(&file_reader, convention.as_str())?;
 
-        let file_title =
-            if let Some(file_title) = file_reader.data_set().get_global_attr_as_string("title") {
-                file_title
-            } else {
-                String::new()
-            };
+        let file_title = file_reader
+            .data_set()
+            .get_global_attr_as_string("title")
+            .unwrap_or_default();
 
         let n_atoms = file_reader
             .data_set()

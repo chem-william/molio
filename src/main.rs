@@ -23,10 +23,10 @@ fn main() {
         // Profiling mode: run multiple iterations for flamegraph
         println!("Running in profiling mode (32 iterations)");
         for _ in 0..32 {
-            molio::read_trajectory(path);
+            let _ = molio::read_trajectory(path);
         }
     } else {
         // Normal benchmarking mode: run once
-        molio::read_trajectory(path);
+        let _ = molio::read_trajectory(path);
     }
 }
