@@ -353,11 +353,11 @@ impl AMBERTrajFormat {
             .cell_angles
             .as_ref()
             .expect("we just checked for None");
-        let mut angles = read_triplet(reader, index, convention, cell_angles)?;
+        let angles = read_triplet(reader, index, convention, cell_angles)?;
 
         Ok(Some(UnitCell::new_from_lengths_angles(
-            lengths,
-            &mut angles,
+            lengths.into(),
+            angles.into(),
         )?))
     }
 
@@ -549,7 +549,7 @@ impl AMBERTrajFormat {
 
         let mut frame = Frame::new();
         if let Some(unitcell) = self.read_cell()? {
-            frame.set_unitcell(unitcell);
+            frame.set_unit_cell(unitcell);
         }
 
         if !self.file_title.is_empty() {
@@ -849,11 +849,11 @@ mod tests {
         let positions = frame.positions();
         assert_approx_eq!(positions[0][0], 0.4172_191, 1e-4);
         assert_approx_eq!(positions[0][1], 8.303_366, 1e-4);
-        assert_approx_eq!(positions[0][2], 11.73_717, 1e-4);
+        assert_approx_eq!(positions[0][2], 11.737_17, 1e-4);
 
         assert_approx_eq!(positions[296][0], 6.664_049, 1e-4);
-        assert_approx_eq!(positions[296][1], 11.61_418, 1e-4);
-        assert_approx_eq!(positions[296][2], 12.96_149, 1e-4);
+        assert_approx_eq!(positions[296][1], 11.614_18, 1e-4);
+        assert_approx_eq!(positions[296][2], 12.961_49, 1e-4);
 
         assert_approx_eq!(
             frame.properties.get("time").unwrap().as_double().unwrap(),
@@ -922,7 +922,7 @@ mod tests {
     fn scale_factor() {
         let path = Path::new("./src/tests-data/netcdf/scaled_traj.nc");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 26);
+        assert_eq!(trajectory.len(), 26);
 
         let frame = trajectory.read_at(12).unwrap().unwrap();
         assert_eq!(frame.size(), 1938);
@@ -1004,7 +1004,8 @@ mod tests {
 
     fn generate_frame() -> Frame {
         let mut frame = Frame::from_unitcell(
-            UnitCell::new_from_lengths_angles([2.0, 3.0, 4.0], &mut [80.0, 90.0, 120.0]).unwrap(),
+            UnitCell::new_from_lengths_angles([2.0, 3.0, 4.0].into(), [80.0, 90.0, 120.0].into())
+                .unwrap(),
         );
         frame.properties.insert(
             "name".to_string(),
@@ -1063,7 +1064,7 @@ mod tests {
         }
 
         let mut trajectory = Trajectory::open(named_tmpfile.path()).unwrap();
-        assert_eq!(trajectory.size, 2);
+        assert_eq!(trajectory.len(), 2);
         check_frame(&trajectory.read().unwrap().unwrap());
         check_frame(&trajectory.read().unwrap().unwrap());
     }
@@ -1084,7 +1085,7 @@ mod tests {
         }
 
         let mut trajectory = Trajectory::open(named_tmpfile.path()).unwrap();
-        assert_eq!(trajectory.size, 2);
+        assert_eq!(trajectory.len(), 2);
         check_frame(&trajectory.read().unwrap().unwrap());
         check_frame(&trajectory.read().unwrap().unwrap());
     }
@@ -1095,7 +1096,7 @@ mod tests {
     fn rst_water() {
         let path = Path::new("./src/tests-data/netcdf/water.ncrst");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 297);

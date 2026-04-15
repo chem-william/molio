@@ -66,10 +66,10 @@ impl Frame {
     }
 
     pub fn set_topology(&mut self, topology: Topology) -> Result<(), CError> {
-        if topology.size() != self.size() {
+        if topology.len() != self.size() {
             return Err(CError::GenericError(format!(
                 "the topology contains {} atoms, but the frame contains {} atoms",
-                topology.size(),
+                topology.len(),
                 self.size(),
             )));
         }
@@ -79,7 +79,7 @@ impl Frame {
         Ok(())
     }
 
-    pub fn topology_as_mut(&mut self) -> &mut Topology {
+    pub fn topology_mut(&mut self) -> &mut Topology {
         &mut self.topology
     }
 
@@ -90,7 +90,7 @@ impl Frame {
     }
 
     /// Set the unit cell of this frame to `cell`
-    pub fn set_unitcell(&mut self, cell: UnitCell) {
+    pub fn set_unit_cell(&mut self, cell: UnitCell) {
         self.unit_cell = cell;
     }
 
@@ -169,7 +169,7 @@ impl Frame {
     }
 
     pub(crate) fn size(&self) -> usize {
-        debug_assert!(self.positions.len() == self.topology.size());
+        debug_assert!(self.positions.len() == self.topology.len());
 
         if let Some(velocities) = self.velocities.as_ref() {
             debug_assert!(self.positions.len() == velocities.len());

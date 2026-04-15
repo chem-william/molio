@@ -167,7 +167,7 @@ impl Codec for SDFFormat {
 
     fn write_next(&mut self, writer: &mut BufWriter<File>, frame: &Frame) -> Result<(), CError> {
         let topology = frame.topology();
-        debug_assert!(frame.size() == topology.size());
+        debug_assert!(frame.size() == topology.len());
 
         let mut frame_name = frame
             .properties
@@ -368,7 +368,7 @@ mod tests {
         let path = Path::new("./src/tests-data/sdf/aspirin.sdf");
         let trajectory = Trajectory::open(path).unwrap();
 
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
     }
 
     #[test]
@@ -376,7 +376,7 @@ mod tests {
         let path = Path::new("./src/tests-data/sdf/kinases.sdf");
         let trajectory = Trajectory::open(path).unwrap();
 
-        assert_eq!(trajectory.size, 6);
+        assert_eq!(trajectory.len(), 6);
     }
 
     #[test]
@@ -398,7 +398,7 @@ mod tests {
 
         // Check topology
         let topology = frame.topology();
-        assert_eq!(topology.size(), 47);
+        assert_eq!(topology.len(), 47);
         assert_eq!(topology[0], Atom::new("O".to_string()));
     }
 
@@ -418,7 +418,7 @@ mod tests {
         assert_approx_eq!(positions[67][2], 1.3726, 1e-3);
 
         let topology = frame.topology();
-        assert_eq!(topology.size(), 68);
+        assert_eq!(topology.len(), 68);
         assert_eq!(topology[0], Atom::new("O".to_string()));
 
         frame = trajectory.read_at(0).unwrap().unwrap();
@@ -435,7 +435,7 @@ mod tests {
     fn read_whole_file() {
         let path = Path::new("./src/tests-data/sdf/kinases.sdf");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 6);
+        assert_eq!(trajectory.len(), 6);
 
         let mut frame = Frame::new();
         while let Some(next_frame) = trajectory.read().unwrap() {

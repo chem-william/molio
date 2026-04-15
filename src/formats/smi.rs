@@ -92,8 +92,8 @@ impl SMIFormat {
         self.residues
             .last_mut()
             .expect("at least one residue")
-            .add_atom(topology.size() - 1);
-        let new_atom_idx = topology.size() - 1;
+            .add_atom(topology.len() - 1);
+        let new_atom_idx = topology.len() - 1;
         topology
             .atoms
             .get_mut(new_atom_idx)
@@ -538,7 +538,7 @@ impl Codec for SMIFormat {
                 .expect("able to add residues to topology");
         }
 
-        frame.resize(topology.size())?;
+        frame.resize(topology.len())?;
         frame.set_topology(topology)?;
         Ok(frame)
     }
@@ -744,14 +744,14 @@ mod tests {
     fn check_nsteps() {
         let path = Path::new("./src/tests-data/smi/test.smi");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 6);
+        assert_eq!(trajectory.len(), 6);
     }
 
     #[test]
     fn check_nsteps_with_newlines() {
         let path = Path::new("./src/tests-data/smi/spaces.smi");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 8);
+        assert_eq!(trajectory.len(), 8);
     }
 
     #[test]
@@ -847,7 +847,7 @@ mod tests {
     fn read_entire_file() {
         let path = Path::new("./src/tests-data/smi/rdkit_problems.smi");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 66);
+        assert_eq!(trajectory.len(), 66);
 
         let mut frame = Frame::new();
         while let Some(next_frame) = trajectory.read().unwrap() {
@@ -862,7 +862,7 @@ mod tests {
     fn check_parsing_results() {
         let path = Path::new("./src/tests-data/smi/details.smi");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 5);
@@ -876,7 +876,7 @@ mod tests {
     fn ugly_smiles_strings() {
         let path = Path::new("./src/tests-data/smi/ugly.smi");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 3);
+        assert_eq!(trajectory.len(), 3);
 
         // C1(CC1CC1CC1)
         let frame = trajectory.read().unwrap().unwrap();
@@ -925,7 +925,7 @@ mod tests {
     fn rdkit_problems() {
         let path = Path::new("./src/tests-data/smi/rdkit_problems.smi");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 66);
+        assert_eq!(trajectory.len(), 66);
 
         // C1CC2C1CC2
         let frame = trajectory.read().unwrap().unwrap();

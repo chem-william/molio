@@ -52,8 +52,13 @@ impl IndexMut<usize> for Topology {
 impl Topology {
     /// Returns the current number of atoms in the topology.
     #[must_use]
-    pub fn size(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.atoms.len()
+    }
+
+    /// Checks whether [`Self`] is empty.
+    pub fn is_empty(&self) -> bool {
+        self.atoms.is_empty()
     }
 
     /// Resizes the topology to contain `size` atoms.
@@ -140,7 +145,7 @@ impl Topology {
 
     // TODO: should this check be moved to Connectivity::add_bond?
     pub fn add_bond(&mut self, i: usize, j: usize, bond_order: BondOrder) -> Result<(), CError> {
-        let amount_atoms = self.size();
+        let amount_atoms = self.len();
         if i >= amount_atoms || j >= amount_atoms {
             return Err(CError::GenericError(format!(
                 "out of bounds atomic index. We have {amount_atoms}, but the bond indices are {i} and {j}"
@@ -153,7 +158,7 @@ impl Topology {
 
     // TODO: should this check be moved to Connectivity::remove_bond?
     pub fn remove_bond(&mut self, i: usize, j: usize) -> Result<(), CError> {
-        let amount_atoms = self.size();
+        let amount_atoms = self.len();
         if i >= amount_atoms || j >= amount_atoms {
             return Err(CError::GenericError(format!(
                 "out of bounds atomic index. We have {amount_atoms}, but the bond indices are {i} and {j}"
@@ -212,11 +217,11 @@ mod tests {
     #[test]
     fn check_size() {
         let mut topology = Topology::default();
-        assert_eq!(topology.size(), 0);
+        assert_eq!(topology.len(), 0);
 
         topology.atoms.push(Atom::new("C".to_string()));
         topology.atoms.push(Atom::new("H".to_string()));
-        assert_eq!(topology.size(), 2);
+        assert_eq!(topology.len(), 2);
     }
 
     #[test]
@@ -226,15 +231,15 @@ mod tests {
 
         // Resize to a larger size should succeed
         assert!(topology.resize(3).is_ok());
-        assert_eq!(topology.size(), 3);
+        assert_eq!(topology.len(), 3);
 
         // Resize to the same size should succeed
         assert!(topology.resize(3).is_ok());
-        assert_eq!(topology.size(), 3);
+        assert_eq!(topology.len(), 3);
 
         // Resize to a smaller size should succeed when no bonds exist
         assert!(topology.resize(2).is_ok());
-        assert_eq!(topology.size(), 2);
+        assert_eq!(topology.len(), 2);
     }
 
     #[test]
@@ -254,7 +259,7 @@ mod tests {
         assert!(result.is_err());
 
         // Topology size should remain unchanged
-        assert_eq!(topology.size(), 3);
+        assert_eq!(topology.len(), 3);
     }
 
     #[test]

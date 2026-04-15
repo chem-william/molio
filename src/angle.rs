@@ -16,7 +16,7 @@ use std::ops::Index;
 ///     |    \   /    |
 ///     |      j      |
 /// ```
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy, Hash)]
 pub struct Angle {
     data: [usize; 3],
 }
@@ -84,7 +84,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "can not have the same atom twice in an angle")]
     fn test_angle_with_duplicate_atoms_i_j() {
-        Angle::new(1, 1, 3);
+        let _ = Angle::new(1, 1, 3);
     }
 
     #[test]
