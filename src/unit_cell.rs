@@ -9,7 +9,7 @@ use core::f64;
 use nalgebra::Matrix3;
 use std::ops::{Deref, DerefMut};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub struct Vec3D([f64; 3]);
 
 impl From<[f64; 3]> for Vec3D {
