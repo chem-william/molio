@@ -2200,13 +2200,13 @@ END
 
         let mut frame = Frame::new();
         frame.unit_cell = UnitCell::new_from_lengths([22.0, 22.0, 22.0]);
-        let atom = Atom::new("A".into());
+        let atom = Atom::new("A");
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
-        let atom = Atom::new("B".into());
+        let atom = Atom::new("B");
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
-        let atom = Atom::new("C".into());
+        let atom = Atom::new("C");
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
-        let atom = Atom::new("D".into());
+        let atom = Atom::new("D");
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
         frame.add_bond(0, 1, BondOrder::Unknown).unwrap();
         frame[0]
@@ -2218,11 +2218,11 @@ END
 
         trajectory.write(&frame).unwrap();
 
-        let atom = Atom::new("E".into());
+        let atom = Atom::new("E");
         frame.add_atom(atom, [4.0, 5.0, 6.0]);
-        let atom = Atom::new("F".into());
+        let atom = Atom::new("F");
         frame.add_atom(atom, [4.0, 5.0, 6.0]);
-        let atom = Atom::new("G".into());
+        let atom = Atom::new("G");
         frame.add_atom(atom, [4.0, 5.0, 6.0]);
 
         frame.add_bond(4, 5, BondOrder::Unknown).unwrap();
@@ -2234,7 +2234,7 @@ END
         frame.add_bond(4, 6, BondOrder::Unknown).unwrap();
         frame.add_bond(5, 6, BondOrder::Unknown).unwrap();
 
-        let mut residue = Residue::new("foo".into(), 3);
+        let mut residue = Residue::new("foo", 3);
         residue.add_atom(1);
         residue.add_atom(2);
         residue
@@ -2249,7 +2249,7 @@ END
         );
         frame.add_residue(residue).unwrap();
 
-        residue = Residue::new_from_name("barbar".into()); // Name will be truncated in output
+        residue = Residue::new_from_name("barbar"); // Name will be truncated in output
         residue.add_atom(3);
         residue
             .properties
@@ -2262,7 +2262,7 @@ END
             .insert("segname".into(), Property::String("SEGMENT".into()));
         frame.add_residue(residue).unwrap();
 
-        residue = Residue::new("baz".into(), -2);
+        residue = Residue::new("baz", -2);
         residue.add_atom(5);
         frame.add_residue(residue).unwrap();
 

@@ -43,18 +43,18 @@ pub struct Residue {
 
 impl Residue {
     #[must_use]
-    pub fn new(name: String, id: i64) -> Self {
+    pub fn new(name: impl Into<String>, id: i64) -> Self {
         Self {
-            name,
+            name: name.into(),
             id: Some(id),
             ..Default::default()
         }
     }
 
     #[must_use]
-    pub fn new_from_name(name: String) -> Self {
+    pub fn new_from_name(name: impl Into<String>) -> Self {
         Self {
-            name,
+            name: name.into(),
             ..Default::default()
         }
     }

@@ -17,7 +17,8 @@ pub struct Atom {
 
 impl Atom {
     #[must_use]
-    pub fn new(name: String) -> Self {
+    pub fn new(name: impl Into<String>) -> Self {
+        let name = name.into();
         Self {
             name: name.clone(),
             symbol: name,
@@ -28,10 +29,10 @@ impl Atom {
     }
 
     #[must_use]
-    pub fn with_symbol(name: String, symbol: String) -> Self {
+    pub fn with_symbol(name: impl Into<String>, symbol: impl Into<String>) -> Self {
         Self {
-            name,
-            symbol,
+            name: name.into(),
+            symbol: symbol.into(),
             charge: 0.0,
             mass: 0.0,
             properties: Properties::new(),
