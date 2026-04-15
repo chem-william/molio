@@ -816,7 +816,7 @@ F 4.0 5.0 6.0
 
         trajectory.write(&frame).unwrap();
 
-        frame.unit_cell = UnitCell::new_from_lengths([12.0, 13.0, 14.0]);
+        frame.unit_cell = UnitCell::new_from_lengths([12.0, 13.0, 14.0].into());
         frame
             .properties
             .insert("is_open".to_string(), Property::Bool(false));

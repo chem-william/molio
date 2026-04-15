@@ -353,11 +353,11 @@ impl AMBERTrajFormat {
             .cell_angles
             .as_ref()
             .expect("we just checked for None");
-        let mut angles = read_triplet(reader, index, convention, cell_angles)?;
+        let angles = read_triplet(reader, index, convention, cell_angles)?;
 
         Ok(Some(UnitCell::new_from_lengths_angles(
-            lengths,
-            &mut angles,
+            lengths.into(),
+            angles.into(),
         )?))
     }
 
@@ -1004,7 +1004,8 @@ mod tests {
 
     fn generate_frame() -> Frame {
         let mut frame = Frame::from_unitcell(
-            UnitCell::new_from_lengths_angles([2.0, 3.0, 4.0], &mut [80.0, 90.0, 120.0]).unwrap(),
+            UnitCell::new_from_lengths_angles([2.0, 3.0, 4.0].into(), [80.0, 90.0, 120.0].into())
+                .unwrap(),
         );
         frame.properties.insert(
             "name".to_string(),

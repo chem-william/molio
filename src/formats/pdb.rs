@@ -12,7 +12,7 @@ use crate::format::Codec;
 use crate::frame::Frame;
 use crate::property::Property;
 use crate::residue::{FullResidueId, Residue};
-use crate::unit_cell::UnitCell;
+use crate::unit_cell::{UnitCell, Vec3D};
 use log::warn;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
@@ -505,7 +505,8 @@ impl PDBFormat {
         let beta = parse_val(&line[40..47])?;
         let gamma = parse_val(&line[47..54])?;
 
-        let unit_cell = UnitCell::new_from_lengths_angles([a, b, c], &mut [alpha, beta, gamma])?;
+        let unit_cell =
+            UnitCell::new_from_lengths_angles([a, b, c].into(), [alpha, beta, gamma].into())?;
         frame.unit_cell = unit_cell;
 
         if line.len() >= 55 {
@@ -831,7 +832,7 @@ impl PDBFormat {
     // Check the number of digits before the decimal separator to be sure than we
     // can represent them. In case of error, use the given `context` in the error
     // message
-    fn check_values_size(values: [f64; 3], width: i32, context: &str) -> Result<(), CError> {
+    fn check_values_size(values: Vec3D, width: i32, context: &str) -> Result<(), CError> {
         let max_pos = f64::powi(10.0, width) - 1.0;
         let max_neg = -f64::powi(10.0, width) - 1.0;
 
@@ -1184,7 +1185,7 @@ impl Codec for PDBFormat {
                 ter_count += 1;
             }
 
-            PDBFormat::check_values_size(*pos, 8, "atomic position")?;
+            PDBFormat::check_values_size((*pos).into(), 8, "atomic position")?;
             writeln!(
                 writer,
                 "{:<6}{:>5} {:<4}{:1}{:3} {:1}{:>4}{:1}   {:8.3}{:8.3}{:8.3}{:6.2}{:6.2}      {: <4}{: >2}",
@@ -2199,7 +2200,7 @@ END
         let mut trajectory = Trajectory::create(named_tmpfile.path()).unwrap();
 
         let mut frame = Frame::new();
-        frame.unit_cell = UnitCell::new_from_lengths([22.0, 22.0, 22.0]);
+        frame.unit_cell = UnitCell::new_from_lengths([22.0, 22.0, 22.0].into());
         let atom = Atom::new("A");
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
         let atom = Atom::new("B");

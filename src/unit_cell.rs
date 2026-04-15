@@ -7,8 +7,30 @@
 use crate::error::CError;
 use core::f64;
 use nalgebra::Matrix3;
+use std::ops::{Deref, DerefMut};
 
-type Vec3D = [f64; 3];
+#[derive(Copy, Clone)]
+pub struct Vec3D([f64; 3]);
+
+impl From<[f64; 3]> for Vec3D {
+    fn from(value: [f64; 3]) -> Self {
+        Vec3D(value)
+    }
+}
+
+impl Deref for Vec3D {
+    type Target = [f64; 3];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Vec3D {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Default)]
 pub enum CellShape {
@@ -38,7 +60,7 @@ mod utils {
         let v2 = matrix.row(1);
         let v3 = matrix.row(2);
 
-        [v1.norm(), v2.norm(), v3.norm()]
+        Vec3D([v1.norm(), v2.norm(), v3.norm()])
     }
 
     /// Calculate the angles between cell vectors from the matrix
@@ -47,11 +69,11 @@ mod utils {
         let v2 = matrix.row(1);
         let v3 = matrix.row(2);
 
-        [
+        Vec3D([
             (v2.dot(&v3) / (v2.norm() * v3.norm())).acos().to_degrees(),
             (v1.dot(&v3) / (v1.norm() * v3.norm())).acos().to_degrees(),
             (v1.dot(&v2) / (v1.norm() * v2.norm())).acos().to_degrees(),
-        ]
+        ])
     }
 
     /// Calculate cosine of an angle in degrees
@@ -100,7 +122,7 @@ mod validation {
     ///
     /// Returns an error if:
     /// - Any length is negative
-    pub fn check_lengths(lengths: &Vec3D) -> Result<(), CError> {
+    pub fn check_lengths(lengths: Vec3D) -> Result<(), CError> {
         if let Some(&length) = lengths.iter().find(|&&x| x < 0.0) {
             return Err(CError::GenericError(format!(
                 "negative length found: {length}"
@@ -118,7 +140,7 @@ mod validation {
     /// - Any angle is negative
     /// - Any angle is zero
     /// - Any angle is 180 degrees or greater
-    pub fn check_angles(angles: &Vec3D) -> Result<(), CError> {
+    pub fn check_angles(angles: Vec3D) -> Result<(), CError> {
         if let Some(&angle) = angles.iter().find(|&&x| x < 0.0) {
             return Err(CError::GenericError(format!(
                 "negative angle found: {angle}"
@@ -148,10 +170,11 @@ mod matrix {
     pub fn cell_matrix_from_lengths_angles(
         lengths: Vec3D,
         // TODO: probably this shouldn't be mut
-        angles: &mut Vec3D,
+        angles: Vec3D,
     ) -> Result<Matrix3<f64>, CError> {
-        validation::check_lengths(&lengths)?;
+        validation::check_lengths(lengths)?;
         validation::check_angles(angles)?;
+        let mut angles = angles;
 
         // Normalize angles to 90 degrees if they're close enough
         if angles.iter().all(|&x| utils::is_roughly_90(x)) {
@@ -204,12 +227,12 @@ impl Eq for UnitCell {}
 impl UnitCell {
     #[must_use]
     pub fn new() -> Self {
-        UnitCell::new_from_lengths([0.0, 0.0, 0.0])
+        UnitCell::new_from_lengths(Vec3D([0.0, 0.0, 0.0]))
     }
 
     #[must_use]
     pub fn new_from_lengths(lengths: Vec3D) -> Self {
-        UnitCell::new_from_lengths_angles(lengths, &mut [90.0, 90.0, 90.0]).unwrap()
+        UnitCell::new_from_lengths_angles(lengths, Vec3D([90.0, 90.0, 90.0])).unwrap()
     }
 
     /// # Errors
@@ -219,7 +242,7 @@ impl UnitCell {
     /// - Any angle is negative
     /// - Any angle is zero
     /// - Any angle is 180 degrees or greater
-    pub fn new_from_lengths_angles(lengths: Vec3D, angles: &mut Vec3D) -> Result<Self, CError> {
+    pub fn new_from_lengths_angles(lengths: Vec3D, angles: Vec3D) -> Result<Self, CError> {
         let matrix = matrix::cell_matrix_from_lengths_angles(lengths, angles)?;
         Self::new_from_matrix(matrix)
     }
@@ -267,12 +290,12 @@ impl UnitCell {
     #[must_use]
     pub fn lengths(&self) -> Vec3D {
         match self.shape {
-            CellShape::Infinite => [0.0, 0.0, 0.0],
-            CellShape::Orthorhombic => [
+            CellShape::Infinite => Vec3D([0.0, 0.0, 0.0]),
+            CellShape::Orthorhombic => Vec3D([
                 self.matrix[(0, 0)],
                 self.matrix[(1, 1)],
                 self.matrix[(2, 2)],
-            ],
+            ]),
             CellShape::Triclinic => utils::calc_lengths_from_matrix(self.matrix),
         }
     }
@@ -280,7 +303,7 @@ impl UnitCell {
     #[must_use]
     pub fn angles(&self) -> Vec3D {
         match self.shape {
-            CellShape::Infinite | CellShape::Orthorhombic => [90.0, 90.0, 90.0],
+            CellShape::Infinite | CellShape::Orthorhombic => Vec3D([90.0, 90.0, 90.0]),
             CellShape::Triclinic => utils::calc_angles_from_matrix(self.matrix),
         }
     }
@@ -303,7 +326,7 @@ mod tests {
     #[test]
     fn test_unit_cell_from_lengths() {
         let lengths = [10.0, 20.0, 30.0];
-        let cell = UnitCell::new_from_lengths(lengths);
+        let cell = UnitCell::new_from_lengths(lengths.into());
         assert_approx_eq!(cell.matrix[(0, 0)], 10.0);
         assert_approx_eq!(cell.matrix[(1, 1)], 20.0);
         assert_approx_eq!(cell.matrix[(2, 2)], 30.0);
@@ -313,8 +336,8 @@ mod tests {
     #[test]
     fn test_unit_cell_from_lengths_angles() {
         let lengths = [10.0, 20.0, 30.0];
-        let mut angles = [90.0, 90.0, 90.0];
-        let cell = UnitCell::new_from_lengths_angles(lengths, &mut angles).unwrap();
+        let angles = [90.0, 90.0, 90.0];
+        let cell = UnitCell::new_from_lengths_angles(lengths.into(), angles.into()).unwrap();
         assert_approx_eq!(cell.matrix[(0, 0)], 10.0);
         assert_approx_eq!(cell.matrix[(1, 1)], 20.0);
         assert_approx_eq!(cell.matrix[(2, 2)], 30.0);
@@ -334,16 +357,16 @@ mod tests {
 
     #[test]
     fn test_unit_cell_lengths() {
-        let cell = UnitCell::new_from_lengths([10.0, 20.0, 30.0]);
+        let cell = UnitCell::new_from_lengths([10.0, 20.0, 30.0].into());
         let expected = [10.0, 20.0, 30.0];
-        for (t, e) in expected.iter().zip(cell.lengths()) {
+        for (t, e) in expected.iter().zip(cell.lengths().iter()) {
             assert_approx_eq!(t, e);
         }
     }
 
     #[test]
     fn test_unit_cell_angles() {
-        let cell = UnitCell::new_from_lengths([10.0, 20.0, 30.0]);
+        let cell = UnitCell::new_from_lengths([10.0, 20.0, 30.0].into());
         for i in 0..3 {
             assert_approx_eq!(cell.angles()[i], 90.0);
         }
@@ -352,56 +375,57 @@ mod tests {
     #[test]
     fn test_check_lengths_valid() {
         let lengths = [1.0, 2.0, 3.0];
-        assert!(validation::check_lengths(&lengths).is_ok());
+        assert!(validation::check_lengths(lengths.into()).is_ok());
     }
 
     #[test]
     #[should_panic(expected = "negative length found: -1")]
     fn test_check_lengths_invalid_first_negative() {
         let lengths = [-1.0, 2.0, 3.0];
-        validation::check_lengths(&lengths).unwrap();
+        validation::check_lengths(lengths.into()).unwrap();
     }
 
     #[test]
     fn test_check_angles_valid() {
         let angles = [90.0, 90.0, 90.0];
-        assert!(validation::check_angles(&angles).is_ok());
+        assert!(validation::check_angles(angles.into()).is_ok());
     }
 
     #[test]
     fn test_check_angles_valid_non_orthogonal() {
         let angles = [60.0, 60.0, 60.0];
-        assert!(validation::check_angles(&angles).is_ok());
+        assert!(validation::check_angles(angles.into()).is_ok());
     }
 
     #[test]
     #[should_panic(expected = "negative angle found: -90")]
     fn test_check_angles_invalid_negative() {
         let angles = [-90.0, 90.0, 90.0];
-        validation::check_angles(&angles).unwrap();
+        validation::check_angles(angles.into()).unwrap();
     }
 
     #[test]
     #[should_panic(expected = "zero angle found: 0")]
     fn test_check_angles_invalid_zero() {
         let angles = [0.0, 90.0, 90.0];
-        validation::check_angles(&angles).unwrap();
+        validation::check_angles(angles.into()).unwrap();
     }
 
     #[test]
     #[should_panic(expected = "angle too large: 180")]
     fn test_check_angles_invalid_180_and_greater() {
         let angles = [180.0, 90.0, 90.0];
-        validation::check_angles(&angles).unwrap();
+        validation::check_angles(angles.into()).unwrap();
         let angles = [200.0, 90.0, 90.0];
-        validation::check_angles(&angles).unwrap();
+        validation::check_angles(angles.into()).unwrap();
     }
 
     #[test]
     fn test_cell_matrix_from_lengths_angles_valid() {
         let lengths = [10.0, 20.0, 30.0];
-        let mut angles = [90.0, 90.0, 90.0];
-        let matrix = matrix::cell_matrix_from_lengths_angles(lengths, &mut angles).unwrap();
+        let angles = [90.0, 90.0, 90.0];
+        let matrix =
+            matrix::cell_matrix_from_lengths_angles(lengths.into(), angles.into()).unwrap();
         assert_approx_eq!(matrix[(0, 0)], 10.0);
         assert_approx_eq!(matrix[(1, 1)], 20.0);
         assert_approx_eq!(matrix[(2, 2)], 30.0);
@@ -410,8 +434,9 @@ mod tests {
     #[test]
     fn test_cell_matrix_from_lengths_angles_triclinic() {
         let lengths = [10.0, 20.0, 30.0];
-        let mut angles = [60.0, 60.0, 60.0];
-        let matrix = matrix::cell_matrix_from_lengths_angles(lengths, &mut angles).unwrap();
+        let angles = [60.0, 60.0, 60.0];
+        let matrix =
+            matrix::cell_matrix_from_lengths_angles(lengths.into(), angles.into()).unwrap();
         assert!(!utils::is_diagonal(matrix));
     }
 
@@ -419,20 +444,20 @@ mod tests {
     fn test_is_orthorhombic() {
         let lengths = [10.0, 20.0, 30.0];
         let angles = [90.0, 90.0, 90.0];
-        assert!(utils::is_orthorhombic(lengths, angles));
+        assert!(utils::is_orthorhombic(lengths.into(), angles.into()));
     }
 
     #[test]
     fn test_is_orthorhombic_with_nan() {
         let lengths = [10.0, 20.0, 0.0];
         let angles = [90.0, 90.0, f64::NAN];
-        assert!(utils::is_orthorhombic(lengths, angles));
+        assert!(utils::is_orthorhombic(lengths.into(), angles.into()));
     }
 
     #[test]
     fn test_is_infinite() {
         let lengths = [0.0, 0.0, 0.0];
-        assert!(utils::is_infinite(lengths));
+        assert!(utils::is_infinite(lengths.into()));
     }
 
     #[test]
@@ -457,8 +482,8 @@ mod tests {
     #[test]
     fn from_lengths_angles() {
         let expected = UnitCell::new_from_lengths_angles(
-            [8.431_160_35, 14.505_106_13, 15.609_114_68],
-            &mut [73.316_992_12, 85.702_005_82, 89.375_015_29],
+            [8.431_160_35, 14.505_106_13, 15.609_114_68].into(),
+            [73.316_992_12, 85.702_005_82, 89.375_015_29].into(),
         )
         .unwrap();
         let mut true_cell = UnitCell::new();
