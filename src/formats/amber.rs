@@ -549,7 +549,7 @@ impl AMBERTrajFormat {
 
         let mut frame = Frame::new();
         if let Some(unitcell) = self.read_cell()? {
-            frame.set_unitcell(unitcell);
+            frame.set_unit_cell(unitcell);
         }
 
         if !self.file_title.is_empty() {

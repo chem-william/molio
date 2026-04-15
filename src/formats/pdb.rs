@@ -1386,7 +1386,7 @@ mod tests {
         let mut trajectory = Trajectory::open(path).unwrap();
         let mut frame = trajectory.read().unwrap().unwrap();
 
-        let topology: &mut Topology = frame.topology_as_mut();
+        let topology: &mut Topology = frame.topology_mut();
         assert_eq!(topology.size(), 65);
 
         assert_eq!(topology[0].symbol, "Zn");
