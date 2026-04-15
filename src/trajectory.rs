@@ -52,7 +52,7 @@ impl Trajectory {
     /// # Errors
     ///
     /// Returns an error if the file cannot be opened or the format is unknown.
-    pub fn open(path: &Path) -> Result<TrajectoryReader, CError> {
+    pub fn open(path: impl AsRef<Path>) -> Result<TrajectoryReader, CError> {
         Self::open_with_format(path, FormatKind::Guess)
     }
 
@@ -62,10 +62,13 @@ impl Trajectory {
     ///
     /// Returns an error if the file cannot be opened or the format fails to
     /// initialize.
-    pub fn open_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryReader, CError> {
-        let kind = format.resolve(path)?;
+    pub fn open_with_format(
+        path: impl AsRef<Path>,
+        format: FormatKind,
+    ) -> Result<TrajectoryReader, CError> {
+        let kind = format.resolve(path.as_ref())?;
 
-        let strategy = FormatReader::open(path, kind)?;
+        let strategy = FormatReader::open(path.as_ref(), kind)?;
         let size = strategy.len()?;
 
         Ok(TrajectoryReader {
@@ -75,14 +78,17 @@ impl Trajectory {
         })
     }
 
-    pub fn append(path: &Path) -> Result<TrajectoryWriter, CError> {
+    pub fn append(path: impl AsRef<Path>) -> Result<TrajectoryWriter, CError> {
         Self::append_with_format(path, FormatKind::Guess)
     }
 
-    pub fn append_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryWriter, CError> {
-        let kind = format.resolve(path)?;
+    pub fn append_with_format(
+        path: impl AsRef<Path>,
+        format: FormatKind,
+    ) -> Result<TrajectoryWriter, CError> {
+        let kind = format.resolve(path.as_ref())?;
 
-        let strategy = FormatWriter::open(path, kind)?;
+        let strategy = FormatWriter::open(path.as_ref(), kind)?;
 
         Ok(TrajectoryWriter {
             strategy,
@@ -96,7 +102,7 @@ impl Trajectory {
     ///
     /// Returns an error if the output file cannot be created or the format is
     /// unknown.
-    pub fn create(path: &Path) -> Result<TrajectoryWriter, CError> {
+    pub fn create(path: impl AsRef<Path>) -> Result<TrajectoryWriter, CError> {
         Self::create_with_format(path, FormatKind::Guess)
     }
 
@@ -106,10 +112,13 @@ impl Trajectory {
     ///
     /// Returns an error if the output file cannot be created or the format
     /// fails to initialize.
-    pub fn create_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryWriter, CError> {
-        let kind = format.resolve(path)?;
+    pub fn create_with_format(
+        path: impl AsRef<Path>,
+        format: FormatKind,
+    ) -> Result<TrajectoryWriter, CError> {
+        let kind = format.resolve(path.as_ref())?;
 
-        let strategy = FormatWriter::create(path, kind)?;
+        let strategy = FormatWriter::create(path.as_ref(), kind)?;
 
         Ok(TrajectoryWriter {
             strategy,
