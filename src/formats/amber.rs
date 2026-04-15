@@ -849,11 +849,11 @@ mod tests {
         let positions = frame.positions();
         assert_approx_eq!(positions[0][0], 0.4172_191, 1e-4);
         assert_approx_eq!(positions[0][1], 8.303_366, 1e-4);
-        assert_approx_eq!(positions[0][2], 11.73_717, 1e-4);
+        assert_approx_eq!(positions[0][2], 11.737_17, 1e-4);
 
         assert_approx_eq!(positions[296][0], 6.664_049, 1e-4);
-        assert_approx_eq!(positions[296][1], 11.61_418, 1e-4);
-        assert_approx_eq!(positions[296][2], 12.96_149, 1e-4);
+        assert_approx_eq!(positions[296][1], 11.614_18, 1e-4);
+        assert_approx_eq!(positions[296][2], 12.961_49, 1e-4);
 
         assert_approx_eq!(
             frame.properties.get("time").unwrap().as_double().unwrap(),

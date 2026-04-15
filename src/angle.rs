@@ -84,7 +84,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "can not have the same atom twice in an angle")]
     fn test_angle_with_duplicate_atoms_i_j() {
-        Angle::new(1, 1, 3);
+        let _ = Angle::new(1, 1, 3);
     }
 
     #[test]
