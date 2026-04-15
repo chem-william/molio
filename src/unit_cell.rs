@@ -7,7 +7,7 @@
 use crate::error::CError;
 use core::f64;
 use nalgebra::Matrix3;
-use std::ops::{Deref, DerefMut};
+use std::ops::Index;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub struct Vec3D([f64; 3]);
@@ -18,17 +18,22 @@ impl From<[f64; 3]> for Vec3D {
     }
 }
 
-impl Deref for Vec3D {
-    type Target = [f64; 3];
-
-    fn deref(&self) -> &Self::Target {
+impl AsRef<[f64; 3]> for Vec3D {
+    fn as_ref(&self) -> &[f64; 3] {
         &self.0
     }
 }
 
-impl DerefMut for Vec3D {
-    fn deref_mut(&mut self) -> &mut Self::Target {
+impl AsMut<[f64; 3]> for Vec3D {
+    fn as_mut(&mut self) -> &mut [f64; 3] {
         &mut self.0
+    }
+}
+
+impl Index<usize> for Vec3D {
+    type Output = f64;
+    fn index(&self, i: usize) -> &f64 {
+        &self.0[i]
     }
 }
 
@@ -94,13 +99,14 @@ mod utils {
 
         // we support cells with one or two lengths of 0 which results in NaN angles
         angles
+            .as_ref()
             .iter()
             .all(|&angle| is_roughly_90(angle) || angle.is_nan())
     }
 
     /// Check if a cell is infinite (all lengths are zero)
     pub fn is_infinite(lengths: Vec3D) -> bool {
-        lengths.iter().all(|&x| is_roughly_zero(x))
+        lengths.as_ref().iter().all(|&x| is_roughly_zero(x))
     }
 
     /// Check if a matrix is diagonal (all off-diagonal elements are zero)
@@ -123,7 +129,7 @@ mod validation {
     /// Returns an error if:
     /// - Any length is negative
     pub fn check_lengths(lengths: Vec3D) -> Result<(), CError> {
-        if let Some(&length) = lengths.iter().find(|&&x| x < 0.0) {
+        if let Some(&length) = lengths.as_ref().iter().find(|&&x| x < 0.0) {
             return Err(CError::GenericError(format!(
                 "negative length found: {length}"
             )));
@@ -141,17 +147,17 @@ mod validation {
     /// - Any angle is zero
     /// - Any angle is 180 degrees or greater
     pub fn check_angles(angles: Vec3D) -> Result<(), CError> {
-        if let Some(&angle) = angles.iter().find(|&&x| x < 0.0) {
+        if let Some(&angle) = angles.as_ref().iter().find(|&&x| x < 0.0) {
             return Err(CError::GenericError(format!(
                 "negative angle found: {angle}"
             )));
         }
 
-        if let Some(&angle) = angles.iter().find(|&&x| utils::is_roughly_zero(x)) {
+        if let Some(&angle) = angles.as_ref().iter().find(|&&x| utils::is_roughly_zero(x)) {
             return Err(CError::GenericError(format!("zero angle found: {angle}")));
         }
 
-        if let Some(&angle) = angles.iter().find(|&&x| x >= 180.0) {
+        if let Some(&angle) = angles.as_ref().iter().find(|&&x| x >= 180.0) {
             return Err(CError::GenericError(format!("angle too large: {angle}")));
         }
 
@@ -177,8 +183,8 @@ mod matrix {
         let mut angles = angles;
 
         // Normalize angles to 90 degrees if they're close enough
-        if angles.iter().all(|&x| utils::is_roughly_90(x)) {
-            for x in angles.iter_mut() {
+        if angles.as_ref().iter().all(|&x| utils::is_roughly_90(x)) {
+            for x in angles.as_mut().iter_mut() {
                 *x = 90.0;
             }
         }
@@ -359,7 +365,7 @@ mod tests {
     fn test_unit_cell_lengths() {
         let cell = UnitCell::new_from_lengths([10.0, 20.0, 30.0].into());
         let expected = [10.0, 20.0, 30.0];
-        for (t, e) in expected.iter().zip(cell.lengths().iter()) {
+        for (t, e) in expected.iter().zip(cell.lengths().as_ref().iter()) {
             assert_approx_eq!(t, e);
         }
     }
