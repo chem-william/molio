@@ -26,7 +26,7 @@ pub struct TrajectoryWriter {
 }
 
 /// Index type that guarantees the frame exists in a trajectory.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FrameIndex(usize);
 
 impl FrameIndex {
