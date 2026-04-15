@@ -922,7 +922,7 @@ mod tests {
     fn scale_factor() {
         let path = Path::new("./src/tests-data/netcdf/scaled_traj.nc");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 26);
+        assert_eq!(trajectory.len(), 26);
 
         let frame = trajectory.read_at(12).unwrap().unwrap();
         assert_eq!(frame.size(), 1938);
@@ -1064,7 +1064,7 @@ mod tests {
         }
 
         let mut trajectory = Trajectory::open(named_tmpfile.path()).unwrap();
-        assert_eq!(trajectory.size, 2);
+        assert_eq!(trajectory.len(), 2);
         check_frame(&trajectory.read().unwrap().unwrap());
         check_frame(&trajectory.read().unwrap().unwrap());
     }
@@ -1085,7 +1085,7 @@ mod tests {
         }
 
         let mut trajectory = Trajectory::open(named_tmpfile.path()).unwrap();
-        assert_eq!(trajectory.size, 2);
+        assert_eq!(trajectory.len(), 2);
         check_frame(&trajectory.read().unwrap().unwrap());
         check_frame(&trajectory.read().unwrap().unwrap());
     }
@@ -1096,7 +1096,7 @@ mod tests {
     fn rst_water() {
         let path = Path::new("./src/tests-data/netcdf/water.ncrst");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 297);

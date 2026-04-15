@@ -13,7 +13,7 @@ use std::path::Path;
 /// A handle to a trajectory file for reading.
 pub struct TrajectoryReader {
     /// Number of frames in the file
-    pub size: usize,
+    size: usize,
 
     strategy: FormatReader,
     current_index: usize,
@@ -179,6 +179,16 @@ impl TrajectoryReader {
     pub fn frames(&mut self) -> impl Iterator<Item = Result<Frame, CError>> + '_ {
         let indices = 0..self.size;
         indices.filter_map(move |i| self.frame_index(i).map(|index| self.read_frame(index)))
+    }
+
+    /// Returns the number of frames in [`Self`].
+    pub fn len(&self) -> usize {
+        self.size
+    }
+
+    /// Returns whether [`Self`] is empty.
+    pub fn is_empty(&self) -> bool {
+        self.size == 0
     }
 }
 

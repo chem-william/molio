@@ -1334,18 +1334,18 @@ mod tests {
     fn check_nsteps() {
         let path = Path::new("./src/tests-data/pdb/water.pdb");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 100);
+        assert_eq!(trajectory.len(), 100);
 
         let path = Path::new("./src/tests-data/pdb/2hkb.pdb");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 11);
+        assert_eq!(trajectory.len(), 11);
     }
 
     #[test]
     fn sanity_check() {
         let path = Path::new("./src/tests-data/pdb/water.pdb");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 100);
+        assert_eq!(trajectory.len(), 100);
 
         let mut frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 297);
@@ -1898,7 +1898,7 @@ mod tests {
     fn atom_id_starts_at_0() {
         let path = Path::new("./src/tests-data/pdb/atom-id-0.pdb");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 2);
@@ -1913,7 +1913,7 @@ mod tests {
     fn multiple_end_records() {
         let path = Path::new("./src/tests-data/pdb/end-endmdl.pdb");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 2);
+        assert_eq!(trajectory.len(), 2);
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 4);
@@ -1926,7 +1926,7 @@ mod tests {
     fn multiple_model_without_end() {
         let path = Path::new("./src/tests-data/pdb/model.pdb");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 2);
+        assert_eq!(trajectory.len(), 2);
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 2223);
@@ -1939,7 +1939,7 @@ mod tests {
     fn file_generated_by_crystal_maker() {
         let path = Path::new("./src/tests-data/pdb/crystal-maker.pdb");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 8);
@@ -1949,7 +1949,7 @@ mod tests {
     fn short_cryst1_record() {
         let path = Path::new("./src/tests-data/pdb/short-cryst1.pdb");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
     }
 
     #[test]
@@ -2103,7 +2103,7 @@ mod tests {
     fn file_by_ase() {
         let path = Path::new("./src/tests-data/pdb/ase.pdb");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 156);
+        assert_eq!(trajectory.len(), 156);
     }
 
     // TODO: fix this test - requires implementing compressed reading
@@ -2271,7 +2271,7 @@ END
         trajectory.finish().unwrap();
 
         let mut read_trajectory = Trajectory::open(named_tmpfile.path()).unwrap();
-        assert_eq!(read_trajectory.size, 2);
+        assert_eq!(read_trajectory.len(), 2);
         let frame1 = read_trajectory.read().unwrap().unwrap();
         assert_eq!(frame1.size(), 4);
         assert_eq!(

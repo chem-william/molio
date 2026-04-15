@@ -496,26 +496,26 @@ mod tests {
     fn check_nsteps() {
         let path = Path::new("./src/tests-data/xyz/single_struct.xyz");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
 
         let path = Path::new("./src/tests-data/xyz/trajectory.xyz");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 2);
+        assert_eq!(trajectory.len(), 2);
 
         let path = Path::new("./src/tests-data/xyz/helium.xyz");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 397);
+        assert_eq!(trajectory.len(), 397);
 
         let path = Path::new("./src/tests-data/xyz/topology.xyz");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
     }
 
     #[test]
     fn extended_xyz() {
         let path = Path::new("./src/tests-data/xyz/extended.xyz");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 3);
+        assert_eq!(trajectory.len(), 3);
 
         let frame = trajectory.read_at(0).unwrap().unwrap();
         assert_eq!(frame.size(), 192);
@@ -608,7 +608,7 @@ mod tests {
     fn read_whole_file() {
         let path = Path::new("./src/tests-data/xyz/helium.xyz");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 397);
+        assert_eq!(trajectory.len(), 397);
 
         let mut frame = Frame::new();
         while let Some(next_frame) = trajectory.read().unwrap() {
@@ -627,7 +627,7 @@ mod tests {
     fn various_files_formatting() {
         let path = Path::new("./src/tests-data/xyz/spaces.xyz");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
         let frame = trajectory.read().unwrap().unwrap();
         let positions = frame.positions();
 

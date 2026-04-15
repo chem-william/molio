@@ -368,7 +368,7 @@ mod tests {
         let path = Path::new("./src/tests-data/sdf/aspirin.sdf");
         let trajectory = Trajectory::open(path).unwrap();
 
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
     }
 
     #[test]
@@ -376,7 +376,7 @@ mod tests {
         let path = Path::new("./src/tests-data/sdf/kinases.sdf");
         let trajectory = Trajectory::open(path).unwrap();
 
-        assert_eq!(trajectory.size, 6);
+        assert_eq!(trajectory.len(), 6);
     }
 
     #[test]
@@ -435,7 +435,7 @@ mod tests {
     fn read_whole_file() {
         let path = Path::new("./src/tests-data/sdf/kinases.sdf");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 6);
+        assert_eq!(trajectory.len(), 6);
 
         let mut frame = Frame::new();
         while let Some(next_frame) = trajectory.read().unwrap() {
