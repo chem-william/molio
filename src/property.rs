@@ -98,7 +98,7 @@ impl PartialEq for Property {
 
 impl Eq for Property {}
 
-#[derive(Clone, PartialEq, Eq, Debug, Default, Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct Properties(HashMap<String, Property>);
 
 impl Properties {
