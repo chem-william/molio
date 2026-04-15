@@ -16,7 +16,7 @@ use std::ops::Index;
 ///     |    \   /    |
 ///     |      j      |
 /// ```
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy, Hash)]
 pub struct Angle {
     data: [usize; 3],
 }

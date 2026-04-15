@@ -7,7 +7,7 @@
 use crate::property::{Properties, Property};
 use std::collections::{BTreeSet, btree_set::Iter};
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 // the specific order of the struct matters in the following when deriving `[Ord]`
 // if resname is not compared last, tests will fail
 pub struct FullResidueId {

@@ -32,7 +32,7 @@ impl DerefMut for Vec3D {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Default)]
+#[derive(Debug, PartialEq, Eq, Default, Hash)]
 pub enum CellShape {
     #[default]
     Orthorhombic,

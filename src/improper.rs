@@ -21,7 +21,7 @@ use std::ops::Index;
 ///
 ///
 /// The second atom of the improper is always the central atom.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy, Hash)]
 pub struct Improper {
     data: [usize; 4],
 }
