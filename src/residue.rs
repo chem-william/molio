@@ -64,8 +64,13 @@ impl Residue {
     }
 
     #[must_use]
-    pub fn size(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.atoms.len()
+    }
+
+    /// Checks whether [`Self`] is empty.
+    pub fn is_empty(&self) -> bool {
+        self.atoms.is_empty()
     }
 
     #[must_use]

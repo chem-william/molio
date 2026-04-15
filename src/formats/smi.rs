@@ -92,8 +92,8 @@ impl SMIFormat {
         self.residues
             .last_mut()
             .expect("at least one residue")
-            .add_atom(topology.size() - 1);
-        let new_atom_idx = topology.size() - 1;
+            .add_atom(topology.len() - 1);
+        let new_atom_idx = topology.len() - 1;
         topology
             .atoms
             .get_mut(new_atom_idx)
@@ -538,7 +538,7 @@ impl Codec for SMIFormat {
                 .expect("able to add residues to topology");
         }
 
-        frame.resize(topology.size())?;
+        frame.resize(topology.len())?;
         frame.set_topology(topology)?;
         Ok(frame)
     }

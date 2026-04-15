@@ -1387,7 +1387,7 @@ mod tests {
         let mut frame = trajectory.read().unwrap().unwrap();
 
         let topology: &mut Topology = frame.topology_mut();
-        assert_eq!(topology.size(), 65);
+        assert_eq!(topology.len(), 65);
 
         assert_eq!(topology[0].symbol, "Zn");
         assert_eq!(topology[1].symbol, "O");
@@ -1561,7 +1561,7 @@ mod tests {
         assert!(opt_residue.is_some());
         let residue = opt_residue.unwrap();
 
-        assert_eq!(residue.size(), 3);
+        assert_eq!(residue.len(), 3);
         assert!(residue.contains(0));
         assert!(residue.contains(1));
         assert!(residue.contains(2));
@@ -1581,7 +1581,7 @@ mod tests {
 
         assert_eq!(frame.topology().residues.len(), 1);
         let residue = frame.topology().residues[0].clone();
-        assert_eq!(residue.size(), frame.size());
+        assert_eq!(residue.len(), frame.size());
         assert_eq!(residue.name, "LIG");
     }
 
