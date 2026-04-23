@@ -185,6 +185,7 @@ impl TrajectoryReader {
     }
 
     /// Returns the number of frames in [`Self`].
+    #[must_use]
     pub fn len(&self) -> usize {
         self.size
     }
