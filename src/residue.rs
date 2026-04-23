@@ -72,6 +72,7 @@ impl Residue {
     }
 
     /// Checks whether [`Self`] is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.atoms.is_empty()
     }

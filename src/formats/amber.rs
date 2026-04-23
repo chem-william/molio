@@ -628,7 +628,7 @@ impl AMBERTrajFormat {
             self.n_atoms = frame.size();
             self.has_velocities = frame.velocities().is_some();
             if let Some(Property::String(name)) = frame.properties.get("name") {
-                self.file_title = name.clone();
+                self.file_title.clone_from(name);
             }
             self.initialized = true;
         }
@@ -872,11 +872,11 @@ mod tests {
         assert_eq!(frame.properties.get("name"), None);
 
         let positions = frame.positions();
-        assert_approx_eq!(positions[0][0], 0.2990952, 1e-4);
+        assert_approx_eq!(positions[0][0], 0.299_095_2, 1e-4);
         assert_approx_eq!(positions[0][1], 8.31003, 1e-4);
         assert_approx_eq!(positions[0][2], 11.72146, 1e-4);
 
-        assert_approx_eq!(positions[296][0], 6.797599, 1e-4);
+        assert_approx_eq!(positions[296][0], 6.797_599, 1e-4);
         assert_approx_eq!(positions[296][1], 11.50882, 1e-4);
         assert_approx_eq!(positions[296][2], 12.70423, 1e-4);
 
@@ -890,11 +890,11 @@ mod tests {
         }
 
         let positions = frame.positions();
-        assert_approx_eq!(positions[0][0], 0.3185586, 1e-4);
-        assert_approx_eq!(positions[0][1], 8.776042, 1e-4);
+        assert_approx_eq!(positions[0][0], 0.318_558_6, 1e-4);
+        assert_approx_eq!(positions[0][1], 8.776_042, 1e-4);
         assert_approx_eq!(positions[0][2], 11.8927, 1e-4);
 
-        assert_approx_eq!(positions[296][0], 7.089802, 1e-4);
+        assert_approx_eq!(positions[296][0], 7.089_802, 1e-4);
         assert_approx_eq!(positions[296][1], 10.35007, 1e-4);
         assert_approx_eq!(positions[296][2], 12.8159, 1e-4);
 
@@ -944,7 +944,7 @@ mod tests {
 
         let velocities = frame.velocities().unwrap();
         assert_approx_eq!(velocities[1400][0], 0.6854_072 * -0.856, 1e-4);
-        assert_approx_eq!(velocities[1400][1], 0.09196_011 * -0.856, 1e-4);
+        assert_approx_eq!(velocities[1400][1], 0.091_960_11 * -0.856, 1e-4);
         assert_approx_eq!(velocities[1400][2], 2.260_214 * -0.856, 1e-4);
 
         assert_approx_eq!(velocities[1600][0], -0.3342_645 * -0.856, 1e-4);
