@@ -67,7 +67,7 @@ impl Frame {
 
     /// Set the frame index to [`index`]
     pub fn set_frame_index(&mut self, index: usize) {
-        self.index = index
+        self.index = index;
     }
 
     /// Get a const reference to the topology of this frame

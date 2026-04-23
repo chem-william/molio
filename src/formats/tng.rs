@@ -32,7 +32,7 @@ impl TNGFile {
                         "could not open file at '{}'",
                         path.to_string_lossy()
                     )));
-                };
+                }
             }
             'w' | 'a' => {
                 traj.last_program_name_set("molio");
@@ -162,7 +162,7 @@ impl TNGFormat {
             frame
                 .properties
                 .insert("time".into(), crate::property::Property::Double(0.0));
-        };
+        }
 
         self.read_positions(&mut frame)?;
         self.read_velocities(&mut frame)?;
@@ -264,7 +264,7 @@ impl TNGFormat {
                     crate::bond::BondOrder::Unknown,
                 )?;
             }
-        };
+        }
 
         frame.set_topology(topology)?;
 
