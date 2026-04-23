@@ -15,6 +15,7 @@ Currently supports
 | SMILES              | .smi      |
 | AMBER Trajectories  | .nc       |
 | AMBER Traj          | .ncrst    |
+| TNG                 | .tng      |
 
 This project is heavily inspired by [`chemfiles`](https://github.com/chemfiles/chemfiles/), a modern C++ library with the same purpose.
 
