@@ -79,6 +79,7 @@ impl Connectivity {
         self.bonds.entry(Bond::new(i, j)).or_insert(bond_order);
     }
 
+    /// Remove a bond between the atoms `i` and `j`
     pub fn remove_bond(&mut self, i: usize, j: usize) {
         let bond = Bond::new(i, j);
         if self.bonds.remove(&bond).is_some() {
@@ -86,6 +87,7 @@ impl Connectivity {
         }
     }
 
+    /// Get the bond order of the bond between `i` and `j`
     pub fn bond_order(&self, i: usize, j: usize) -> Result<BondOrder, CError> {
         let bond = Bond::new(i, j);
         self.bonds.get(&bond).copied().ok_or_else(|| {
@@ -95,6 +97,7 @@ impl Connectivity {
         })
     }
 
+    /// Recalculate the angles and the dihedrals from the bond list
     fn recalculate(&mut self) {
         self.angles.clear();
         self.dihedrals.clear();
