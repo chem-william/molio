@@ -444,35 +444,35 @@ mod tests {
     #[should_panic(expected = "expected Bool")]
     fn test_expect_bool_panic() {
         let prop = Property::Double(1.0);
-        prop.expect_bool();
+        let _ = prop.expect_bool();
     }
 
     #[test]
     #[should_panic(expected = "expected Double")]
     fn test_expect_double_panic() {
         let prop = Property::String("test".to_string());
-        prop.expect_double();
+        let _ = prop.expect_double();
     }
 
     #[test]
     #[should_panic(expected = "expected String")]
     fn test_expect_string_panic() {
         let prop = Property::Double(1.0);
-        prop.expect_string();
+        let _ = prop.expect_string();
     }
 
     #[test]
     #[should_panic(expected = "expected Vector3D")]
     fn test_expect_vector3d_panic() {
         let prop = Property::Double(1.0);
-        prop.expect_vector3d();
+        let _ = prop.expect_vector3d();
     }
 
     #[test]
     #[should_panic(expected = "expected Matrix3x3")]
     fn test_expect_matrix3x3_panic() {
         let prop = Property::Double(1.0);
-        prop.expect_matrix3x3();
+        let _ = prop.expect_matrix3x3();
     }
 
     #[test]

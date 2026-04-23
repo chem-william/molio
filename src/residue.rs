@@ -7,7 +7,7 @@
 use crate::property::{Properties, Property};
 use std::collections::{BTreeSet, btree_set::Iter};
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 // the specific order of the struct matters in the following when deriving `[Ord]`
 // if resname is not compared last, tests will fail
 pub struct FullResidueId {
@@ -43,31 +43,40 @@ pub struct Residue {
 
 impl Residue {
     #[must_use]
-    pub fn new(name: String, id: i64) -> Self {
+    pub fn new(name: impl Into<String>, id: i64) -> Self {
         Self {
-            name,
+            name: name.into(),
             id: Some(id),
             ..Default::default()
         }
     }
 
     #[must_use]
-    pub fn new_from_name(name: String) -> Self {
+    pub fn new_from_name(name: impl Into<String>) -> Self {
         Self {
-            name,
+            name: name.into(),
             ..Default::default()
         }
     }
 
+    /// Add an atom with index `i` to this residue.
+    ///
+    /// If the atom is already in the residue, this does nothing.
     pub fn add_atom(&mut self, index: usize) {
         self.atoms.insert(index);
     }
 
     #[must_use]
-    pub fn size(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.atoms.len()
     }
 
+    /// Checks whether [`Self`] is empty.
+    pub fn is_empty(&self) -> bool {
+        self.atoms.is_empty()
+    }
+
+    /// Check if the residue contains a given atom with index `i`
     #[must_use]
     pub fn contains(&self, index: usize) -> bool {
         self.atoms.contains(&index)

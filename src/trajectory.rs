@@ -13,10 +13,11 @@ use std::path::Path;
 /// A handle to a trajectory file for reading.
 pub struct TrajectoryReader {
     /// Number of frames in the file
-    pub size: usize,
+    size: usize,
 
     strategy: FormatReader,
-    current_index: usize,
+    /// Next index that will be read.
+    index: usize,
 }
 
 /// A handle to a trajectory file for writing.
@@ -26,7 +27,7 @@ pub struct TrajectoryWriter {
 }
 
 /// Index type that guarantees the frame exists in a trajectory.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FrameIndex(usize);
 
 impl FrameIndex {
@@ -52,7 +53,7 @@ impl Trajectory {
     /// # Errors
     ///
     /// Returns an error if the file cannot be opened or the format is unknown.
-    pub fn open(path: &Path) -> Result<TrajectoryReader, CError> {
+    pub fn open(path: impl AsRef<Path>) -> Result<TrajectoryReader, CError> {
         Self::open_with_format(path, FormatKind::Guess)
     }
 
@@ -62,27 +63,33 @@ impl Trajectory {
     ///
     /// Returns an error if the file cannot be opened or the format fails to
     /// initialize.
-    pub fn open_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryReader, CError> {
-        let kind = format.resolve(path)?;
+    pub fn open_with_format(
+        path: impl AsRef<Path>,
+        format: FormatKind,
+    ) -> Result<TrajectoryReader, CError> {
+        let kind = format.resolve(path.as_ref())?;
 
-        let strategy = FormatReader::open(path, kind)?;
+        let strategy = FormatReader::open(path.as_ref(), kind)?;
         let size = strategy.len()?;
 
         Ok(TrajectoryReader {
             size,
             strategy,
-            current_index: 0,
+            index: 0,
         })
     }
 
-    pub fn append(path: &Path) -> Result<TrajectoryWriter, CError> {
+    pub fn append(path: impl AsRef<Path>) -> Result<TrajectoryWriter, CError> {
         Self::append_with_format(path, FormatKind::Guess)
     }
 
-    pub fn append_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryWriter, CError> {
-        let kind = format.resolve(path)?;
+    pub fn append_with_format(
+        path: impl AsRef<Path>,
+        format: FormatKind,
+    ) -> Result<TrajectoryWriter, CError> {
+        let kind = format.resolve(path.as_ref())?;
 
-        let strategy = FormatWriter::open(path, kind)?;
+        let strategy = FormatWriter::open(path.as_ref(), kind)?;
 
         Ok(TrajectoryWriter {
             strategy,
@@ -96,7 +103,7 @@ impl Trajectory {
     ///
     /// Returns an error if the output file cannot be created or the format is
     /// unknown.
-    pub fn create(path: &Path) -> Result<TrajectoryWriter, CError> {
+    pub fn create(path: impl AsRef<Path>) -> Result<TrajectoryWriter, CError> {
         Self::create_with_format(path, FormatKind::Guess)
     }
 
@@ -106,10 +113,13 @@ impl Trajectory {
     ///
     /// Returns an error if the output file cannot be created or the format
     /// fails to initialize.
-    pub fn create_with_format(path: &Path, format: FormatKind) -> Result<TrajectoryWriter, CError> {
-        let kind = format.resolve(path)?;
+    pub fn create_with_format(
+        path: impl AsRef<Path>,
+        format: FormatKind,
+    ) -> Result<TrajectoryWriter, CError> {
+        let kind = format.resolve(path.as_ref())?;
 
-        let strategy = FormatWriter::create(path, kind)?;
+        let strategy = FormatWriter::create(path.as_ref(), kind)?;
 
         Ok(TrajectoryWriter {
             strategy,
@@ -125,12 +135,13 @@ impl TrajectoryReader {
     ///
     /// Returns an error if the format fails while reading.
     pub fn read(&mut self) -> Result<Option<Frame>, CError> {
-        if self.current_index >= self.size {
+        if self.index >= self.size {
             return Ok(None);
         }
 
-        let frame = self.strategy.read()?;
-        self.current_index += 1;
+        let mut frame = self.strategy.read()?;
+        frame.set_frame_index(self.index);
+        self.index += 1;
         Ok(Some(frame))
     }
 
@@ -141,8 +152,9 @@ impl TrajectoryReader {
     /// Returns an error if the frame cannot be read.
     pub fn read_frame(&mut self, index: FrameIndex) -> Result<Frame, CError> {
         let index = index.value();
-        let frame = self.strategy.read_at(index)?;
-        self.current_index = index + 1;
+        let mut frame = self.strategy.read_at(index)?;
+        frame.set_frame_index(index);
+        self.index = index + 1;
         Ok(frame)
     }
 
@@ -170,6 +182,16 @@ impl TrajectoryReader {
     pub fn frames(&mut self) -> impl Iterator<Item = Result<Frame, CError>> + '_ {
         let indices = 0..self.size;
         indices.filter_map(move |i| self.frame_index(i).map(|index| self.read_frame(index)))
+    }
+
+    /// Returns the number of frames in [`Self`].
+    pub fn len(&self) -> usize {
+        self.size
+    }
+
+    /// Returns whether [`Self`] is empty.
+    pub fn is_empty(&self) -> bool {
+        self.size == 0
     }
 }
 

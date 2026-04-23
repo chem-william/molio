@@ -17,19 +17,19 @@ use crate::{
 #[derive(Default, Debug)]
 pub struct Connectivity {
     /// Bonds in this connectivity
-    pub bonds: BTreeSet<Bond>,
+    pub(crate) bonds: BTreeSet<Bond>,
 
     /// Angles in this connectivity
-    pub angles: BTreeSet<Angle>,
+    pub(crate) angles: BTreeSet<Angle>,
 
     /// Dihedrals in this connectivity
-    pub dihedrals: BTreeSet<Dihedral>,
+    pub(crate) dihedrals: BTreeSet<Dihedral>,
 
     /// Impropers in this connectivity
-    pub impropers: BTreeSet<Improper>,
+    pub(crate) impropers: BTreeSet<Improper>,
 
     /// Bond orders in this connectivity
-    pub bond_orders: Vec<BondOrder>,
+    pub(crate) bond_orders: Vec<BondOrder>,
 
     /// Is the cached content up to date?
     up_to_date: bool,

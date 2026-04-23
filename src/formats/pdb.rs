@@ -12,7 +12,7 @@ use crate::format::Codec;
 use crate::frame::Frame;
 use crate::property::Property;
 use crate::residue::{FullResidueId, Residue};
-use crate::unit_cell::UnitCell;
+use crate::unit_cell::{UnitCell, Vec3D};
 use log::warn;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
@@ -505,7 +505,8 @@ impl PDBFormat {
         let beta = parse_val(&line[40..47])?;
         let gamma = parse_val(&line[47..54])?;
 
-        let unit_cell = UnitCell::new_from_lengths_angles([a, b, c], &mut [alpha, beta, gamma])?;
+        let unit_cell =
+            UnitCell::new_from_lengths_angles([a, b, c].into(), [alpha, beta, gamma].into())?;
         frame.unit_cell = unit_cell;
 
         if line.len() >= 55 {
@@ -831,7 +832,7 @@ impl PDBFormat {
     // Check the number of digits before the decimal separator to be sure than we
     // can represent them. In case of error, use the given `context` in the error
     // message
-    fn check_values_size(values: [f64; 3], width: i32, context: &str) -> Result<(), CError> {
+    fn check_values_size(values: Vec3D, width: i32, context: &str) -> Result<(), CError> {
         let max_pos = f64::powi(10.0, width) - 1.0;
         let max_neg = -f64::powi(10.0, width) - 1.0;
 
@@ -1184,7 +1185,7 @@ impl Codec for PDBFormat {
                 ter_count += 1;
             }
 
-            PDBFormat::check_values_size(*pos, 8, "atomic position")?;
+            PDBFormat::check_values_size((*pos).into(), 8, "atomic position")?;
             writeln!(
                 writer,
                 "{:<6}{:>5} {:<4}{:1}{:3} {:1}{:>4}{:1}   {:8.3}{:8.3}{:8.3}{:6.2}{:6.2}      {: <4}{: >2}",
@@ -1333,18 +1334,18 @@ mod tests {
     fn check_nsteps() {
         let path = Path::new("./src/tests-data/pdb/water.pdb");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 100);
+        assert_eq!(trajectory.len(), 100);
 
         let path = Path::new("./src/tests-data/pdb/2hkb.pdb");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 11);
+        assert_eq!(trajectory.len(), 11);
     }
 
     #[test]
     fn sanity_check() {
         let path = Path::new("./src/tests-data/pdb/water.pdb");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 100);
+        assert_eq!(trajectory.len(), 100);
 
         let mut frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 297);
@@ -1385,8 +1386,8 @@ mod tests {
         let mut trajectory = Trajectory::open(path).unwrap();
         let mut frame = trajectory.read().unwrap().unwrap();
 
-        let topology: &mut Topology = frame.topology_as_mut();
-        assert_eq!(topology.size(), 65);
+        let topology: &mut Topology = frame.topology_mut();
+        assert_eq!(topology.len(), 65);
 
         assert_eq!(topology[0].symbol, "Zn");
         assert_eq!(topology[1].symbol, "O");
@@ -1560,7 +1561,7 @@ mod tests {
         assert!(opt_residue.is_some());
         let residue = opt_residue.unwrap();
 
-        assert_eq!(residue.size(), 3);
+        assert_eq!(residue.len(), 3);
         assert!(residue.contains(0));
         assert!(residue.contains(1));
         assert!(residue.contains(2));
@@ -1580,7 +1581,7 @@ mod tests {
 
         assert_eq!(frame.topology().residues.len(), 1);
         let residue = frame.topology().residues[0].clone();
-        assert_eq!(residue.size(), frame.size());
+        assert_eq!(residue.len(), frame.size());
         assert_eq!(residue.name, "LIG");
     }
 
@@ -1897,7 +1898,7 @@ mod tests {
     fn atom_id_starts_at_0() {
         let path = Path::new("./src/tests-data/pdb/atom-id-0.pdb");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 2);
@@ -1912,7 +1913,7 @@ mod tests {
     fn multiple_end_records() {
         let path = Path::new("./src/tests-data/pdb/end-endmdl.pdb");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 2);
+        assert_eq!(trajectory.len(), 2);
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 4);
@@ -1925,7 +1926,7 @@ mod tests {
     fn multiple_model_without_end() {
         let path = Path::new("./src/tests-data/pdb/model.pdb");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 2);
+        assert_eq!(trajectory.len(), 2);
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 2223);
@@ -1938,7 +1939,7 @@ mod tests {
     fn file_generated_by_crystal_maker() {
         let path = Path::new("./src/tests-data/pdb/crystal-maker.pdb");
         let mut trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
 
         let frame = trajectory.read().unwrap().unwrap();
         assert_eq!(frame.size(), 8);
@@ -1948,7 +1949,7 @@ mod tests {
     fn short_cryst1_record() {
         let path = Path::new("./src/tests-data/pdb/short-cryst1.pdb");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 1);
+        assert_eq!(trajectory.len(), 1);
     }
 
     #[test]
@@ -2102,7 +2103,7 @@ mod tests {
     fn file_by_ase() {
         let path = Path::new("./src/tests-data/pdb/ase.pdb");
         let trajectory = Trajectory::open(path).unwrap();
-        assert_eq!(trajectory.size, 156);
+        assert_eq!(trajectory.len(), 156);
     }
 
     // TODO: fix this test - requires implementing compressed reading
@@ -2199,14 +2200,14 @@ END
         let mut trajectory = Trajectory::create(named_tmpfile.path()).unwrap();
 
         let mut frame = Frame::new();
-        frame.unit_cell = UnitCell::new_from_lengths([22.0, 22.0, 22.0]);
-        let atom = Atom::new("A".into());
+        frame.unit_cell = UnitCell::new_from_lengths([22.0, 22.0, 22.0].into());
+        let atom = Atom::new("A");
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
-        let atom = Atom::new("B".into());
+        let atom = Atom::new("B");
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
-        let atom = Atom::new("C".into());
+        let atom = Atom::new("C");
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
-        let atom = Atom::new("D".into());
+        let atom = Atom::new("D");
         frame.add_atom(atom, [1.0, 2.0, 3.0]);
         frame.add_bond(0, 1, BondOrder::Unknown).unwrap();
         frame[0]
@@ -2218,11 +2219,11 @@ END
 
         trajectory.write(&frame).unwrap();
 
-        let atom = Atom::new("E".into());
+        let atom = Atom::new("E");
         frame.add_atom(atom, [4.0, 5.0, 6.0]);
-        let atom = Atom::new("F".into());
+        let atom = Atom::new("F");
         frame.add_atom(atom, [4.0, 5.0, 6.0]);
-        let atom = Atom::new("G".into());
+        let atom = Atom::new("G");
         frame.add_atom(atom, [4.0, 5.0, 6.0]);
 
         frame.add_bond(4, 5, BondOrder::Unknown).unwrap();
@@ -2234,7 +2235,7 @@ END
         frame.add_bond(4, 6, BondOrder::Unknown).unwrap();
         frame.add_bond(5, 6, BondOrder::Unknown).unwrap();
 
-        let mut residue = Residue::new("foo".into(), 3);
+        let mut residue = Residue::new("foo", 3);
         residue.add_atom(1);
         residue.add_atom(2);
         residue
@@ -2249,7 +2250,7 @@ END
         );
         frame.add_residue(residue).unwrap();
 
-        residue = Residue::new_from_name("barbar".into()); // Name will be truncated in output
+        residue = Residue::new_from_name("barbar"); // Name will be truncated in output
         residue.add_atom(3);
         residue
             .properties
@@ -2262,7 +2263,7 @@ END
             .insert("segname".into(), Property::String("SEGMENT".into()));
         frame.add_residue(residue).unwrap();
 
-        residue = Residue::new("baz".into(), -2);
+        residue = Residue::new("baz", -2);
         residue.add_atom(5);
         frame.add_residue(residue).unwrap();
 
@@ -2270,7 +2271,7 @@ END
         trajectory.finish().unwrap();
 
         let mut read_trajectory = Trajectory::open(named_tmpfile.path()).unwrap();
-        assert_eq!(read_trajectory.size, 2);
+        assert_eq!(read_trajectory.len(), 2);
         let frame1 = read_trajectory.read().unwrap().unwrap();
         assert_eq!(frame1.size(), 4);
         assert_eq!(

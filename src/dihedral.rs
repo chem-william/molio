@@ -16,7 +16,7 @@ use std::ops::Index;
 ///     |    \   /   \   |
 ///     |      j      m  |
 /// ```
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug, Hash)]
 pub struct Dihedral {
     data: [usize; 4],
 }
@@ -98,13 +98,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "cannot have an atom linked to itself in a dihedral angle")]
     fn test_dihedral_with_linked_duplicate_i_j() {
-        Dihedral::new(1, 1, 3, 4);
+        let _ = Dihedral::new(1, 1, 3, 4);
     }
 
     #[test]
     #[should_panic(expected = "cannot have an atom twice in a dihedral angle")]
     fn test_dihedral_with_distant_duplicate_i_k() {
-        Dihedral::new(1, 2, 1, 4);
+        let _ = Dihedral::new(1, 2, 1, 4);
     }
 
     #[test]

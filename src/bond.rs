@@ -7,7 +7,7 @@
 use std::ops::Index;
 
 /// Stores the type of bond
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Hash)]
 pub enum BondOrder {
     /// Bond order is unknown or unspecified
     #[default]
@@ -48,7 +48,7 @@ pub enum BondOrder {
 }
 
 /// Ensure a canonical representation of a bond two atoms
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug, Hash)]
 pub struct Bond {
     data: [usize; 2],
 }
