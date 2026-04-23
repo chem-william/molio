@@ -308,41 +308,33 @@ impl SMIFormat {
         let chirality_string = chirality.expect_string();
         match chirality_string.len() {
             0 => is_good_tag = true,
-            2 => {
-                if chirality == Property::String("CW".to_string()) {
-                    is_good_tag = true;
-                    write!(writer, "@@")?;
-                }
+            2 if chirality == Property::String("CW".to_string()) => {
+                is_good_tag = true;
+                write!(writer, "@@")?;
             }
-            3 => {
-                if chirality == Property::String("CCW".to_string()) {
-                    is_good_tag = true;
-                    write!(writer, "@")?;
-                }
+            3 if chirality == Property::String("CCW".to_string()) => {
+                is_good_tag = true;
+                write!(writer, "@")?;
             }
-            7 => {
-                if chirality_string.starts_with("CC")
-                    && SMIFormat::is_chirality_tag(&chirality_string[4..6])
-                    && chirality_string
-                        .as_bytes()
-                        .get(6)
-                        .is_some_and(u8::is_ascii_digit)
-                {
-                    is_good_tag = true;
-                    write!(writer, "@{}", &chirality_string[4..])?;
-                }
+            7 if chirality_string.starts_with("CC")
+                && SMIFormat::is_chirality_tag(&chirality_string[4..6])
+                && chirality_string
+                    .as_bytes()
+                    .get(6)
+                    .is_some_and(u8::is_ascii_digit) =>
+            {
+                is_good_tag = true;
+                write!(writer, "@{}", &chirality_string[4..])?;
             }
-            8 => {
-                if chirality_string.starts_with("CCW")
-                    && SMIFormat::is_chirality_tag(&chirality_string[4..6])
-                    && chirality_string
-                        .as_bytes()
-                        .get(6..8)
-                        .is_some_and(|b| b[0].is_ascii_digit() && b[1].is_ascii_digit())
-                {
-                    is_good_tag = true;
-                    write!(writer, "@{}", &chirality_string[4..])?;
-                }
+            8 if chirality_string.starts_with("CCW")
+                && SMIFormat::is_chirality_tag(&chirality_string[4..6])
+                && chirality_string
+                    .as_bytes()
+                    .get(6..8)
+                    .is_some_and(|b| b[0].is_ascii_digit() && b[1].is_ascii_digit()) =>
+            {
+                is_good_tag = true;
+                write!(writer, "@{}", &chirality_string[4..])?;
             }
             _ => {}
         }
