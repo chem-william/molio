@@ -59,6 +59,9 @@ impl Residue {
         }
     }
 
+    /// Add an atom with index `i` to this residue.
+    ///
+    /// If the atom is already in the residue, this does nothing.
     pub fn add_atom(&mut self, index: usize) {
         self.atoms.insert(index);
     }
@@ -73,6 +76,7 @@ impl Residue {
         self.atoms.is_empty()
     }
 
+    /// Check if the residue contains a given atom with index `i`
     #[must_use]
     pub fn contains(&self, index: usize) -> bool {
         self.atoms.contains(&index)

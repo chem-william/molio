@@ -260,6 +260,7 @@ impl UnitCell {
     /// Will return `Err` if the input matrix [`CellShape::Orthorhombic`], but
     /// not diagonal
     pub fn new_from_matrix(matrix: Matrix3<f64>) -> Result<Self, CError> {
+        let mut matrix = matrix;
         if matrix.determinant() < 0.0 {
             return Err(CError::GenericError(
                 "invalid unit cell matrix with negative determinant".to_string(),
@@ -276,6 +277,7 @@ impl UnitCell {
 
         let shape = if is_diagonal_matrix {
             if matrix.diagonal().iter().all(|&x| utils::is_roughly_zero(x)) {
+                matrix = Matrix3::zeros();
                 CellShape::Infinite
             } else {
                 CellShape::Orthorhombic

@@ -14,6 +14,9 @@ use std::ops::{Deref, Index, IndexMut};
 
 #[derive(Debug, Default)]
 pub struct Frame {
+    /// Index of the grame in the file
+    pub(crate) index: usize,
+
     /// Unit cell of the system
     pub unit_cell: UnitCell,
 
@@ -34,6 +37,7 @@ impl Frame {
     #[must_use]
     pub fn new() -> Self {
         Frame {
+            index: 0,
             unit_cell: UnitCell::new(),
             properties: Properties::new(),
             positions: vec![],
@@ -45,12 +49,25 @@ impl Frame {
     #[must_use]
     pub fn from_unitcell(unit_cell: UnitCell) -> Self {
         Frame {
+            index: 0,
             unit_cell,
             properties: Properties::new(),
             positions: vec![],
             velocities: None,
             topology: Topology::default(),
         }
+    }
+
+    /// Index of the frame in the file.
+    ///
+    /// This is set by [`Trajectory`] when reading.
+    pub fn get_frame_index(&self) -> usize {
+        self.index
+    }
+
+    /// Set the frame index to [`index`]
+    pub fn set_frame_index(&mut self, index: usize) {
+        self.index = index
     }
 
     /// Get a const reference to the topology of this frame
@@ -99,17 +116,17 @@ impl Frame {
         &self.positions
     }
 
-    pub fn positions_mut(&mut self) -> &mut Vec<[f64; 3]> {
-        &mut self.positions
+    pub fn positions_mut(&mut self) -> &mut [[f64; 3]] {
+        self.positions.as_mut_slice()
     }
 
     #[must_use]
-    pub fn velocities(&self) -> Option<&Vec<[f64; 3]>> {
-        self.velocities.as_ref()
+    pub fn velocities(&self) -> Option<&[[f64; 3]]> {
+        self.velocities.as_deref()
     }
 
-    pub fn velocities_mut(&mut self) -> Option<&mut Vec<[f64; 3]>> {
-        self.velocities.as_mut()
+    pub fn velocities_mut(&mut self) -> Option<&mut [[f64; 3]]> {
+        self.velocities.as_deref_mut()
     }
 
     pub fn add_atom(&mut self, atom: Atom, position: [f64; 3]) {

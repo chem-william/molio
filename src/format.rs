@@ -9,6 +9,7 @@ use crate::formats::amber::{AMBERTrajFormat, Convention, FileMode};
 use crate::formats::pdb::PDBFormat;
 use crate::formats::sdf::SDFFormat;
 use crate::formats::smi::SMIFormat;
+use crate::formats::tng::TNGFormat;
 use crate::formats::xyz::XYZFormat;
 use crate::frame::Frame;
 use std::fs::File;
@@ -33,6 +34,8 @@ pub enum FormatKind {
     AMBER,
     /// AMBER `NetCDF` restart format.
     AMBERRestart,
+    /// Trajectory Next Generation binary format.
+    TNG,
     /// Automatically detect format from file extension.
     Guess,
 }
@@ -56,6 +59,7 @@ impl FormatKind {
             "sdf" => Ok(Self::SDF),
             "ncrst" => Ok(Self::AMBERRestart),
             "nc" => Ok(Self::AMBER),
+            "tng" => Ok(Self::TNG),
             _ => Err(CError::UnknownFormat(ext.to_string())),
         }
     }
@@ -182,6 +186,7 @@ macro_rules! format_dispatch {
             Self::Smi(inner) => inner.$method($($arg),*),
             Self::Sdf(inner) => inner.$method($($arg),*),
             Self::Amber(inner) => inner.$method($($arg),*),
+            Self::Tng(inner) => inner.$method($($arg),*),
         }
     };
 }
@@ -195,6 +200,7 @@ pub(crate) enum FormatReader {
     Smi(TextReader<SMIFormat>),
     Sdf(TextReader<SDFFormat>),
     Amber(AMBERTrajFormat),
+    Tng(TNGFormat),
 }
 
 impl FormatReader {
@@ -214,6 +220,7 @@ impl FormatReader {
                 FileMode::Read,
                 Convention::Restart,
             )?)),
+            FormatKind::TNG => Ok(Self::Tng(TNGFormat::open(path)?)),
             FormatKind::Guess => {
                 unreachable!("Guess should be resolved before reaching FormatReader")
             }
@@ -242,6 +249,7 @@ pub(crate) enum FormatWriter {
     Smi(TextWriter<SMIFormat>),
     Sdf(TextWriter<SDFFormat>),
     Amber(AMBERTrajFormat),
+    Tng(TNGFormat),
 }
 
 impl FormatWriter {
@@ -256,6 +264,7 @@ impl FormatWriter {
                 Convention::Amber,
             )?)),
             FormatKind::AMBERRestart => unimplemented!("amber restart open on formatwriter"),
+            FormatKind::TNG => unimplemented!("tng cannot append"),
             FormatKind::Guess => {
                 unreachable!("Guess should be resolved before reaching FormatWriter")
             }
@@ -269,6 +278,7 @@ impl FormatWriter {
             FormatKind::SDF => Ok(Self::Sdf(TextWriter::create(path, SDFFormat)?)),
             FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::create(path)?)),
             FormatKind::AMBERRestart => unimplemented!("amber restart create on formatwriter"),
+            FormatKind::TNG => Ok(Self::Tng(TNGFormat::create(path)?)),
             FormatKind::Guess => {
                 unreachable!("Guess should be resolved before reaching FormatWriter")
             }

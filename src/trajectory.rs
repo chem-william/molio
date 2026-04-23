@@ -16,7 +16,8 @@ pub struct TrajectoryReader {
     size: usize,
 
     strategy: FormatReader,
-    current_index: usize,
+    /// Next index that will be read.
+    index: usize,
 }
 
 /// A handle to a trajectory file for writing.
@@ -74,7 +75,7 @@ impl Trajectory {
         Ok(TrajectoryReader {
             size,
             strategy,
-            current_index: 0,
+            index: 0,
         })
     }
 
@@ -134,12 +135,13 @@ impl TrajectoryReader {
     ///
     /// Returns an error if the format fails while reading.
     pub fn read(&mut self) -> Result<Option<Frame>, CError> {
-        if self.current_index >= self.size {
+        if self.index >= self.size {
             return Ok(None);
         }
 
-        let frame = self.strategy.read()?;
-        self.current_index += 1;
+        let mut frame = self.strategy.read()?;
+        frame.set_frame_index(self.index);
+        self.index += 1;
         Ok(Some(frame))
     }
 
@@ -150,8 +152,9 @@ impl TrajectoryReader {
     /// Returns an error if the frame cannot be read.
     pub fn read_frame(&mut self, index: FrameIndex) -> Result<Frame, CError> {
         let index = index.value();
-        let frame = self.strategy.read_at(index)?;
-        self.current_index = index + 1;
+        let mut frame = self.strategy.read_at(index)?;
+        frame.set_frame_index(index);
+        self.index = index + 1;
         Ok(frame)
     }
 
