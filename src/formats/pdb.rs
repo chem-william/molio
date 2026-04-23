@@ -312,7 +312,7 @@ impl PDBFormat {
 
             let unwrapped = initial_offset.unwrap();
             if unwrapped <= 0 {
-                warn!("'{unwrapped}' is too small, assuming id is '1'",);
+                warn!("'{unwrapped}' is too small, assuming id is '1'");
                 self.atom_offsets.push(0);
             } else {
                 self.atom_offsets.push(
