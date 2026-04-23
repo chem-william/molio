@@ -4,7 +4,7 @@
 //
 // See LICENSE at the project root for full text.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     angle::Angle,
@@ -14,10 +14,10 @@ use crate::{
     improper::Improper,
 };
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Connectivity {
-    /// Bonds in this connectivity
-    pub(crate) bonds: BTreeSet<Bond>,
+    /// Bonds and their orders in this connectivity (sorted by Bond for consistent iteration)
+    pub(crate) bonds: BTreeMap<Bond, BondOrder>,
 
     /// Angles in this connectivity
     pub(crate) angles: BTreeSet<Angle>,
@@ -27,9 +27,6 @@ pub struct Connectivity {
 
     /// Impropers in this connectivity
     pub(crate) impropers: BTreeSet<Improper>,
-
-    /// Bond orders in this connectivity
-    pub(crate) bond_orders: Vec<BondOrder>,
 
     /// Is the cached content up to date?
     up_to_date: bool,
@@ -71,9 +68,6 @@ impl Connectivity {
     pub fn add_bond(&mut self, i: usize, j: usize, bond_order: BondOrder) {
         self.up_to_date = false;
 
-        let bond = Bond::new(i, j);
-        let was_new = self.bonds.insert(bond);
-
         if i > self.biggest_atom {
             self.biggest_atom = i;
         }
@@ -82,41 +76,23 @@ impl Connectivity {
             self.biggest_atom = j;
         }
 
-        if was_new {
-            let diff = self
-                .bonds
-                .iter()
-                .position(|b| *b == bond)
-                .expect("we just inserted the element");
-            self.bond_orders.insert(diff, bond_order);
-        }
+        self.bonds.entry(Bond::new(i, j)).or_insert(bond_order);
     }
 
     pub fn remove_bond(&mut self, i: usize, j: usize) {
         let bond = Bond::new(i, j);
-        let pos = self.bonds.iter().position(|b| *b == bond);
-
-        if let Some(found_pos) = pos {
+        if self.bonds.remove(&bond).is_some() {
             self.up_to_date = false;
-            self.bonds.remove(&bond);
-
-            self.bond_orders.remove(found_pos);
-
-            debug_assert_eq!(self.bond_orders.len(), self.bonds.len());
         }
     }
 
     pub fn bond_order(&self, i: usize, j: usize) -> Result<BondOrder, CError> {
         let bond = Bond::new(i, j);
-        self.bonds
-            .iter()
-            .position(|b| *b == bond)
-            .map(|pos| self.bond_orders[pos])
-            .ok_or_else(|| {
-                CError::GenericError(format!(
-                    "out of bounds atomic index. No bond between {i} and {j} exists"
-                ))
-            })
+        self.bonds.get(&bond).copied().ok_or_else(|| {
+            CError::GenericError(format!(
+                "out of bounds atomic index. No bond between {i} and {j} exists"
+            ))
+        })
     }
 
     fn recalculate(&mut self) {
@@ -128,7 +104,7 @@ impl Connectivity {
         let mut bonded_to = vec![Vec::with_capacity(4); self.biggest_atom + 1];
 
         // Generate the list of which atom is bonded to which one
-        for bond in &self.bonds {
+        for bond in self.bonds.keys() {
             debug_assert!(bond[0] < bonded_to.len());
             debug_assert!(bond[1] < bonded_to.len());
             bonded_to[bond[0]].push(bond[1]);
@@ -136,7 +112,7 @@ impl Connectivity {
         }
 
         // Generate list of angles
-        for bond in &self.bonds {
+        for bond in self.bonds.keys() {
             let i = bond[0];
             let j = bond[1];
 
@@ -194,7 +170,7 @@ mod tests {
 
         // Check that the bond was added
         assert_eq!(connectivity.bonds.len(), 1);
-        assert!(connectivity.bonds.contains(&Bond::new(1, 2)));
+        assert!(connectivity.bonds.contains_key(&Bond::new(1, 2)));
 
         // Check bond order
         assert_eq!(connectivity.bond_order(1, 2).unwrap(), BondOrder::Single);
@@ -226,14 +202,11 @@ mod tests {
         // Remove a bond
         connectivity.remove_bond(1, 2);
         assert_eq!(connectivity.bonds.len(), 2);
-        assert!(!connectivity.bonds.contains(&Bond::new(1, 2)));
+        assert!(!connectivity.bonds.contains_key(&Bond::new(1, 2)));
 
         // Removing a non-existent bond should do nothing
         connectivity.remove_bond(1, 2);
         assert_eq!(connectivity.bonds.len(), 2);
-
-        // Check that bond orders array has same length as bonds set
-        assert_eq!(connectivity.bond_orders.len(), connectivity.bonds.len());
     }
 
     #[test]

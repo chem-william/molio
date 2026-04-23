@@ -20,7 +20,7 @@ use crate::{
     residue::Residue,
 };
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Topology {
     /// Atoms in the system
     pub atoms: Vec<Atom>,
@@ -67,7 +67,7 @@ impl Topology {
     /// # Errors
     /// Returns an error if any existing bond references an atom index >= `size`.
     pub fn resize(&mut self, size: usize) -> Result<(), CError> {
-        for bond in &self.connect.bonds {
+        for bond in self.connect.bonds.keys() {
             if bond[0] >= size || bond[1] >= size {
                 return Err(CError::GenericError(format!(
                     "can not resize the topology to contain {size} as there is a bond between atoms {} - {}",
@@ -90,7 +90,7 @@ impl Topology {
     /// Returns a vector of all bonds present in the topology.
     #[must_use]
     pub fn bonds(&self) -> Vec<Bond> {
-        self.connect.bonds.iter().copied().collect()
+        self.connect.bonds.keys().copied().collect()
     }
 
     /// Returns a vector of all angles present in the topology.
@@ -196,7 +196,7 @@ impl Topology {
         for &bond_i in first {
             for &bond_j in second {
                 let check_bond = Bond::new(bond_i, bond_j);
-                if self.connect.bonds.contains(&check_bond) {
+                if self.connect.bonds.contains_key(&check_bond) {
                     return true;
                 }
             }
@@ -205,8 +205,8 @@ impl Topology {
     }
 
     #[must_use]
-    pub fn bond_orders(&self) -> &Vec<BondOrder> {
-        &self.connect.bond_orders
+    pub fn bond_orders(&self) -> Vec<BondOrder> {
+        self.connect.bonds.values().copied().collect()
     }
 }
 
