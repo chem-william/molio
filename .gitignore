@@ -4,3 +4,4 @@ chem-files-tests-data/
 benchmark_chem/read*
 benchmark_chem/cpp/read_chem
 benchmark_chem/output.md
+perf.data*
