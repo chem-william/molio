@@ -71,7 +71,7 @@ writer.finish().unwrap();
 
 This also means that we can only read AMBER trajectories based on NetCDF-3 files.
 
-When reading the topology, we assume that the topology file has the name as the `.nc` file. For example, if the trajectory file is titled `trajectory.nc`, the topology must exist in `trajectory.parm7`. Otherwise, topology data won't be read.
+When reading the topology, we assume that the topology file has the same name as the `.nc` file. For example, if the trajectory file is titled `trajectory.nc`, the topology must exist in `trajectory.parm7`. Otherwise, topology data won't be read.
 
 ## Contributions
 [Contributions](https://github.com/chem-william/molio/edit/main/CONTRIBUTING.md) are very welcome! Please open an [issue](https://github.com/chem-william/molio/issues/new) to discuss bugs or new features.

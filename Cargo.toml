@@ -1,6 +1,6 @@
 [package]
 name = "molio"
-version = "0.2.0"
+version = "0.4.0"
 edition = "2024"
 description = "A library for reading chemical file formats"
 readme = "README.md"
@@ -8,6 +8,14 @@ repository = "https://github.com/chem-william/molio"
 license = "BSD-3-Clause"
 keywords = ["chemistry", "parser"]
 categories = ["text-processing", "science", "parser-implementations"]
+include = [
+  "/src/**",
+  "/Cargo.toml",
+  "/README*",
+  "/LICENSE*",
+  "!/src/tests-data/**"
+
+]
 
 [dependencies]
 thiserror = "2.0.18"
