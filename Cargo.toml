@@ -30,11 +30,23 @@ tng-rs = "0.2.1"
 criterion = { version = "0.8.2", features = ["html_reports"]}
 
 [[bench]]
-name = "my_benchmark"
+name = "tng"
 harness = false
 
 [[bench]]
-name = "tng"
+name = "sdf"
+harness = false
+
+[[bench]]
+name = "xyz"
+harness = false
+
+[[bench]]
+name = "pdb"
+harness = false
+
+[[bench]]
+name = "amber"
 harness = false
 
 [profile.release]
