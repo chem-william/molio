@@ -6,10 +6,12 @@
 
 use crate::error::CError;
 use crate::formats::amber::{AMBERTrajFormat, Convention, FileMode};
+#[cfg(feature = "pdb")]
 use crate::formats::pdb::PDBFormat;
 use crate::formats::sdf::SDFFormat;
 use crate::formats::smi::SMIFormat;
 use crate::formats::tng::TNGFormat;
+#[cfg(feature = "xyz")]
 use crate::formats::xyz::XYZFormat;
 use crate::frame::Frame;
 use std::fs::File;
@@ -23,8 +25,11 @@ use std::path::Path;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FormatKind {
     /// XYZ file format.
+    #[cfg(feature = "xyz")]
     XYZ,
+
     /// PDB file format.
+    #[cfg(feature = "pdb")]
     PDB,
     /// SMILES file format.
     SMI,
@@ -53,7 +58,10 @@ impl FormatKind {
             .ok_or_else(|| CError::UnknownFormat(path.display().to_string()))?;
 
         match ext.to_ascii_lowercase().as_str() {
+            #[cfg(feature = "xyz")]
             "xyz" => Ok(Self::XYZ),
+
+            #[cfg(feature = "pdb")]
             "pdb" => Ok(Self::PDB),
             "smi" => Ok(Self::SMI),
             "sdf" => Ok(Self::SDF),
@@ -181,7 +189,9 @@ impl<C: Codec> TextWriter<C> {
 macro_rules! format_dispatch {
     ($self:expr, $method:ident $(, $arg:expr)*) => {
         match $self {
+            #[cfg(feature = "xyz")]
             Self::Xyz(inner) => inner.$method($($arg),*),
+            #[cfg(feature = "pdb")]
             Self::Pdb(inner) => inner.$method($($arg),*),
             Self::Smi(inner) => inner.$method($($arg),*),
             Self::Sdf(inner) => inner.$method($($arg),*),
@@ -195,7 +205,9 @@ macro_rules! format_dispatch {
 /// Text formats are wrapped in [`TextReader`], binary formats appear directly.
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum FormatReader {
+    #[cfg(feature = "xyz")]
     Xyz(TextReader<XYZFormat>),
+    #[cfg(feature = "pdb")]
     Pdb(TextReader<PDBFormat>),
     Smi(TextReader<SMIFormat>),
     Sdf(TextReader<SDFFormat>),
@@ -206,7 +218,9 @@ pub(crate) enum FormatReader {
 impl FormatReader {
     pub(crate) fn open(path: &Path, kind: FormatKind) -> Result<Self, CError> {
         match kind {
+            #[cfg(feature = "xyz")]
             FormatKind::XYZ => Ok(Self::Xyz(TextReader::open(path, XYZFormat)?)),
+            #[cfg(feature = "pdb")]
             FormatKind::PDB => Ok(Self::Pdb(TextReader::open(path, PDBFormat::new())?)),
             FormatKind::SMI => Ok(Self::Smi(TextReader::open(path, SMIFormat::default())?)),
             FormatKind::SDF => Ok(Self::Sdf(TextReader::open(path, SDFFormat)?)),
@@ -244,7 +258,9 @@ impl FormatReader {
 /// Text formats are wrapped in [`TextWriter`], binary formats appear directly.
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum FormatWriter {
+    #[cfg(feature = "xyz")]
     Xyz(TextWriter<XYZFormat>),
+    #[cfg(feature = "pdb")]
     Pdb(TextWriter<PDBFormat>),
     Smi(TextWriter<SMIFormat>),
     Sdf(TextWriter<SDFFormat>),
@@ -255,7 +271,15 @@ pub(crate) enum FormatWriter {
 impl FormatWriter {
     pub(crate) fn open(path: &Path, kind: FormatKind) -> Result<Self, CError> {
         match kind {
-            FormatKind::XYZ | FormatKind::PDB | FormatKind::SMI | FormatKind::SDF => {
+            #[cfg(feature = "xyz")]
+            FormatKind::XYZ => {
+                unimplemented!("we cannot append to a text format")
+            }
+            #[cfg(feature = "pdb")]
+            FormatKind::PDB => {
+                unimplemented!("we cannot append to a text format")
+            }
+            FormatKind::SMI | FormatKind::SDF => {
                 unimplemented!("we cannot append to a text format")
             }
             FormatKind::AMBER => Ok(Self::Amber(AMBERTrajFormat::open(
@@ -272,7 +296,9 @@ impl FormatWriter {
     }
     pub(crate) fn create(path: &Path, kind: FormatKind) -> Result<Self, CError> {
         match kind {
+            #[cfg(feature = "xyz")]
             FormatKind::XYZ => Ok(Self::Xyz(TextWriter::create(path, XYZFormat)?)),
+            #[cfg(feature = "pdb")]
             FormatKind::PDB => Ok(Self::Pdb(TextWriter::create(path, PDBFormat::new())?)),
             FormatKind::SMI => Ok(Self::Smi(TextWriter::create(path, SMIFormat::default())?)),
             FormatKind::SDF => Ok(Self::Sdf(TextWriter::create(path, SDFFormat)?)),

@@ -232,7 +232,7 @@ impl Drop for TrajectoryWriter {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "xyz"))]
 mod tests {
     use super::*;
     use std::path::PathBuf;
