@@ -29,6 +29,11 @@ tng-rs = "0.2.1"
 [dev-dependencies]
 criterion = { version = "0.8.2", features = ["html_reports"]}
 
+[features]
+default = ["xyz"]
+xyz = []
+pdb = []
+
 [[bench]]
 name = "tng"
 harness = false
@@ -40,10 +45,12 @@ harness = false
 [[bench]]
 name = "xyz"
 harness = false
+required-features = ["xyz"]
 
 [[bench]]
 name = "pdb"
 harness = false
+required-features = ["pdb"]
 
 [[bench]]
 name = "amber"
