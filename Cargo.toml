@@ -17,7 +17,7 @@ exclude = [
 
 [dependencies]
 thiserror = "2.0.18"
-nalgebra = "0.34.2"
+nalgebra = "0.35.0"
 assert_approx_eq = "1.1.0"
 phf = { version = "0.13.1", features = ["macros"]}
 tempfile = "3.27.0"
