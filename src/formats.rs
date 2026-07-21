@@ -1,7 +1,10 @@
 pub mod amber;
+#[cfg(feature = "pdb")]
 pub mod pdb;
+#[cfg(feature = "pdb")]
 pub mod pdb_connectivity;
 pub mod sdf;
 pub mod smi;
 pub mod tng;
+#[cfg(feature = "xyz")]
 pub mod xyz;
