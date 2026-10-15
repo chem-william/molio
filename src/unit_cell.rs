@@ -5,7 +5,6 @@
 // See LICENSE at the project root for full text.
 
 use crate::error::CError;
-use core::f64;
 use nalgebra::Matrix3;
 use std::ops::Index;
 

@@ -37,6 +37,11 @@ impl Index<usize> for Angle {
 }
 
 impl Angle {
+    /// Create a new [`Angle`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if `i == j || i == k || j == k` as you cannot have the same atom twice in an angle
     #[must_use]
     pub fn new(i: usize, j: usize, k: usize) -> Self {
         assert!(
