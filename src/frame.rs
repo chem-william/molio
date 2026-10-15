@@ -186,10 +186,10 @@ impl Frame {
     }
 
     pub(crate) fn size(&self) -> usize {
-        debug_assert!(self.positions.len() == self.topology.len());
+        debug_assert_eq!(self.positions.len(), self.topology.len());
 
         if let Some(velocities) = self.velocities.as_ref() {
-            debug_assert!(self.positions.len() == velocities.len());
+            debug_assert_eq!(self.positions.len(), velocities.len());
         }
 
         self.positions.len()

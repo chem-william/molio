@@ -185,14 +185,14 @@ fn read_array(
         "invalid type for variable, expected f32/f64 data",
     )? {
         NumericData::F32(values) => {
-            for (chunk, item) in values.chunks_exact(3).zip(array.iter_mut()) {
+            for (chunk, item) in values.as_chunks::<3>().0.iter().zip(array.iter_mut()) {
                 item[0] = variable.scale * f64::from(chunk[0]);
                 item[1] = variable.scale * f64::from(chunk[1]);
                 item[2] = variable.scale * f64::from(chunk[2]);
             }
         }
         NumericData::F64(values) => {
-            for (chunk, item) in values.chunks_exact(3).zip(array.iter_mut()) {
+            for (chunk, item) in values.as_chunks::<3>().0.iter().zip(array.iter_mut()) {
                 item[0] = variable.scale * chunk[0];
                 item[1] = variable.scale * chunk[1];
                 item[2] = variable.scale * chunk[2];

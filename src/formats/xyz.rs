@@ -91,7 +91,7 @@ impl XYZFormat {
 
         let mut properties = PropertiesList::new();
 
-        for chunk in fields.chunks_exact(3) {
+        for chunk in fields.as_chunks::<3>().0 {
             let name = chunk[0];
             let kind = match chunk[1] {
                 "R" | "I" => PropertyKind::Double,

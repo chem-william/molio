@@ -16,15 +16,15 @@ exclude = [
 ]
 
 [dependencies]
-thiserror = "2.0.19"
+thiserror = "2.0.21"
 nalgebra = "0.35.0"
 assert_approx_eq = "1.1.0"
 phf = { version = "0.14.0", features = ["macros"]}
 tempfile = "3.27.0"
-log = "0.4.33"
+log = "0.4.34"
 yowl = "0.4.0"
 netcdf3 = "0.6.1"
-tng-rs = "0.2.1"
+tng-rs = "0.3.0"
 
 [dev-dependencies]
 criterion = { version = "0.8.2", features = ["html_reports"]}

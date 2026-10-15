@@ -384,8 +384,6 @@ pub struct ExtendedProperty {
 
 #[cfg(test)]
 mod tests {
-    use core::f64;
-
     use assert_approx_eq::assert_approx_eq;
 
     use super::*;
@@ -400,9 +398,9 @@ mod tests {
 
     #[test]
     fn test_double_property() {
-        let prop = Property::Double(f64::consts::PI);
-        assert_eq!(prop.as_double(), Some(f64::consts::PI));
-        assert_approx_eq!(prop.expect_double(), f64::consts::PI);
+        let prop = Property::Double(std::f64::consts::PI);
+        assert_eq!(prop.as_double(), Some(std::f64::consts::PI));
+        assert_approx_eq!(prop.expect_double(), std::f64::consts::PI);
         assert_eq!(prop.as_bool(), None);
     }
 
@@ -531,7 +529,10 @@ mod tests {
 
         // Test insertion
         properties.insert("bool_prop".to_string(), Property::Bool(true));
-        properties.insert("double_prop".to_string(), Property::Double(f64::consts::PI));
+        properties.insert(
+            "double_prop".to_string(),
+            Property::Double(std::f64::consts::PI),
+        );
         properties.insert(
             "string_prop".to_string(),
             Property::String("hello".to_string()),
@@ -541,7 +542,7 @@ mod tests {
         assert_eq!(properties.get("bool_prop").unwrap().as_bool(), Some(true));
         assert_approx_eq!(
             properties.get("double_prop").unwrap().expect_double(),
-            f64::consts::PI
+            std::f64::consts::PI
         );
         assert_eq!(
             properties.get("string_prop").unwrap().expect_string(),
@@ -583,12 +584,11 @@ mod tests {
 
     #[test]
     fn test_parse_double() {
-        let pi = f64::consts::PI;
         assert_approx_eq!(
-            DoubleParser::parse(&pi.to_string())
+            DoubleParser::parse(&std::f64::consts::PI.to_string())
                 .unwrap()
                 .expect_double(),
-            pi
+            std::f64::consts::PI
         );
         assert_approx_eq!(DoubleParser::parse("-1.5").unwrap().expect_double(), -1.5);
         assert_approx_eq!(DoubleParser::parse("0").unwrap().expect_double(), 0.0);
@@ -675,12 +675,11 @@ mod tests {
             Property::Bool(true)
         );
 
-        let pi = f64::consts::PI;
         assert_approx_eq!(
-            Property::parse_value(&pi.to_string(), &PropertyKind::Double)
+            Property::parse_value(&std::f64::consts::PI.to_string(), &PropertyKind::Double)
                 .unwrap()
                 .expect_double(),
-            f64::consts::PI
+            std::f64::consts::PI
         );
 
         assert_eq!(
@@ -717,7 +716,10 @@ mod tests {
     fn test_properties_iter() {
         let mut properties = Properties::new();
         properties.insert("bool_prop".to_string(), Property::Bool(true));
-        properties.insert("double_prop".to_string(), Property::Double(f64::consts::PI));
+        properties.insert(
+            "double_prop".to_string(),
+            Property::Double(std::f64::consts::PI),
+        );
 
         // Test direct iteration over properties
         let mut prop_count = 0;
@@ -725,7 +727,7 @@ mod tests {
             prop_count += 1;
             match key.as_str() {
                 "bool_prop" => assert_eq!(prop.as_bool(), Some(true)),
-                "double_prop" => assert_approx_eq!(prop.expect_double(), f64::consts::PI),
+                "double_prop" => assert_approx_eq!(prop.expect_double(), std::f64::consts::PI),
                 _ => panic!("Unexpected property key: {key}"),
             }
         }
